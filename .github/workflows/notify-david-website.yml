@@ -1,0 +1,29 @@
+name: Notify David website of Windows release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'david/windows/latest.json'
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify caregiver phone-push bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-push.php' || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'David website notification bridge did not confirm success.' >&2
+          exit 1
