@@ -1,7 +1,7 @@
 {
-  "version": "6.0.10",
-  "publishedAt": "2026-09-12T19:02:42Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.10-Setup.exe",
-  "sha256": "5849680f61f7aa6f6df0773e8f9354cfc8bdeb76f3a77fdd2dc2032b64e22d33",
-  "notes": "David 6.0.10 GitHub updater test. No feature changes; this release verifies automatic update delivery from the public Software-Updates repository."
+  "version": "6.0.11",
+  "publishedAt": "2026-09-12T19:38:10Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.11-Setup.exe",
+  "sha256": "eb43fbef06cf7cb9114ec8e81b7cc76bfcd1dadcef7c87ee0f07192ae27924aa",
+  "notes": "David 6.0.11 phone update notification test. No new user-facing features; this release verifies that an official GitHub Windows release triggers the caregiver phone push through the David website bridge."
 }
