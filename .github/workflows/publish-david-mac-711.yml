@@ -1,0 +1,69 @@
+name: Publish David 7.1.1 Mac reminder parity update
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-711.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 7.1.1 Mac artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david711.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-5a14-81f5-958e-eaa541be6250/raw?se=2026-09-12T23%3A39%3A19Z&sp=r&sv=2026-02-06&sr=b&scid=d2b01960-386a-5cc2-a163-b3527da1f28f&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T13%3A08%3A09Z&ske=2026-09-13T13%3A08%3A09Z&sks=b&skv=2026-02-06&sig=xnAICLkGWOIg2fCSjokFl3ffBvS0TCppGXN8Q9F9azE%3D'
+          rm -rf /tmp/david711
+          mkdir -p /tmp/david711
+          unzip -q /tmp/david711.zip -d /tmp/david711
+          DMG="$(find /tmp/david711 -type f -name 'David-7.1.1-Native-macOS.dmg' -print -quit)"
+          test -n "$DMG"
+          echo '91e993ba39b6cf329065fe63588d7b58e3e2d56c10482ab0b19001ea49a60ff8  '"$DMG" | sha256sum -c -
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Publish DMG, checksum and Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/macos
+          cp "$DMG" david/macos/David-7.1.1-Native-macOS.dmg
+          printf '%s  %s\n' '91e993ba39b6cf329065fe63588d7b58e3e2d56c10482ab0b19001ea49a60ff8' 'David-7.1.1-Native-macOS.dmg' > david/macos/David-7.1.1-Native-macOS.dmg.sha256
+          cat > david/macos/latest.json <<'JSON'
+          {
+            "version": "7.1.1",
+            "publishedAt": "2026-09-12T23:32:50Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.1-Native-macOS.dmg",
+            "sha256": "91e993ba39b6cf329065fe63588d7b58e3e2d56c10482ab0b19001ea49a60ff8",
+            "notes": "David 7.1.1 Mac reminder parity update. Adds Windows-style reminder categories, schedules, importance, medication details, appointment countdowns, advanced options, and editing of existing reminders."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos/David-7.1.1-Native-macOS.dmg david/macos/David-7.1.1-Native-macOS.dmg.sha256 david/macos/latest.json
+          git commit -m 'Publish David 7.1.1 Mac reminder parity update'
+          git push
+
+      - name: Verify public Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/latest.json'
+          for i in $(seq 1 12); do
+            body="$(curl -fsS "$manifest?t=$(date +%s%N)" || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"version"[[:space:]]*:[[:space:]]*"7\.1\.1"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public Mac latest.json did not show 7.1.1 in time.' >&2
+          exit 1
