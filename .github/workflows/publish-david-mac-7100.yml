@@ -1,0 +1,51 @@
+name: Publish David 7.1.0 Native macOS Baseline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-7100.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 7.1.0 Mac artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david7100.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-f9e0-81f5-ad00-0443318f560a/raw?se=2026-09-12T23%3A09%3A57Z&sp=r&sv=2026-02-06&sr=b&scid=6c715571-f7d8-55d5-8e86-2e69f83718d3&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T01%3A15%3A25Z&ske=2026-09-13T01%3A15%3A25Z&sks=b&skv=2026-02-06&sig=RFi2NyHpymxhzphLzOn4VDCuolqpybRv8lXCANOFgPw%3D'
+          rm -rf /tmp/david7100
+          mkdir -p /tmp/david7100
+          unzip -q /tmp/david7100.zip -d /tmp/david7100
+          test -f '/tmp/david7100/Build/David-7.1.0-Native-macOS.dmg'
+          echo 'fa74db2fa2bd6e6c537e89c3e52c280d83e292e16b3c57518152b7141bb1f4ef  /tmp/david7100/Build/David-7.1.0-Native-macOS.dmg' | sha256sum -c -
+
+      - name: Publish DMG, checksum and Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/macos
+          cp '/tmp/david7100/Build/David-7.1.0-Native-macOS.dmg' 'david/macos/David-7.1.0-Native-macOS.dmg'
+          printf '%s  %s\n' 'fa74db2fa2bd6e6c537e89c3e52c280d83e292e16b3c57518152b7141bb1f4ef' 'David-7.1.0-Native-macOS.dmg' > 'david/macos/David-7.1.0-Native-macOS.dmg.sha256.txt'
+          cat > david/macos/latest.json <<'JSON'
+          {
+            "version": "7.1.0",
+            "publishedAt": "2026-09-12T23:04:13Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.0-Native-macOS.dmg",
+            "sha256": "fa74db2fa2bd6e6c537e89c3e52c280d83e292e16b3c57518152b7141bb1f4ef",
+            "notes": "David 7.1.0 native macOS baseline. Adds a Mac Update Center, public GitHub update channel, SHA-256 verification, and a native compiled update helper. No Python or customer-side scripts."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos
+          git commit -m 'Publish David 7.1.0 native macOS baseline'
+          git push
