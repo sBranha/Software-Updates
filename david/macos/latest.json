@@ -1,0 +1,7 @@
+{
+  "version": "7.1.0",
+  "publishedAt": "2026-09-12T23:04:13Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.0-Native-macOS.dmg",
+  "sha256": "fa74db2fa2bd6e6c537e89c3e52c280d83e292e16b3c57518152b7141bb1f4ef",
+  "notes": "David 7.1.0 native macOS baseline. Adds a Mac Update Center, public GitHub update channel, SHA-256 verification, and a native compiled update helper. No Python or customer-side scripts."
+}
