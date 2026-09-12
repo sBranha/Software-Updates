@@ -1,10 +1,11 @@
-name: Notify David website of Windows release
+name: Notify David website of desktop release
 
 on:
   push:
     branches: [ main ]
     paths:
       - 'david/windows/latest.json'
+      - 'david/macos/latest.json'
       - '.github/workflows/notify-david-website.yml'
 
 permissions:
