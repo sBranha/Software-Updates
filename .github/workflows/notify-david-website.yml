@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'david/windows/latest.json'
+      - '.github/workflows/notify-david-website.yml'
 
 permissions:
   contents: read
@@ -18,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in 1 2 3 4 5; do
-            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-push.php' || true)"
+            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-notify.php' || true)"
             echo "$body"
             if echo "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
               exit 0
