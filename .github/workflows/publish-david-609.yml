@@ -1,0 +1,44 @@
+name: Publish David 6.0.9 installer
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-david-609.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 6.0.9 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david609.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-c1a8-81f5-8bda-68f404f76e75/raw?se=2026-09-12T19%3A04%3A58Z&sp=r&sv=2026-02-06&sr=b&scid=67df0df2-bfd8-5c7b-a3aa-a9539e435dcb&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T12%3A26%3A14Z&ske=2026-09-13T12%3A26%3A14Z&sks=b&skv=2026-02-06&sig=pjZJePEXxidnSC1Ernqk29pwpImrpmeGYZPAbXULKNc%3D'
+          rm -rf /tmp/david609
+          mkdir -p /tmp/david609
+          unzip -q /tmp/david609.zip -d /tmp/david609
+          test -f /tmp/david609/David-6.0.9-Setup.exe
+          echo '17f4513d84826c73a202ef6e921817a319c085ad155f1dab88bc826728d5fc5e  /tmp/david609/David-6.0.9-Setup.exe' | sha256sum -c -
+
+      - name: Publish installer into GitHub update folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david609/David-6.0.9-Setup.exe david/windows/David-6.0.9-Setup.exe
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/David-6.0.9-Setup.exe
+          if git diff --cached --quiet; then
+            echo 'Installer already published.'
+            exit 0
+          fi
+          git commit -m 'Publish David 6.0.9 Windows installer'
+          git push
