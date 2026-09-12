@@ -1,0 +1,81 @@
+name: Publish David 6.0.11 phone notification test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-david-611.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 6.0.11 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david611.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-b038-81f5-8609-b20f467f2332/raw?se=2026-09-12T19%3A43%3A40Z&sp=r&sv=2026-02-06&sr=b&scid=25b524c4-beae-54b5-9ce0-6a1452f5983a&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T01%3A15%3A25Z&ske=2026-09-13T01%3A15%3A25Z&sks=b&skv=2026-02-06&sig=Ie9ZOKFZptQyVW/0XvSZnlaGfBuVGAzcchmGnIkO0dE%3D'
+          rm -rf /tmp/david611
+          mkdir -p /tmp/david611
+          unzip -q /tmp/david611.zip -d /tmp/david611
+          test -f /tmp/david611/David-6.0.11-Setup.exe
+          echo 'eb43fbef06cf7cb9114ec8e81b7cc76bfcd1dadcef7c87ee0f07192ae27924aa  /tmp/david611/David-6.0.11-Setup.exe' | sha256sum -c -
+
+      - name: Publish installer, checksum and latest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david611/David-6.0.11-Setup.exe david/windows/David-6.0.11-Setup.exe
+          cp /tmp/david611/David-6.0.11-Setup.sha256.txt david/windows/David-6.0.11-Setup.sha256.txt
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.0.11",
+            "publishedAt": "2026-09-12T19:38:10Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.11-Setup.exe",
+            "sha256": "eb43fbef06cf7cb9114ec8e81b7cc76bfcd1dadcef7c87ee0f07192ae27924aa",
+            "notes": "David 6.0.11 phone update notification test. No new user-facing features; this release verifies that an official GitHub Windows release triggers the caregiver phone push through the David website bridge."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/David-6.0.11-Setup.exe david/windows/David-6.0.11-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David 6.0.11 Windows phone notification test'
+          git push
+
+      - name: Wait for public GitHub manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/latest.json'
+          for i in $(seq 1 12); do
+            body="$(curl -fsS "$manifest?t=$(date +%s%N)" || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"version"[[:space:]]*:[[:space:]]*"6\.0\.11"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public latest.json did not show 6.0.11 in time.' >&2
+          exit 1
+
+      - name: Trigger caregiver phone push bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-push.php' || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'David website phone-push bridge did not confirm success.' >&2
+          exit 1
