@@ -1,0 +1,7 @@
+{
+  "version": "6.0.9",
+  "publishedAt": "2026-09-12T18:25:47Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.9-Setup.exe",
+  "sha256": "17f4513d84826c73a202ef6e921817a319c085ad155f1dab88bc826728d5fc5e",
+  "notes": "David 6.0.9 final Windows production release. Software updates are delivered from the official public GitHub Software-Updates repository."
+}
