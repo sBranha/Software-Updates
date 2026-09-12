@@ -1,0 +1,50 @@
+name: Publish David 6.0.10 update test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-david-610.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 6.0.10 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david610.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-d6b8-81f5-bc4c-e147daee443a/raw?se=2026-09-12T19%3A07%3A54Z&sp=r&sv=2026-02-06&sr=b&scid=6e319657-3677-5b0d-8778-d8a781439b6e&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T15%3A40%3A20Z&ske=2026-09-13T15%3A40%3A20Z&sks=b&skv=2026-02-06&sig=LRiskXQLD/G1oa5PVrT6q6l0VX4Gs88QdsK%2BFjnpEvM%3D'
+          rm -rf /tmp/david610
+          mkdir -p /tmp/david610
+          unzip -q /tmp/david610.zip -d /tmp/david610
+          test -f /tmp/david610/David-6.0.10-Setup.exe
+          echo '5849680f61f7aa6f6df0773e8f9354cfc8bdeb76f3a77fdd2dc2032b64e22d33  /tmp/david610/David-6.0.10-Setup.exe' | sha256sum -c -
+
+      - name: Publish installer, checksum and latest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david610/David-6.0.10-Setup.exe david/windows/David-6.0.10-Setup.exe
+          cp /tmp/david610/David-6.0.10-Setup.sha256.txt david/windows/David-6.0.10-Setup.sha256.txt
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.0.10",
+            "publishedAt": "2026-09-12T19:02:42Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.10-Setup.exe",
+            "sha256": "5849680f61f7aa6f6df0773e8f9354cfc8bdeb76f3a77fdd2dc2032b64e22d33",
+            "notes": "David 6.0.10 GitHub updater test. No feature changes; this release verifies automatic update delivery from the public Software-Updates repository."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/David-6.0.10-Setup.exe david/windows/David-6.0.10-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David 6.0.10 Windows update test'
+          git push
