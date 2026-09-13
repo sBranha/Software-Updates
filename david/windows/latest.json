@@ -1,7 +1,7 @@
 {
-  "version": "6.0.11",
-  "publishedAt": "2026-09-12T19:38:10Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.11-Setup.exe",
-  "sha256": "eb43fbef06cf7cb9114ec8e81b7cc76bfcd1dadcef7c87ee0f07192ae27924aa",
-  "notes": "David 6.0.11 phone update notification test. No new user-facing features; this release verifies that an official GitHub Windows release triggers the caregiver phone push through the David website bridge."
+  "version": "6.0.12",
+  "publishedAt": "2026-09-13T03:28:04Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe",
+  "sha256": "b4eb34a7b3f919a7c3609faaa8d946ac0df4a5c9492d254083f3221eb3391a02",
+  "notes": "David 6.0.12 repairs the oversized reminder archive and Connected Care reminder sync. It compacts duplicate reminders, bounds local history, stops bulk reminder reseeding during routine sync, adds explicit save/delete/delete-all operations, and reduces repeated background work."
 }
