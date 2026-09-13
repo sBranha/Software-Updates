@@ -1,7 +1,7 @@
 {
-  "version": "7.1.1",
-  "publishedAt": "2026-09-12T23:32:50Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.1-Native-macOS.dmg",
-  "sha256": "91e993ba39b6cf329065fe63588d7b58e3e2d56c10482ab0b19001ea49a60ff8",
-  "notes": "David 7.1.1 Mac reminder parity update. Adds Windows-style reminder categories, schedules, importance, medication details, appointment countdowns, advanced options, and editing of existing reminders."
+  "version": "7.1.2",
+  "publishedAt": "2026-09-13T00:12:16Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.2-Native-macOS.dmg",
+  "sha256": "2a87915f385f3e40ce4aa0862d4c670aa994e94529fa73fb66aa3d0c7ec4043a",
+  "notes": "David 7.1.2 Mac Connected Care reliability update. Prevents overlapping sync requests, limits sync history to the newest 250 entries like Windows, slows background sync to a stable cadence, restores phone-to-Mac caregiver chat display, shows clearer sync errors, and cache-busts GitHub update checks."
 }
