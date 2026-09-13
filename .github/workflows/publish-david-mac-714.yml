@@ -1,0 +1,80 @@
+name: Publish David 7.1.4 Mac responsiveness and reminder popup repair
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-714.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  VERSION: '7.1.4'
+  DMG_SHA256: 'fa18f8d50ad574e2e31e202e1d3237a5f693d5c6b25005bb11e395e129155f95'
+  ARTIFACT_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-fef4-81f5-83cc-437e7eaa71ea/raw?se=2026-09-13T00%3A52%3A40Z&sp=r&sv=2026-02-06&sr=b&scid=86a3bedd-a34c-508d-bd9c-66a6eefeccfa&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-13T00%3A08%3A42Z&ske=2026-09-14T00%3A08%3A42Z&sks=b&skv=2026-02-06&sig=CYvUTtoQi/ZqzlGHf6I6RJHVne8WQythKR4DCiMFwFE%3D'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 7.1.4 Mac artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 "$ARTIFACT_URL" -o /tmp/david714.zip
+          rm -rf /tmp/david714
+          mkdir -p /tmp/david714
+          unzip -q /tmp/david714.zip -d /tmp/david714
+          test -f /tmp/david714/Build/David-7.1.4-Native-macOS.dmg
+          ACTUAL="$(sha256sum /tmp/david714/Build/David-7.1.4-Native-macOS.dmg | awk '{print $1}')"
+          test "$ACTUAL" = "$DMG_SHA256"
+
+      - name: Publish DMG, checksum and Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/macos
+          cp /tmp/david714/Build/David-7.1.4-Native-macOS.dmg david/macos/David-7.1.4-Native-macOS.dmg
+          printf '%s  %s\n' "$DMG_SHA256" 'David-7.1.4-Native-macOS.dmg' > david/macos/David-7.1.4-Native-macOS.dmg.sha256.txt
+          PUBLISHED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > david/macos/latest.json <<JSON
+          {
+            "version": "7.1.4",
+            "publishedAt": "$PUBLISHED",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.4-Native-macOS.dmg",
+            "sha256": "$DMG_SHA256",
+            "notes": "David 7.1.4 Mac responsiveness and reminder-popup repair. It stops unchanged Connected Care pulls from rewriting the reminder/chat files and churning SwiftUI identities every few seconds. Legacy reminders now receive deterministic IDs, and reminder popup suppression is keyed to the actual caregiver event or scheduled occurrence instead of permanently suppressing matching reminder text."
+          }
+          JSON
+          git config user.name 'David Software Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos/David-7.1.4-Native-macOS.dmg david/macos/David-7.1.4-Native-macOS.dmg.sha256.txt david/macos/latest.json
+          git commit -m 'Publish David 7.1.4 Mac responsiveness and reminder popup repair'
+          git push origin main
+
+      - name: Verify public Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..12}; do
+            BODY="$(curl -fsSL "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/latest.json?check=$(date +%s)-$i" || true)"
+            if printf '%s' "$BODY" | grep -q '"version": "7.1.4"'; then
+              printf '%s\n' "$BODY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public Mac manifest did not show 7.1.4 in time.' >&2
+          exit 1
+
+      - name: Notify David website of Mac release
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl -fsS -X POST https://david.forgegather.net/github-update-notify.php || true)"
+          echo "$RESPONSE"
