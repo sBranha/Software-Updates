@@ -1,0 +1,81 @@
+name: Publish David 6.0.12 Windows reminder sync repair
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-david-612.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 6.0.12 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david612.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-a258-81f5-bdf3-9f64271acf99/raw?se=2026-09-13T03%3A33%3A46Z&sp=r&sv=2026-02-06&sr=b&scid=4588f9f0-6339-5c71-9cdf-5f1496a188dc&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T14%3A40%3A44Z&ske=2026-09-13T14%3A40%3A44Z&sks=b&skv=2026-02-06&sig=n/LypXt7u8cirtNBXS6VUwlYCmEhEXUlTM18/1Jx0SI%3D'
+          rm -rf /tmp/david612
+          mkdir -p /tmp/david612
+          unzip -q /tmp/david612.zip -d /tmp/david612
+          test -f /tmp/david612/dist/David-6.0.12-Setup.exe
+          echo 'b4eb34a7b3f919a7c3609faaa8d946ac0df4a5c9492d254083f3221eb3391a02  /tmp/david612/dist/David-6.0.12-Setup.exe' | sha256sum -c -
+
+      - name: Publish installer, checksum and latest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david612/dist/David-6.0.12-Setup.exe david/windows/David-6.0.12-Setup.exe
+          cp /tmp/david612/dist/David-6.0.12-Setup.sha256.txt david/windows/David-6.0.12-Setup.sha256.txt
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.0.12",
+            "publishedAt": "2026-09-13T03:28:04Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe",
+            "sha256": "b4eb34a7b3f919a7c3609faaa8d946ac0df4a5c9492d254083f3221eb3391a02",
+            "notes": "David 6.0.12 repairs the oversized reminder archive and Connected Care reminder sync. It compacts duplicate reminders, bounds local history, stops bulk reminder reseeding during routine sync, adds explicit save/delete/delete-all operations, and reduces repeated background work."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/David-6.0.12-Setup.exe david/windows/David-6.0.12-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David 6.0.12 Windows reminder sync repair'
+          git push
+
+      - name: Wait for public GitHub manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/latest.json'
+          for i in $(seq 1 12); do
+            body="$(curl -fsS "$manifest?t=$(date +%s%N)" || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"version"[[:space:]]*:[[:space:]]*"6\.0\.12"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public latest.json did not show 6.0.12 in time.' >&2
+          exit 1
+
+      - name: Trigger caregiver phone push bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-notify.php' || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'David website phone-push bridge did not confirm success.' >&2
+          exit 1
