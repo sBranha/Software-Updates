@@ -1,0 +1,80 @@
+name: Publish David 7.1.3 Mac oversized sync repair
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-713.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  VERSION: '7.1.3'
+  DMG_SHA256: 'e9fd382e15974a4ea25fc4b39fbb21ce80978447dfe92c8dffb94b309c246f46'
+  ARTIFACT_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-3664-81f5-8e1e-96dc32253b20/raw?se=2026-09-13T00%3A35%3A57Z&sp=r&sv=2026-02-06&sr=b&scid=542c6bd5-bf4a-5b88-a62d-28b4c4b9e812&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T09%3A20%3A45Z&ske=2026-09-13T09%3A20%3A45Z&sks=b&skv=2026-02-06&sig=vEDN6NHwnd7ZnvuIlON2wdbYfwjewxWP60jotDkJcoI%3D'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 7.1.3 Mac artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 "$ARTIFACT_URL" -o /tmp/david713.zip
+          rm -rf /tmp/david713
+          mkdir -p /tmp/david713
+          unzip -q /tmp/david713.zip -d /tmp/david713
+          test -f /tmp/david713/Build/David-7.1.3-Native-macOS.dmg
+          ACTUAL="$(sha256sum /tmp/david713/Build/David-7.1.3-Native-macOS.dmg | awk '{print $1}')"
+          test "$ACTUAL" = "$DMG_SHA256"
+
+      - name: Publish DMG, checksum and Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/macos
+          cp /tmp/david713/Build/David-7.1.3-Native-macOS.dmg david/macos/David-7.1.3-Native-macOS.dmg
+          printf '%s  %s\n' "$DMG_SHA256" 'David-7.1.3-Native-macOS.dmg' > david/macos/David-7.1.3-Native-macOS.dmg.sha256.txt
+          PUBLISHED="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > david/macos/latest.json <<JSON
+          {
+            "version": "7.1.3",
+            "publishedAt": "$PUBLISHED",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.3-Native-macOS.dmg",
+            "sha256": "$DMG_SHA256",
+            "notes": "David 7.1.3 Mac Connected Care oversized-sync repair. Incoming caregiver chat and reminders now use a tiny receive-first request so a large local archive cannot block them. Local reminders are compacted before upload, history is reduced to the latest 50 entries, and oversized uploads retry without history and then in bounded reminder batches."
+          }
+          JSON
+          git config user.name 'David Software Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos/David-7.1.3-Native-macOS.dmg david/macos/David-7.1.3-Native-macOS.dmg.sha256.txt david/macos/latest.json
+          git commit -m 'Publish David 7.1.3 Mac oversized sync repair'
+          git push origin main
+
+      - name: Verify public Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..12}; do
+            BODY="$(curl -fsSL "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/latest.json?check=$(date +%s)-$i" || true)"
+            if printf '%s' "$BODY" | grep -q '"version": "7.1.3"'; then
+              printf '%s\n' "$BODY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public Mac manifest did not show 7.1.3 in time.' >&2
+          exit 1
+
+      - name: Notify David website of Mac release
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl -fsS -X POST https://david.forgegather.net/github-update-notify.php || true)"
+          echo "$RESPONSE"
