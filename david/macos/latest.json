@@ -1,7 +1,7 @@
 {
-  "version": "7.1.2",
-  "publishedAt": "2026-09-13T00:12:16Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.2-Native-macOS.dmg",
-  "sha256": "2a87915f385f3e40ce4aa0862d4c670aa994e94529fa73fb66aa3d0c7ec4043a",
-  "notes": "David 7.1.2 Mac Connected Care reliability update. Prevents overlapping sync requests, limits sync history to the newest 250 entries like Windows, slows background sync to a stable cadence, restores phone-to-Mac caregiver chat display, shows clearer sync errors, and cache-busts GitHub update checks."
+  "version": "7.1.3",
+  "publishedAt": "2026-09-13T00:31:36Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.3-Native-macOS.dmg",
+  "sha256": "e9fd382e15974a4ea25fc4b39fbb21ce80978447dfe92c8dffb94b309c246f46",
+  "notes": "David 7.1.3 Mac Connected Care oversized-sync repair. Incoming caregiver chat and reminders now use a tiny receive-first request so a large local archive cannot block them. Local reminders are compacted before upload, history is reduced to the latest 50 entries, and oversized uploads retry without history and then in bounded reminder batches."
 }
