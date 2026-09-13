@@ -1,0 +1,67 @@
+name: Publish David 7.1.2 Mac sync and chat reliability update
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-712.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Download verified David 7.1.2 Mac artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --output /tmp/david712.zip 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-0100-81f5-a69c-cfedd253a6c0/raw?se=2026-09-13T00%3A17%3A31Z&sp=r&sv=2026-02-06&sr=b&scid=d5f4b118-ccb5-554a-8e33-fb813cc17ccc&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-12T23%3A22%3A12Z&ske=2026-09-13T23%3A22%3A12Z&sks=b&skv=2026-02-06&sig=KzB4s5s12pfVvPubKFEzSvmP8mVaqN4QJ/NL4kD%2BfuU%3D'
+          rm -rf /tmp/david712
+          mkdir -p /tmp/david712
+          unzip -q /tmp/david712.zip -d /tmp/david712
+          test -f /tmp/david712/Build/David-7.1.2-Native-macOS.dmg
+          echo '2a87915f385f3e40ce4aa0862d4c670aa994e94529fa73fb66aa3d0c7ec4043a  /tmp/david712/Build/David-7.1.2-Native-macOS.dmg' | sha256sum -c -
+
+      - name: Publish DMG, checksum and Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/macos
+          cp /tmp/david712/Build/David-7.1.2-Native-macOS.dmg david/macos/David-7.1.2-Native-macOS.dmg
+          printf '%s  %s\n' '2a87915f385f3e40ce4aa0862d4c670aa994e94529fa73fb66aa3d0c7ec4043a' 'David-7.1.2-Native-macOS.dmg' > david/macos/David-7.1.2-Native-macOS.dmg.sha256.txt
+          cat > david/macos/latest.json <<'JSON'
+          {
+            "version": "7.1.2",
+            "publishedAt": "2026-09-13T00:12:16Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.2-Native-macOS.dmg",
+            "sha256": "2a87915f385f3e40ce4aa0862d4c670aa994e94529fa73fb66aa3d0c7ec4043a",
+            "notes": "David 7.1.2 Mac Connected Care reliability update. Prevents overlapping sync requests, limits sync history to the newest 250 entries like Windows, slows background sync to a stable cadence, restores phone-to-Mac caregiver chat display, shows clearer sync errors, and cache-busts GitHub update checks."
+          }
+          JSON
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos/David-7.1.2-Native-macOS.dmg david/macos/David-7.1.2-Native-macOS.dmg.sha256.txt david/macos/latest.json
+          git commit -m 'Publish David 7.1.2 Mac sync and chat reliability update'
+          git push
+
+      - name: Verify public Mac manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/latest.json'
+          for i in $(seq 1 12); do
+            body="$(curl -fsS "$manifest?t=$(date +%s%N)" || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"version"[[:space:]]*:[[:space:]]*"7\.1\.2"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public Mac latest.json did not show 7.1.2 in time.' >&2
+          exit 1
