@@ -1,0 +1,508 @@
+name: Publish David 6.0.13 Windows chat layout update
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-david-613.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout public update repo
+        uses: actions/checkout@v4
+
+      - name: Build David 6.0.13 from the verified 6.0.12 release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '6.0.13'
+          $baseSetup = Join-Path $PWD 'david\windows\David-6.0.12-Setup.exe'
+          if (!(Test-Path $baseSetup)) { throw 'David 6.0.12 base installer is missing.' }
+
+          $work = Join-Path $env:RUNNER_TEMP 'david613'
+          $baseDir = Join-Path $work 'base'
+          $stage = Join-Path $work 'stage'
+          $dist = Join-Path $work 'dist'
+          New-Item -ItemType Directory -Force -Path $work,$baseDir,$stage,$dist | Out-Null
+
+          Write-Host 'Installing the public 6.0.12 build into a temporary folder...'
+          $p = Start-Process -FilePath $baseSetup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',("/DIR=$baseDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Base installer exited with code $($p.ExitCode)." }
+          $baseExe = Get-ChildItem -Path $baseDir -Filter 'David.exe' -Recurse | Select-Object -First 1
+          if (!$baseExe) { throw 'David.exe was not found after installing 6.0.12.' }
+          Write-Host "Base executable: $($baseExe.FullName)"
+          Get-ChildItem -Path $baseDir -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+          Write-Host 'Compiling the chat UI patch library...'
+          $patchSource = Join-Path $work 'ChatPatch.cs'
+          $patchDll = Join-Path $work 'David.ChatPatch.dll'
+          @'
+          using System;
+          using System.Collections.Generic;
+          using System.Drawing;
+          using System.Linq;
+          using System.Reflection;
+          using System.Windows.Forms;
+
+          namespace DavidChatPatch
+          {
+              public static class ChatUiPatch
+              {
+                  static readonly Dictionary<Form, State> Installed = new Dictionary<Form, State>();
+                  static readonly BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+                  public static void Apply(object target)
+                  {
+                      Form form = target as Form;
+                      if (form == null || Installed.ContainsKey(form)) return;
+                      State s = new State(form);
+                      Installed[form] = s;
+                      s.Install();
+                  }
+
+                  sealed class State
+                  {
+                      readonly Form form;
+                      FlowLayoutPanel messages;
+                      Control composer;
+                      TextBox custom;
+                      MethodInfo send;
+                      bool busy;
+                      bool queued;
+
+                      public State(Form f) { form = f; }
+
+                      public void Install()
+                      {
+                          Type t = form.GetType();
+                          FieldInfo mf = t.GetField("messages", Flags);
+                          messages = mf == null ? null : mf.GetValue(form) as FlowLayoutPanel;
+                          FieldInfo cf = t.GetField("custom", Flags);
+                          custom = cf == null ? null : cf.GetValue(form) as TextBox;
+                          if (messages == null) messages = FindAll<FlowLayoutPanel>(form).FirstOrDefault(x => x.AutoScroll);
+                          if (custom == null) custom = FindAll<TextBox>(form).FirstOrDefault(x => x.Multiline);
+                          composer = custom == null ? null : custom.Parent;
+                          send = t.GetMethods(Flags).FirstOrDefault(m => m.Name == "Send" && m.GetParameters().Length >= 1);
+
+                          if (messages != null)
+                          {
+                              messages.ControlAdded += delegate { Schedule(); };
+                              messages.SizeChanged += delegate { Schedule(); };
+                          }
+                          form.Resize += delegate { Schedule(); };
+                          form.Shown += delegate { Schedule(); };
+                          form.FormClosed += delegate { Installed.Remove(form); };
+                          if (form.IsHandleCreated) Schedule();
+                          else form.HandleCreated += delegate { Schedule(); };
+                      }
+
+                      void Schedule()
+                      {
+                          if (queued || form.IsDisposed || !form.IsHandleCreated) return;
+                          queued = true;
+                          try
+                          {
+                              form.BeginInvoke((MethodInvoker)delegate { queued = false; RefreshUi(); });
+                          }
+                          catch { queued = false; }
+                      }
+
+                      void RefreshUi()
+                      {
+                          if (busy || form.IsDisposed) return;
+                          busy = true;
+                          try
+                          {
+                              EnsureComposer();
+                              CleanMessages();
+                          }
+                          finally { busy = false; }
+                      }
+
+                      void EnsureComposer()
+                      {
+                          if (composer == null || composer.IsDisposed) return;
+                          int desiredHeight = Math.Max(108, composer.Height);
+                          composer.Height = desiredHeight;
+                          composer.Top = Math.Max(0, form.ClientSize.Height - desiredHeight - 18);
+
+                          if (custom != null && !custom.IsDisposed)
+                          {
+                              custom.Left = 16;
+                              custom.Top = 14;
+                              custom.Height = 48;
+                          }
+
+                          string[] texts = { "YES", "NO", "I'M OKAY", "CALL ME" };
+                          string[] bodies = { "Yes", "No", "I'm okay", "Call me when you can" };
+                          string[] quicks = { "YES", "NO", "OKAY", "CALL_ME" };
+                          int[] xs = { 16, 108, 200, 312 };
+                          int[] widths = { 86, 86, 106, 106 };
+                          Color[] backs = {
+                              Color.FromArgb(47,177,119),
+                              Color.FromArgb(83,98,119),
+                              Color.FromArgb(62,144,193),
+                              Color.FromArgb(108,102,178)
+                          };
+                          int y = desiredHeight - 34;
+
+                          for (int i = 0; i < texts.Length; i++)
+                          {
+                              string text = texts[i];
+                              Button b = composer.Controls.OfType<Button>().FirstOrDefault(x => string.Equals(Norm(x.Text), Norm(text), StringComparison.OrdinalIgnoreCase));
+                              if (b == null)
+                              {
+                                  b = new Button();
+                                  b.Text = text;
+                                  b.FlatStyle = FlatStyle.Flat;
+                                  b.FlatAppearance.BorderSize = 0;
+                                  b.ForeColor = Color.White;
+                                  b.BackColor = backs[i];
+                                  b.Font = new Font("Segoe UI", 8f, FontStyle.Bold);
+                                  b.Cursor = Cursors.Hand;
+                                  int capture = i;
+                                  b.Click += delegate { InvokeSend(bodies[capture], quicks[capture]); };
+                                  composer.Controls.Add(b);
+                              }
+                              b.SetBounds(xs[i], y, widths[i], 27);
+                              b.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+                              b.Visible = true;
+                              b.BringToFront();
+                          }
+
+                          Control shell = messages == null ? null : messages.Parent;
+                          if (shell != null && shell != composer)
+                          {
+                              int bottom = composer.Top - 12;
+                              if (bottom > shell.Top + 180) shell.Height = bottom - shell.Top;
+                              if (messages != null)
+                              {
+                                  messages.Left = 12;
+                                  messages.Top = 12;
+                                  messages.Width = Math.Max(200, shell.ClientSize.Width - 24);
+                                  messages.Height = Math.Max(150, shell.ClientSize.Height - 24);
+                              }
+                          }
+                      }
+
+                      void InvokeSend(string body, string quick)
+                      {
+                          if (send == null) return;
+                          try
+                          {
+                              ParameterInfo[] p = send.GetParameters();
+                              if (p.Length >= 2) send.Invoke(form, new object[] { body, quick });
+                              else send.Invoke(form, new object[] { body });
+                          }
+                          catch { }
+                      }
+
+                      void CleanMessages()
+                      {
+                          if (messages == null || messages.IsDisposed) return;
+                          messages.FlowDirection = FlowDirection.TopDown;
+                          messages.WrapContents = false;
+                          int available = Math.Max(500, messages.ClientSize.Width - 34);
+                          int rowWidth = Math.Min(720, available);
+                          int leftGap = Math.Max(4, (messages.ClientSize.Width - rowWidth) / 2);
+
+                          foreach (Control c in messages.Controls.Cast<Control>().ToList())
+                          {
+                              Label day = c as Label;
+                              if (day != null)
+                              {
+                                  day.Width = rowWidth;
+                                  day.Margin = new Padding(leftGap, 7, 4, 3);
+                                  continue;
+                              }
+
+                              Panel row = c as Panel;
+                              if (row == null) continue;
+                              StripQuickReplies(row);
+
+                              List<Panel> panels = row.Controls.OfType<Panel>().Where(p => FindAll<Label>(p).Any()).ToList();
+                              Panel bubble = panels.OrderByDescending(p => p.Width * Math.Max(1, p.Height)).FirstOrDefault();
+                              bool right = bubble != null && bubble.Left > Math.Max(1, row.Width) / 2;
+
+                              if (bubble != null)
+                              {
+                                  int contentBottom = 0;
+                                  foreach (Control child in bubble.Controls)
+                                      if (child.Visible && !(child is Button)) contentBottom = Math.Max(contentBottom, child.Bottom);
+                                  if (contentBottom > 0) bubble.Height = Math.Max(58, contentBottom + 8);
+                              }
+
+                              row.Width = rowWidth;
+                              if (bubble != null)
+                              {
+                                  bubble.Top = 0;
+                                  bubble.Left = right ? Math.Max(8, rowWidth - bubble.Width - 10) : 10;
+                              }
+
+                              int visibleBottom = 0;
+                              foreach (Control child in row.Controls)
+                                  if (child.Visible) visibleBottom = Math.Max(visibleBottom, child.Bottom);
+                              row.Height = Math.Max(62, visibleBottom + 2);
+                              row.Margin = new Padding(leftGap, 2, 4, 2);
+                          }
+                          messages.PerformLayout();
+                      }
+
+                      void StripQuickReplies(Control root)
+                      {
+                          foreach (Control child in root.Controls.Cast<Control>().ToList())
+                          {
+                              Button b = child as Button;
+                              if (b != null && IsQuick(b.Text) && !IsInside(child, composer))
+                              {
+                                  root.Controls.Remove(child);
+                                  child.Dispose();
+                                  continue;
+                              }
+                              StripQuickReplies(child);
+                              Panel p = child as Panel;
+                              if (p != null && p.Controls.Count == 0 && p.Parent != messages && p.Height <= 70)
+                              {
+                                  root.Controls.Remove(p);
+                                  p.Dispose();
+                              }
+                          }
+                      }
+
+                      static bool IsInside(Control child, Control parent)
+                      {
+                          if (child == null || parent == null) return false;
+                          Control p = child;
+                          while (p != null) { if (p == parent) return true; p = p.Parent; }
+                          return false;
+                      }
+
+                      static bool IsQuick(string text)
+                      {
+                          string n = Norm(text);
+                          return n == "YES" || n == "NO" || n == "IM OKAY" || n == "CALL ME";
+                      }
+
+                      static string Norm(string text)
+                      {
+                          return (text ?? "").Replace("’", "'").Replace("'", "").Trim().ToUpperInvariant();
+                      }
+                  }
+
+                  static List<T> FindAll<T>(Control root) where T : Control
+                  {
+                      List<T> found = new List<T>();
+                      if (root == null) return found;
+                      foreach (Control c in root.Controls)
+                      {
+                          T t = c as T;
+                          if (t != null) found.Add(t);
+                          found.AddRange(FindAll<T>(c));
+                      }
+                      return found;
+                  }
+              }
+          }
+          '@ | Set-Content -Path $patchSource -Encoding UTF8
+
+          $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (!(Test-Path $csc)) { $csc = 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe' }
+          if (!(Test-Path $csc)) { throw '.NET Framework C# compiler was not found.' }
+          & $csc /nologo /target:library /optimize+ /out:$patchDll /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll $patchSource
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $patchDll)) { throw 'Chat patch library compilation failed.' }
+
+          Write-Host 'Building the assembly patcher...'
+          $patcherDir = Join-Path $work 'CecilPatch'
+          dotnet new console --framework net8.0 --force -o $patcherDir | Out-Host
+          dotnet add (Join-Path $patcherDir 'CecilPatch.csproj') package Mono.Cecil --version 0.11.6 | Out-Host
+          @'
+          using System;
+          using System.Collections.Generic;
+          using System.Linq;
+          using Mono.Cecil;
+          using Mono.Cecil.Cil;
+
+          static class P
+          {
+              static IEnumerable<TypeDefinition> AllTypes(IEnumerable<TypeDefinition> roots)
+              {
+                  foreach (var t in roots)
+                  {
+                      yield return t;
+                      foreach (var n in AllTypes(t.NestedTypes)) yield return n;
+                  }
+              }
+
+              static int Main(string[] args)
+              {
+                  if (args.Length != 4) throw new Exception("Usage: patcher input.exe output.exe patch.dll version");
+                  string input = args[0], output = args[1], patchPath = args[2], version = args[3];
+                  var resolver = new DefaultAssemblyResolver();
+                  resolver.AddSearchDirectory(System.IO.Path.GetDirectoryName(input)!);
+                  resolver.AddSearchDirectory(System.IO.Path.GetDirectoryName(patchPath)!);
+                  var asm = AssemblyDefinition.ReadAssembly(input, new ReaderParameters { AssemblyResolver = resolver, ReadSymbols = false });
+                  var module = asm.MainModule;
+                  var chat = AllTypes(module.Types).FirstOrDefault(t => t.Name == "ChatForm");
+                  if (chat == null) throw new Exception("ChatForm was not found in David.exe.");
+                  var ctor = chat.Methods.FirstOrDefault(m => m.IsConstructor && !m.IsStatic && !m.HasParameters && m.HasBody);
+                  if (ctor == null) throw new Exception("ChatForm constructor was not found.");
+
+                  var patchAsm = AssemblyDefinition.ReadAssembly(patchPath);
+                  var patchType = AllTypes(patchAsm.MainModule.Types).First(t => t.FullName == "DavidChatPatch.ChatUiPatch");
+                  var apply = patchType.Methods.First(m => m.Name == "Apply" && m.Parameters.Count == 1);
+                  var applyRef = module.ImportReference(apply);
+                  var il = ctor.Body.GetILProcessor();
+                  var rets = ctor.Body.Instructions.Where(i => i.OpCode == OpCodes.Ret).ToList();
+                  if (rets.Count == 0) throw new Exception("ChatForm constructor has no return instruction.");
+                  foreach (var ret in rets)
+                  {
+                      il.InsertBefore(ret, il.Create(OpCodes.Ldarg_0));
+                      il.InsertBefore(ret, il.Create(OpCodes.Call, applyRef));
+                  }
+
+                  int strings = 0;
+                  foreach (var type in AllTypes(module.Types))
+                  foreach (var method in type.Methods.Where(m => m.HasBody))
+                  foreach (var ins in method.Body.Instructions)
+                  {
+                      if (ins.OpCode == OpCodes.Ldstr && ins.Operand is string s && s.Contains("6.0.12"))
+                      {
+                          ins.Operand = s.Replace("6.0.12", version);
+                          strings++;
+                      }
+                  }
+
+                  asm.Name.Version = new Version(6,0,13,0);
+                  foreach (var a in asm.CustomAttributes)
+                  {
+                      if (a.ConstructorArguments.Count == 0) continue;
+                      if (a.AttributeType.FullName == "System.Reflection.AssemblyFileVersionAttribute" || a.AttributeType.FullName == "System.Reflection.AssemblyInformationalVersionAttribute")
+                          a.ConstructorArguments[0] = new CustomAttributeArgument(a.ConstructorArguments[0].Type, version);
+                  }
+                  if (strings == 0) throw new Exception("No 6.0.12 version strings were found to update.");
+                  asm.Write(output);
+                  Console.WriteLine($"Patched ChatForm constructor returns: {rets.Count}; version strings updated: {strings}");
+                  return 0;
+              }
+          }
+          '@ | Set-Content -Path (Join-Path $patcherDir 'Program.cs') -Encoding UTF8
+
+          $patchedExe = Join-Path $work 'David.exe'
+          dotnet run --project (Join-Path $patcherDir 'CecilPatch.csproj') -c Release -- $baseExe.FullName $patchedExe $patchDll $version | Out-Host
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $patchedExe)) { throw 'David.exe patching failed.' }
+
+          Write-Host 'Staging the complete 6.0.12 installation and replacing only the app executable plus chat patch library...'
+          Get-ChildItem -Path $baseDir -Force | Where-Object { $_.Name -notlike 'unins*.exe' -and $_.Name -notlike 'unins*.dat' } | ForEach-Object {
+              Copy-Item -Path $_.FullName -Destination $stage -Recurse -Force
+          }
+          Copy-Item $patchedExe (Join-Path $stage 'David.exe') -Force
+          Copy-Item $patchDll (Join-Path $stage 'David.ChatPatch.dll') -Force
+
+          $iss = Join-Path $work 'David-6.0.13.iss'
+          $iconLine = ''
+          if (Test-Path (Join-Path $stage 'David.ico')) { $iconLine = "SetupIconFile=$stage\David.ico" }
+          @"
+          [Setup]
+          AppId=DavidDailyCompanion
+          AppName=David Daily Companion
+          AppVersion=$version
+          AppPublisher=David Daily Companion
+          DefaultDirName={autopf}\David
+          DefaultGroupName=David
+          DisableProgramGroupPage=yes
+          OutputDir=$dist
+          OutputBaseFilename=David-$version-Setup
+          Compression=lzma2
+          SolidCompression=yes
+          WizardStyle=modern
+          PrivilegesRequired=admin
+          CloseApplications=yes
+          RestartApplications=no
+          UninstallDisplayName=David Daily Companion
+          $iconLine
+
+          [Files]
+          Source: "$stage\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autodesktop}\David"; Filename: "{app}\David.exe"; WorkingDir: "{app}"
+          Name: "{group}\David"; Filename: "{app}\David.exe"; WorkingDir: "{app}"
+          Name: "{group}\David Caregiver Manager"; Filename: "{app}\David.exe"; Parameters: "/caregiver"; WorkingDir: "{app}"
+          Name: "{userstartup}\David"; Filename: "{app}\David.exe"; Parameters: "/background"; WorkingDir: "{app}"
+
+          [Run]
+          Filename: "{app}\David.exe"; WorkingDir: "{app}"; Flags: nowait runasoriginaluser
+          "@ | Set-Content -Path $iss -Encoding UTF8
+
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { $iscc = 'C:\Program Files\Inno Setup 6\ISCC.exe' }
+          if (!(Test-Path $iscc)) {
+              choco install innosetup -y --no-progress | Out-Host
+              $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          }
+          if (!(Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          & $iscc $iss | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+
+          $setup = Join-Path $dist "David-$version-Setup.exe"
+          if (!(Test-Path $setup)) { throw 'The 6.0.13 installer was not created.' }
+          $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant()
+          Write-Host "David $version SHA-256: $hash"
+
+          Copy-Item $setup (Join-Path $PWD "david\windows\David-$version-Setup.exe") -Force
+          "$hash  David-$version-Setup.exe" | Set-Content -Path (Join-Path $PWD "david\windows\David-$version-Setup.sha256.txt") -Encoding ASCII
+          @"
+          {
+            "version": "$version",
+            "publishedAt": "$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-$version-Setup.exe",
+            "sha256": "$hash",
+            "notes": "David 6.0.13 cleans up Chat: YES, NO, I'M OKAY and CALL ME now live in one permanent quick-reply bar beside the message composer instead of repeating under every caregiver message. The conversation column is centered and compacted so messages stay uniform and no longer have large gaps. This release preserves the 6.0.12 reminder-sync repair and the existing GitHub updater."
+          }
+          "@ | Set-Content -Path (Join-Path $PWD 'david\windows\latest.json') -Encoding UTF8
+
+      - name: Publish 6.0.13 installer and updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'David Update Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/David-6.0.13-Setup.exe david/windows/David-6.0.13-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David 6.0.13 Windows chat layout update'
+          git push
+
+      - name: Verify public update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/latest.json'
+          for i in $(seq 1 15); do
+            body="$(curl -fsS "$manifest?t=$(date +%s%N)" || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"version"[[:space:]]*:[[:space:]]*"6\.0\.13"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Public latest.json did not show 6.0.13 in time.' >&2
+          exit 1
+
+      - name: Trigger caregiver phone push bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            body="$(curl -fsS -X POST -H 'Accept: application/json' 'https://david.forgegather.net/github-update-notify.php' || true)"
+            echo "$body"
+            if echo "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'David website phone-push bridge did not confirm success.' >&2
+          exit 1
