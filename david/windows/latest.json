@@ -1,7 +1,7 @@
 {
-  "version": "6.0.12",
-  "publishedAt": "2026-09-13T03:28:04Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe",
-  "sha256": "b4eb34a7b3f919a7c3609faaa8d946ac0df4a5c9492d254083f3221eb3391a02",
-  "notes": "David 6.0.12 repairs the oversized reminder archive and Connected Care reminder sync. It compacts duplicate reminders, bounds local history, stops bulk reminder reseeding during routine sync, adds explicit save/delete/delete-all operations, and reduces repeated background work."
+  "version": "6.0.13",
+  "publishedAt": "2026-09-14T01:42:08Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.13-Setup.exe",
+  "sha256": "b2d7a00056e5e843a7b2557f9d5e94b19d5476abab853e193d3626e2e71cebd0",
+  "notes": "David 6.0.13 cleans up Chat: YES, NO, I'M OKAY and CALL ME now live in one permanent quick-reply bar beside the message composer instead of repeating under every caregiver message. The conversation column is centered and compacted so messages stay uniform and no longer have large gaps. This release preserves the 6.0.12 reminder-sync repair and the existing GitHub updater."
 }
