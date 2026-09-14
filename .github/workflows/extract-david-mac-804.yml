@@ -1,0 +1,37 @@
+name: Extract David Mac 8.0.4 App
+
+on:
+  push:
+    paths:
+      - '.github/workflows/extract-david-mac-804.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: macos-latest
+    steps:
+      - name: Download current public DMG
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/David-8.0.4-Native-macOS.dmg https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.4-Native-macOS.dmg
+      - name: Mount and inspect
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mount /tmp/out
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/mount /tmp/David-8.0.4-Native-macOS.dmg
+          cp -R /tmp/mount/David.app /tmp/out/David.app
+          /usr/libexec/PlistBuddy -c Print /tmp/out/David.app/Contents/Info.plist > /tmp/out/InfoPlist.txt
+          strings -a /tmp/out/David.app/Contents/MacOS/David > /tmp/out/strings.txt
+          nm -nm /tmp/out/David.app/Contents/MacOS/David > /tmp/out/nm.txt || true
+          otool -L /tmp/out/David.app/Contents/MacOS/David > /tmp/out/otool-L.txt
+          find /tmp/out/David.app -maxdepth 4 -print > /tmp/out/file-list.txt
+          tar -C /tmp/out -czf /tmp/David-8.0.4-App.tgz David.app InfoPlist.txt strings.txt nm.txt otool-L.txt file-list.txt
+          hdiutil detach /tmp/mount
+      - uses: actions/upload-artifact@v4
+        with:
+          name: David-8.0.4-App-Extract
+          path: /tmp/David-8.0.4-App.tgz
+          retention-days: 1
