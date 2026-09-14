@@ -1,0 +1,417 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Windows.Forms;
+using System.Windows.Forms.Layout;
+
+namespace DavidCompanion;
+
+public class ChatForm : Form
+{
+	private FlowLayoutPanel messages;
+
+	private TextBox custom;
+
+	private Label status;
+
+	private Label unreadHint;
+
+	private Timer timer;
+
+	private bool polling;
+
+	private string lastRendered;
+
+	private string replyTargetId;
+
+	public ChatForm()
+	{
+		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0026: Expected O, but got Unknown
+		//IL_0027: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0031: Expected O, but got Unknown
+		//IL_0032: Unknown result type (might be due to invalid IL or missing references)
+		//IL_003c: Expected O, but got Unknown
+		//IL_003d: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0047: Expected O, but got Unknown
+		//IL_0048: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0052: Expected O, but got Unknown
+		//IL_00c0: Unknown result type (might be due to invalid IL or missing references)
+		//IL_00ca: Expected O, but got Unknown
+		//IL_0319: Unknown result type (might be due to invalid IL or missing references)
+		//IL_03a0: Unknown result type (might be due to invalid IL or missing references)
+		//IL_03aa: Expected O, but got Unknown
+		//IL_062d: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0634: Expected O, but got Unknown
+		//IL_06b4: Unknown result type (might be due to invalid IL or missing references)
+		//IL_06bb: Expected O, but got Unknown
+		KeyEventHandler val = null;
+		FormClosedEventHandler val2 = null;
+		messages = new FlowLayoutPanel();
+		custom = new TextBox();
+		status = new Label();
+		unreadHint = new Label();
+		timer = new Timer();
+		lastRendered = "";
+		replyTargetId = "";
+		((Form)this)..ctor();
+		((Control)this).Text = "David - Chat Room";
+		((Form)this).StartPosition = (FormStartPosition)1;
+		((Form)this).Size = new Size(820, 720);
+		((Control)this).MinimumSize = new Size(760, 640);
+		((Control)this).BackColor = Theme.Background;
+		((Control)this).Font = new Font("Segoe UI", 10f);
+		((Form)this).Icon = Program.TryLoadIcon();
+		GradientPanel gradientPanel = new GradientPanel();
+		((Control)gradientPanel).SetBounds(18, 16, 768, 112);
+		((Control)gradientPanel).Anchor = (AnchorStyles)13;
+		((Control)this).Controls.Add((Control)(object)gradientPanel);
+		Label val3 = Ui.Label("DAVID CHAT", 9, bold: true, Color.FromArgb(239, 184, 92));
+		((Control)val3).SetBounds(24, 17, 180, 23);
+		((Control)gradientPanel).Controls.Add((Control)(object)val3);
+		Label val4 = Ui.Label("Conversation", 24, bold: true, Color.White);
+		((Control)val4).SetBounds(22, 39, 470, 43);
+		((Control)gradientPanel).Controls.Add((Control)(object)val4);
+		Label val5 = Ui.Label("Private, ongoing chat with your caregivers", 10, bold: false, Color.FromArgb(207, 220, 235));
+		((Control)val5).SetBounds(24, 79, 500, 24);
+		((Control)gradientPanel).Controls.Add((Control)(object)val5);
+		status = Ui.Pill("CONNECTING", Color.FromArgb(35, 74, 99), Color.FromArgb(191, 226, 245));
+		((Control)status).SetBounds(598, 24, 140, 32);
+		((Control)status).Anchor = (AnchorStyles)9;
+		((Control)gradientPanel).Controls.Add((Control)(object)status);
+		unreadHint = Ui.Label("New messages appear automatically", 8, bold: false, Color.FromArgb(190, 207, 225));
+		((Control)unreadHint).SetBounds(545, 68, 195, 24);
+		unreadHint.TextAlign = (ContentAlignment)64;
+		((Control)unreadHint).Anchor = (AnchorStyles)9;
+		((Control)gradientPanel).Controls.Add((Control)(object)unreadHint);
+		RoundedPanel roundedPanel = Ui.Card(Theme.Surface);
+		((Control)roundedPanel).SetBounds(18, 142, 768, 420);
+		((Control)roundedPanel).Anchor = (AnchorStyles)15;
+		((Control)this).Controls.Add((Control)(object)roundedPanel);
+		((Control)messages).SetBounds(12, 12, 744, 396);
+		((Control)messages).Anchor = (AnchorStyles)15;
+		((ScrollableControl)messages).AutoScroll = true;
+		messages.FlowDirection = (FlowDirection)1;
+		messages.WrapContents = false;
+		((Control)messages).BackColor = Theme.Surface;
+		((Control)messages).Padding = new Padding(8, 8, 8, 8);
+		((Control)roundedPanel).Controls.Add((Control)(object)messages);
+		RoundedPanel roundedPanel2 = Ui.Card(Theme.Surface);
+		((Control)roundedPanel2).SetBounds(18, 576, 768, 102);
+		((Control)roundedPanel2).Anchor = (AnchorStyles)14;
+		((Control)this).Controls.Add((Control)(object)roundedPanel2);
+		((TextBoxBase)custom).Multiline = true;
+		custom.AcceptsReturn = true;
+		((TextBoxBase)custom).BorderStyle = (BorderStyle)1;
+		((Control)custom).Font = new Font("Segoe UI", 11f);
+		((Control)custom).BackColor = Theme.Surface2;
+		((Control)custom).ForeColor = Theme.Text;
+		((Control)custom).SetBounds(16, 14, 570, 48);
+		((Control)custom).Anchor = (AnchorStyles)13;
+		((Control)roundedPanel2).Controls.Add((Control)(object)custom);
+		Button val6 = Ui.Button("SEND", Theme.Blue, 10);
+		((Control)val6).SetBounds(600, 14, 148, 48);
+		((Control)val6).Anchor = (AnchorStyles)9;
+		((Control)roundedPanel2).Controls.Add((Control)(object)val6);
+		Button val7 = Ui.Button("YES", Theme.Green, 8);
+		((Control)val7).SetBounds(16, 69, 86, 27);
+		((Control)roundedPanel2).Controls.Add((Control)(object)val7);
+		Button val8 = Ui.Button("NO", Color.FromArgb(83, 98, 119), 8);
+		((Control)val8).SetBounds(108, 69, 86, 27);
+		((Control)roundedPanel2).Controls.Add((Control)(object)val8);
+		Button val9 = Ui.Button("I'M OKAY", Color.FromArgb(62, 144, 193), 8);
+		((Control)val9).SetBounds(200, 69, 106, 27);
+		((Control)roundedPanel2).Controls.Add((Control)(object)val9);
+		Button val10 = Ui.Button("CALL ME", Color.FromArgb(108, 102, 178), 8);
+		((Control)val10).SetBounds(312, 69, 106, 27);
+		((Control)roundedPanel2).Controls.Add((Control)(object)val10);
+		Button val11 = Ui.Button("I NEED HELP", Theme.Danger, 8);
+		((Control)val11).SetBounds(424, 69, 126, 27);
+		((Control)roundedPanel2).Controls.Add((Control)(object)val11);
+		Label val12 = Ui.Label("Enter sends • Shift+Enter makes a new line", 8, bold: false, Theme.Muted);
+		((Control)val12).SetBounds(562, 71, 185, 24);
+		val12.TextAlign = (ContentAlignment)64;
+		((Control)val12).Anchor = (AnchorStyles)9;
+		((Control)roundedPanel2).Controls.Add((Control)(object)val12);
+		EventHandler eventHandler = delegate
+		{
+			Send("Yes", "YES");
+		};
+		((Control)val7).Click += eventHandler;
+		((Control)val8).Click += delegate
+		{
+			Send("No", "NO");
+		};
+		((Control)val9).Click += delegate
+		{
+			Send("I'm okay", "OKAY");
+		};
+		((Control)val10).Click += delegate
+		{
+			Send("Call me when you can", "CALL_ME");
+		};
+		((Control)val6).Click += delegate
+		{
+			if (!string.IsNullOrWhiteSpace(((Control)custom).Text))
+			{
+				Send(((Control)custom).Text.Trim());
+			}
+		};
+		TextBox obj = custom;
+		if (val == null)
+		{
+			val = (KeyEventHandler)delegate(object o, KeyEventArgs e)
+			{
+				//IL_0001: Unknown result type (might be due to invalid IL or missing references)
+				//IL_0008: Invalid comparison between Unknown and I4
+				if ((int)e.KeyCode == 13 && !e.Shift)
+				{
+					e.SuppressKeyPress = true;
+					if (!string.IsNullOrWhiteSpace(((Control)custom).Text))
+					{
+						Send(((Control)custom).Text.Trim());
+					}
+				}
+			};
+		}
+		((Control)obj).KeyDown += val;
+		((Control)val11).Click += delegate
+		{
+			//IL_0022: Unknown result type (might be due to invalid IL or missing references)
+			CloudResponse cloudResponse = CloudClient.StartHelp();
+			MessageBox.Show((cloudResponse != null && cloudResponse.ok) ? "Your caregivers were notified." : "David could not send the Help request.", "David");
+		};
+		timer.Interval = 2000;
+		timer.Tick += delegate
+		{
+			RefreshMessages();
+		};
+		((Form)this).Shown += delegate
+		{
+			RefreshMessages();
+			timer.Start();
+			((Control)custom).Focus();
+		};
+		if (val2 == null)
+		{
+			val2 = (FormClosedEventHandler)delegate
+			{
+				timer.Stop();
+			};
+		}
+		((Form)this).FormClosed += val2;
+	}
+
+	private void RefreshMessages()
+	{
+		if (polling)
+		{
+			return;
+		}
+		polling = true;
+		((Control)status).Text = "SYNCING";
+		((Control)status).BackColor = Color.FromArgb(73, 91, 117);
+		ThreadPool.QueueUserWorkItem(delegate
+		{
+			//IL_0025: Unknown result type (might be due to invalid IL or missing references)
+			//IL_002b: Expected O, but got Unknown
+			MethodInvoker val = null;
+			CloudResponse r = CloudClient.SyncNow();
+			try
+			{
+				if (val == null)
+				{
+					val = (MethodInvoker)delegate
+					{
+						polling = false;
+						if (r != null && r.ok)
+						{
+							((Control)status).Text = "LIVE";
+							((Control)status).BackColor = Color.FromArgb(31, 108, 78);
+							Render(r.chat);
+						}
+						else
+						{
+							((Control)status).Text = "OFFLINE";
+							((Control)status).BackColor = Color.FromArgb(120, 72, 58);
+						}
+					};
+				}
+				((Control)this).BeginInvoke((Delegate)(object)val);
+			}
+			catch
+			{
+				polling = false;
+			}
+		});
+	}
+
+	private void Render(List<CloudChatMessage> chat)
+	{
+		//IL_0137: Unknown result type (might be due to invalid IL or missing references)
+		//IL_02d3: Unknown result type (might be due to invalid IL or missing references)
+		//IL_02da: Expected O, but got Unknown
+		//IL_030c: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0313: Expected O, but got Unknown
+		//IL_0330: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0283: Unknown result type (might be due to invalid IL or missing references)
+		List<CloudChatMessage> list = (chat ?? new List<CloudChatMessage>()).Where((CloudChatMessage x) => x != null).ToList();
+		CloudChatMessage cloudChatMessage = list.LastOrDefault((CloudChatMessage x) => string.Equals(x.senderKind, "caregiver", StringComparison.OrdinalIgnoreCase));
+		replyTargetId = ((cloudChatMessage == null) ? "" : (cloudChatMessage.id ?? ""));
+		List<CloudChatMessage> list2 = list.Skip(Math.Max(0, list.Count - 80)).ToList();
+		string text = string.Join("|", list2.Select((CloudChatMessage x) => (x.id ?? "") + ":" + (x.seenAt ?? "")));
+		if (text == lastRendered && ((ArrangedElementCollection)((Control)messages).Controls).Count > 0)
+		{
+			return;
+		}
+		lastRendered = text;
+		((Control)messages).SuspendLayout();
+		((Control)messages).Controls.Clear();
+		if (list2.Count == 0)
+		{
+			RoundedPanel roundedPanel = Ui.Card(Theme.Surface2);
+			((Control)roundedPanel).Width = 690;
+			((Control)roundedPanel).Height = 105;
+			((Control)roundedPanel).Margin = new Padding(12, 60, 12, 8);
+			Label val = Ui.Label("No messages yet", 15, bold: true, Theme.Text);
+			((Control)val).SetBounds(20, 20, 620, 30);
+			((Control)roundedPanel).Controls.Add((Control)(object)val);
+			Label val2 = Ui.Label("Send the first message below. New replies will appear here automatically.", 10, bold: false, Theme.Muted);
+			((Control)val2).SetBounds(20, 55, 640, 34);
+			((Control)roundedPanel).Controls.Add((Control)(object)val2);
+			((Control)messages).Controls.Add((Control)(object)roundedPanel);
+		}
+		DateTime dateTime = DateTime.MinValue;
+		foreach (CloudChatMessage item in list2)
+		{
+			DateTime.TryParse(item.createdAt, null, DateTimeStyles.RoundtripKind, out var result);
+			if (result != DateTime.MinValue)
+			{
+				result = result.ToLocalTime();
+			}
+			if (result != DateTime.MinValue && dateTime.Date != result.Date)
+			{
+				Label val3 = Ui.Label((result.Date == DateTime.Today) ? "TODAY" : result.ToString("dddd, MMM d"), 8, bold: true, Theme.Muted);
+				((Control)val3).Width = 690;
+				((Control)val3).Height = 28;
+				val3.TextAlign = (ContentAlignment)32;
+				((Control)val3).Margin = new Padding(8, 10, 8, 4);
+				((Control)messages).Controls.Add((Control)(object)val3);
+				dateTime = result;
+			}
+			bool flag = string.Equals(item.senderKind, "person", StringComparison.OrdinalIgnoreCase);
+			string text2 = item.body ?? "";
+			Font val4 = new Font("Segoe UI", 11f);
+			try
+			{
+				Size size = TextRenderer.MeasureText(text2, val4, new Size(430, 2000), (TextFormatFlags)8208);
+				int num = Math.Max(76, size.Height + 54);
+				Panel val5 = new Panel();
+				((Control)val5).Width = 690;
+				((Control)val5).Height = num + 6;
+				((Control)val5).Margin = new Padding(4, 1, 4, 2);
+				((Control)val5).BackColor = Color.Transparent;
+				RoundedPanel roundedPanel2 = new RoundedPanel();
+				roundedPanel2.Radius = 18;
+				((Control)roundedPanel2).Width = Math.Min(500, Math.Max(225, size.Width + 44));
+				((Control)roundedPanel2).Height = num;
+				((Control)roundedPanel2).BackColor = (flag ? Color.FromArgb(34, 103, 83) : Theme.Surface3);
+				roundedPanel2.BorderColor = (flag ? Color.FromArgb(48, 139, 111) : Theme.Border);
+				roundedPanel2.BorderWidth = 1;
+				((Control)roundedPanel2).Top = 0;
+				((Control)roundedPanel2).Left = (flag ? (((Control)val5).Width - ((Control)roundedPanel2).Width - 10) : 10);
+				((Control)val5).Controls.Add((Control)(object)roundedPanel2);
+				string text3 = ((!string.IsNullOrWhiteSpace(item.senderName)) ? item.senderName : (flag ? "You" : "Caregiver"));
+				Label val6 = Ui.Label(text3, 8, bold: true, flag ? Color.FromArgb(197, 241, 226) : Theme.Muted);
+				((Control)val6).SetBounds(14, 9, ((Control)roundedPanel2).Width - 28, 18);
+				((Control)roundedPanel2).Controls.Add((Control)(object)val6);
+				Label val7 = Ui.Label(text2, 11, bold: false, flag ? Color.White : Theme.Text);
+				((Control)val7).SetBounds(14, 29, ((Control)roundedPanel2).Width - 28, Math.Max(24, size.Height + 4));
+				((Control)roundedPanel2).Controls.Add((Control)(object)val7);
+				string text4 = ((result == DateTime.MinValue) ? "" : result.ToString("h:mm tt"));
+				if (flag)
+				{
+					text4 += (string.IsNullOrWhiteSpace(item.seenAt) ? "  •  Sent" : "  •  Seen");
+				}
+				Label val8 = Ui.Label(text4, 7, bold: false, flag ? Color.FromArgb(181, 226, 211) : Theme.Muted);
+				val8.TextAlign = (ContentAlignment)(flag ? 64 : 16);
+				((Control)val8).SetBounds(14, ((Control)roundedPanel2).Height - 23, ((Control)roundedPanel2).Width - 28, 17);
+				((Control)roundedPanel2).Controls.Add((Control)(object)val8);
+				((Control)messages).Controls.Add((Control)(object)val5);
+			}
+			finally
+			{
+				((IDisposable)val4)?.Dispose();
+			}
+		}
+		((Control)messages).ResumeLayout();
+		try
+		{
+			((ScrollProperties)((ScrollableControl)messages).VerticalScroll).Value = ((ScrollProperties)((ScrollableControl)messages).VerticalScroll).Maximum;
+			((Control)messages).PerformLayout();
+		}
+		catch
+		{
+		}
+	}
+
+	private void Send(string text, string quick = "")
+	{
+		if (string.IsNullOrWhiteSpace(text) || polling)
+		{
+			return;
+		}
+		polling = true;
+		((Control)status).Text = "SENDING";
+		((Control)status).BackColor = Color.FromArgb(73, 91, 117);
+		string outgoing = text;
+		string target = replyTargetId ?? "";
+		string quickReply = quick ?? "";
+		ThreadPool.QueueUserWorkItem(delegate
+		{
+			//IL_0022: Unknown result type (might be due to invalid IL or missing references)
+			//IL_002c: Expected O, but got Unknown
+			//IL_003c: Unknown result type (might be due to invalid IL or missing references)
+			//IL_0042: Expected O, but got Unknown
+			MethodInvoker val = null;
+			_ = outgoing;
+			_ = target;
+			((<>c__DisplayClass21.<>c__DisplayClass24)(object)quickReply).r = (CloudResponse)CloudClient.ReplyChat();
+			try
+			{
+				ChatForm chatForm = this;
+				if (val == null)
+				{
+					CloudResponse r = default(CloudResponse);
+					val = (MethodInvoker)delegate
+					{
+						//IL_010b: Unknown result type (might be due to invalid IL or missing references)
+						polling = false;
+						if (r != null && r.ok)
+						{
+							((Control)custom).Text = "";
+							((Control)status).Text = "LIVE";
+							((Control)status).BackColor = Color.FromArgb(31, 108, 78);
+							Render(r.chat);
+							((Control)custom).Focus();
+						}
+						else
+						{
+							((Control)status).Text = "OFFLINE";
+							((Control)status).BackColor = Color.FromArgb(120, 72, 58);
+							MessageBox.Show((r == null) ? "Message could not be sent." : r.error, "David");
+						}
+					};
+				}
+				((Control)chatForm).BeginInvoke((Delegate)(object)val);
+			}
+			catch
+			{
+				polling = false;
+			}
+		});
+	}
+}
