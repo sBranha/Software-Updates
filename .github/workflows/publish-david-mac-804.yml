@@ -1,0 +1,65 @@
+name: Publish David Mac 8.0.4
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-david-mac-804.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public update repository
+        uses: actions/checkout@v4
+
+      - name: Download verified David 8.0.4 build artifact
+        shell: bash
+        env:
+          SOURCE_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-a048-81f5-b39f-ee94c16a4a81/raw?se=2026-09-14T01%3A03%3A15Z&sp=r&sv=2026-02-06&sr=b&scid=7cfef734-afb7-5f23-bcf2-c846c6ea3a42&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-14T00%3A40%3A13Z&ske=2026-09-15T00%3A40%3A13Z&sks=b&skv=2026-02-06&sig=Q0GvWaE7Tn6KKDqiaObZuPbZAzU0rsilTUSMhRm9g14%3D'
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 "$SOURCE_URL" -o /tmp/david804.zip
+          rm -rf /tmp/david804
+          mkdir -p /tmp/david804
+          unzip -q /tmp/david804.zip -d /tmp/david804
+          DMG="$(find /tmp/david804 -type f -name 'David-8.0.4-Native-macOS.dmg' -print -quit)"
+          test -n "$DMG"
+          ACTUAL="$(sha256sum "$DMG" | awk '{print $1}')"
+          EXPECTED='ac99a7d34d05b0f407ece5e3478397d82c0350c318b094098a3d6dde5777038a'
+          test "$ACTUAL" = "$EXPECTED"
+          mkdir -p david/macos
+          cp "$DMG" david/macos/David-8.0.4-Native-macOS.dmg
+          printf '%s  %s\n' "$ACTUAL" 'David-8.0.4-Native-macOS.dmg' > david/macos/David-8.0.4-Native-macOS.dmg.sha256.txt
+
+      - name: Update Mac latest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, datetime
+          manifest = {
+              "version": "8.0.4",
+              "publishedAt": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+              "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.4-Native-macOS.dmg",
+              "sha256": "ac99a7d34d05b0f407ece5e3478397d82c0350c318b094098a3d6dde5777038a",
+              "notes": "David 8.0.4 Mac chat readability and caregiver security update. Chat uses larger readable text, larger message bubbles and quick replies, a larger composer, and better conversation spacing. Caregiver access now locks automatically whenever you leave the Caregiver area, so the PIN is required again the next time Caregiver is opened."
+          }
+          with open('david/macos/latest.json','w',encoding='utf-8') as f:
+              json.dump(manifest,f,indent=2)
+              f.write('\n')
+          PY
+
+      - name: Publish to public Mac update channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add david/macos/David-8.0.4-Native-macOS.dmg david/macos/David-8.0.4-Native-macOS.dmg.sha256.txt david/macos/latest.json
+          git commit -m 'Publish David Mac 8.0.4'
+          git push
