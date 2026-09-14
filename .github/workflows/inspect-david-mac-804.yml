@@ -1,0 +1,47 @@
+name: Inspect David Mac 8.0.4 build package
+
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-david-mac-804.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download 8.0.4 build package and list contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_URL="$(python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('.github/workflows/publish-david-mac-804.yml').read_text()
+          m=re.search(r"SOURCE_URL:\s*'([^']+)'",s)
+          if not m: raise SystemExit('SOURCE_URL not found')
+          print(m.group(1))
+          PY
+          )"
+          curl --fail --location --retry 3 "$SOURCE_URL" -o /tmp/david804.zip
+          rm -rf /tmp/david804
+          mkdir -p /tmp/david804
+          unzip -q /tmp/david804.zip -d /tmp/david804
+          {
+            echo '=== ZIP LIST ==='
+            unzip -l /tmp/david804.zip
+            echo
+            echo '=== EXTRACTED FILES ==='
+            find /tmp/david804 -maxdepth 6 -type f -printf '%p %s bytes\n' | sort
+          } > david/macos/David-8.0.4-package-diagnostic.txt
+      - name: Commit diagnostic listing
+        run: |
+          git config user.name 'David Update Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/macos/David-8.0.4-package-diagnostic.txt
+          git commit -m 'Add temporary David Mac 8.0.4 package diagnostic'
+          git push
