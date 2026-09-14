@@ -19,17 +19,25 @@ jobs:
           curl -L --fail --retry 3 -o /tmp/David-8.0.4-Native-macOS.dmg https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.4-Native-macOS.dmg
       - name: Mount and inspect
         run: |
-          set -euo pipefail
+          set -u
+          rm -rf /tmp/mount /tmp/out
           mkdir -p /tmp/mount /tmp/out
-          hdiutil attach -nobrowse -readonly -mountpoint /tmp/mount /tmp/David-8.0.4-Native-macOS.dmg
-          cp -R /tmp/mount/David.app /tmp/out/David.app
-          /usr/libexec/PlistBuddy -c Print /tmp/out/David.app/Contents/Info.plist > /tmp/out/InfoPlist.txt
-          strings -a /tmp/out/David.app/Contents/MacOS/David > /tmp/out/strings.txt
-          nm -nm /tmp/out/David.app/Contents/MacOS/David > /tmp/out/nm.txt || true
-          otool -L /tmp/out/David.app/Contents/MacOS/David > /tmp/out/otool-L.txt
-          find /tmp/out/David.app -maxdepth 4 -print > /tmp/out/file-list.txt
-          tar -C /tmp/out -czf /tmp/David-8.0.4-App.tgz David.app InfoPlist.txt strings.txt nm.txt otool-L.txt file-list.txt
-          hdiutil detach /tmp/mount
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/mount /tmp/David-8.0.4-Native-macOS.dmg > /tmp/out/hdiutil.txt 2>&1 || true
+          ls -laR /tmp/mount > /tmp/out/mount-list.txt 2>&1 || true
+          APP="$(find /tmp/mount -maxdepth 2 -type d -name '*.app' -print -quit)"
+          echo "APP=$APP" >> /tmp/out/mount-list.txt
+          if [ -n "$APP" ]; then
+            cp -R "$APP" /tmp/out/David.app
+            /usr/libexec/PlistBuddy -c Print /tmp/out/David.app/Contents/Info.plist > /tmp/out/InfoPlist.txt 2>&1 || true
+            EXE="$(find /tmp/out/David.app/Contents/MacOS -type f -maxdepth 1 -print -quit)"
+            echo "EXE=$EXE" >> /tmp/out/mount-list.txt
+            strings -a "$EXE" > /tmp/out/strings.txt 2>&1 || true
+            nm -nm "$EXE" > /tmp/out/nm.txt 2>&1 || true
+            otool -L "$EXE" > /tmp/out/otool-L.txt 2>&1 || true
+            find /tmp/out/David.app -maxdepth 5 -print > /tmp/out/file-list.txt 2>&1 || true
+          fi
+          tar -C /tmp/out -czf /tmp/David-8.0.4-App.tgz .
+          hdiutil detach /tmp/mount >/dev/null 2>&1 || true
       - uses: actions/upload-artifact@v4
         with:
           name: David-8.0.4-App-Extract
