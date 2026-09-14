@@ -1,0 +1,108 @@
+	private void Render(List<CloudChatMessage> chat)
+	{
+		//IL_0137: Unknown result type (might be due to invalid IL or missing references)
+		//IL_02d3: Unknown result type (might be due to invalid IL or missing references)
+		//IL_02da: Expected O, but got Unknown
+		//IL_030c: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0313: Expected O, but got Unknown
+		//IL_0330: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0283: Unknown result type (might be due to invalid IL or missing references)
+		List<CloudChatMessage> list = (chat ?? new List<CloudChatMessage>()).Where((CloudChatMessage x) => x != null).ToList();
+		CloudChatMessage cloudChatMessage = list.LastOrDefault((CloudChatMessage x) => string.Equals(x.senderKind, "caregiver", StringComparison.OrdinalIgnoreCase));
+		replyTargetId = ((cloudChatMessage == null) ? "" : (cloudChatMessage.id ?? ""));
+		List<CloudChatMessage> list2 = list.Skip(Math.Max(0, list.Count - 80)).ToList();
+		string text = string.Join("|", list2.Select((CloudChatMessage x) => (x.id ?? "") + ":" + (x.seenAt ?? "")));
+		if (text == lastRendered && ((ArrangedElementCollection)((Control)messages).Controls).Count > 0)
+		{
+			return;
+		}
+		lastRendered = text;
+		((Control)messages).SuspendLayout();
+		((Control)messages).Controls.Clear();
+		if (list2.Count == 0)
+		{
+			RoundedPanel roundedPanel = Ui.Card(Theme.Surface2);
+			((Control)roundedPanel).Width = 690;
+			((Control)roundedPanel).Height = 105;
+			((Control)roundedPanel).Margin = new Padding(12, 60, 12, 8);
+			Label val = Ui.Label("No messages yet", 15, bold: true, Theme.Text);
+			((Control)val).SetBounds(20, 20, 620, 30);
+			((Control)roundedPanel).Controls.Add((Control)(object)val);
+			Label val2 = Ui.Label("Send the first message below. New replies will appear here automatically.", 10, bold: false, Theme.Muted);
+			((Control)val2).SetBounds(20, 55, 640, 34);
+			((Control)roundedPanel).Controls.Add((Control)(object)val2);
+			((Control)messages).Controls.Add((Control)(object)roundedPanel);
+		}
+		DateTime dateTime = DateTime.MinValue;
+		foreach (CloudChatMessage item in list2)
+		{
+			DateTime.TryParse(item.createdAt, null, DateTimeStyles.RoundtripKind, out var result);
+			if (result != DateTime.MinValue)
+			{
+				result = result.ToLocalTime();
+			}
+			if (result != DateTime.MinValue && dateTime.Date != result.Date)
+			{
+				Label val3 = Ui.Label((result.Date == DateTime.Today) ? "TODAY" : result.ToString("dddd, MMM d"), 8, bold: true, Theme.Muted);
+				((Control)val3).Width = 690;
+				((Control)val3).Height = 28;
+				val3.TextAlign = (ContentAlignment)32;
+				((Control)val3).Margin = new Padding(8, 10, 8, 4);
+				((Control)messages).Controls.Add((Control)(object)val3);
+				dateTime = result;
+			}
+			bool flag = string.Equals(item.senderKind, "person", StringComparison.OrdinalIgnoreCase);
+			string text2 = item.body ?? "";
+			Font val4 = new Font("Segoe UI", 11f);
+			try
+			{
+				Size size = TextRenderer.MeasureText(text2, val4, new Size(430, 2000), (TextFormatFlags)8208);
+				int num = Math.Max(76, size.Height + 54);
+				Panel val5 = new Panel();
+				((Control)val5).Width = 690;
+				((Control)val5).Height = num + 6;
+				((Control)val5).Margin = new Padding(4, 1, 4, 2);
+				((Control)val5).BackColor = Color.Transparent;
+				RoundedPanel roundedPanel2 = new RoundedPanel();
+				roundedPanel2.Radius = 18;
+				((Control)roundedPanel2).Width = Math.Min(500, Math.Max(225, size.Width + 44));
+				((Control)roundedPanel2).Height = num;
+				((Control)roundedPanel2).BackColor = (flag ? Color.FromArgb(34, 103, 83) : Theme.Surface3);
+				roundedPanel2.BorderColor = (flag ? Color.FromArgb(48, 139, 111) : Theme.Border);
+				roundedPanel2.BorderWidth = 1;
+				((Control)roundedPanel2).Top = 0;
+				((Control)roundedPanel2).Left = (flag ? (((Control)val5).Width - ((Control)roundedPanel2).Width - 10) : 10);
+				((Control)val5).Controls.Add((Control)(object)roundedPanel2);
+				string text3 = ((!string.IsNullOrWhiteSpace(item.senderName)) ? item.senderName : (flag ? "You" : "Caregiver"));
+				Label val6 = Ui.Label(text3, 8, bold: true, flag ? Color.FromArgb(197, 241, 226) : Theme.Muted);
+				((Control)val6).SetBounds(14, 9, ((Control)roundedPanel2).Width - 28, 18);
+				((Control)roundedPanel2).Controls.Add((Control)(object)val6);
+				Label val7 = Ui.Label(text2, 11, bold: false, flag ? Color.White : Theme.Text);
+				((Control)val7).SetBounds(14, 29, ((Control)roundedPanel2).Width - 28, Math.Max(24, size.Height + 4));
+				((Control)roundedPanel2).Controls.Add((Control)(object)val7);
+				string text4 = ((result == DateTime.MinValue) ? "" : result.ToString("h:mm tt"));
+				if (flag)
+				{
+					text4 += (string.IsNullOrWhiteSpace(item.seenAt) ? "  •  Sent" : "  •  Seen");
+				}
+				Label val8 = Ui.Label(text4, 7, bold: false, flag ? Color.FromArgb(181, 226, 211) : Theme.Muted);
+				val8.TextAlign = (ContentAlignment)(flag ? 64 : 16);
+				((Control)val8).SetBounds(14, ((Control)roundedPanel2).Height - 23, ((Control)roundedPanel2).Width - 28, 17);
+				((Control)roundedPanel2).Controls.Add((Control)(object)val8);
+				((Control)messages).Controls.Add((Control)(object)val5);
+			}
+			finally
+			{
+				((IDisposable)val4)?.Dispose();
+			}
+		}
+		((Control)messages).ResumeLayout();
+		try
+		{
+			((ScrollProperties)((ScrollableControl)messages).VerticalScroll).Value = ((ScrollProperties)((ScrollableControl)messages).VerticalScroll).Maximum;
+			((Control)messages).PerformLayout();
+		}
+		catch
+		{
+		}
+	}
