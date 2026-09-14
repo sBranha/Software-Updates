@@ -14,56 +14,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download current David installer
-        run: |
-          curl -L --fail --retry 3 -o /tmp/David-6.0.12-Setup.exe https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe
-
-      - name: Extract David.exe from installer
+      - name: Download and extract current David.exe
         shell: python
         run: |
-          import lzma, struct
+          import urllib.request,lzma,struct
           from pathlib import Path
-          data = Path('/tmp/David-6.0.12-Setup.exe').read_bytes()
-          data_offset = 863232
-          chunk_size = 108949
-          pos = data_offset
-          assert data[pos:pos+4] == b'zlb\x1a'
-          payload = data[pos+4:pos+4+chunk_size]
-          prop = payload[0]
-          assert prop <= 40
-          dict_size = 0xffffffff if prop == 40 else (2 | (prop & 1)) << (prop // 2 + 11)
-          chunk = lzma.decompress(payload[1:], format=lzma.FORMAT_RAW,
-                                  filters=[{'id': lzma.FILTER_LZMA2, 'dict_size': dict_size}])
-          buf = bytearray(chunk[:314880])
-          i = 0
-          file_size = len(buf)
-          while i < len(buf) - 5:
-              if buf[i] in (0xE8, 0xE9):
-                  addr = struct.unpack_from('<I', buf, i+1)[0]
-                  offset = i + 5
-                  if addr < file_size:
-                      struct.pack_into('<I', buf, i+1, (addr-offset) & 0xffffffff)
-                  elif addr >= (0x100000000-offset):
-                      struct.pack_into('<I', buf, i+1, (addr-file_size) & 0xffffffff)
-                  i += 5
-              else:
-                  i += 1
-          Path('/tmp/David.exe').write_bytes(buf)
-
-      - name: Decompile ChatForm diagnostic
+          url='https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe'
+          data=urllib.request.urlopen(url).read(); pos=863232; size=108949
+          assert data[pos:pos+4]==b'zlb\x1a'
+          p=data[pos+4:pos+4+size]; prop=p[0]; ds=0xffffffff if prop==40 else (2|(prop&1))<<(prop//2+11)
+          chunk=lzma.decompress(p[1:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA2,'dict_size':ds}])
+          b=bytearray(chunk[:314880]); i=0; n=len(b)
+          while i<n-5:
+            if b[i] in (0xE8,0xE9):
+              a=struct.unpack_from('<I',b,i+1)[0]; o=i+5
+              if a<n: struct.pack_into('<I',b,i+1,(a-o)&0xffffffff)
+              elif a>=(0x100000000-o): struct.pack_into('<I',b,i+1,(a-n)&0xffffffff)
+              i+=5
+            else: i+=1
+          Path('/tmp/David.exe').write_bytes(b)
+      - name: Decompile and isolate Render method
         shell: bash
         run: |
           dotnet tool install --global ilspycmd
           export PATH="$PATH:$HOME/.dotnet/tools"
-          ilspycmd -t DavidCompanion.ChatForm /tmp/David.exe > david/windows/ChatForm-6.0.12-diagnostic.cs.txt
-          grep -n -E 'Render|YES|NO|OKAY|CALL ME|SetBounds|FlowLayout|composer|reply' david/windows/ChatForm-6.0.12-diagnostic.cs.txt | head -200 || true
-
-      - name: Commit diagnostic source
+          ilspycmd -t DavidCompanion.ChatForm /tmp/David.exe > /tmp/chat.cs
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/chat.cs').read_text()
+          a=s.index('\tprivate void Render(')
+          b=s.index('\n\tprivate void Send(',a)
+          Path('david/windows/ChatForm-6.0.12-Render-diagnostic.cs.txt').write_text(s[a:b])
+          PY
+      - name: Commit Render diagnostic
         shell: bash
         run: |
           git config user.name 'David Update Builder'
           git config user.email 'actions@users.noreply.github.com'
-          git add david/windows/ChatForm-6.0.12-diagnostic.cs.txt
-          git commit -m 'Add temporary David 6.0.12 ChatForm diagnostic'
+          git add david/windows/ChatForm-6.0.12-Render-diagnostic.cs.txt
+          git commit -m 'Add temporary David ChatForm Render diagnostic'
           git push
