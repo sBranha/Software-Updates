@@ -20,7 +20,7 @@ jobs:
       - name: Download verified David 8.0.4 build artifact
         shell: bash
         env:
-          SOURCE_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-a048-81f5-b39f-ee94c16a4a81/raw?se=2026-09-14T01%3A03%3A15Z&sp=r&sv=2026-02-06&sr=b&scid=7cfef734-afb7-5f23-bcf2-c846c6ea3a42&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-14T00%3A40%3A13Z&ske=2026-09-15T00%3A40%3A13Z&sks=b&skv=2026-02-06&sig=Q0GvWaE7Tn6KKDqiaObZuPbZAzU0rsilTUSMhRm9g14%3D'
+          SOURCE_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-1e34-81f5-8ce4-72a58b29f4a7/raw?se=2026-09-14T01%3A17%3A39Z&sp=r&sv=2026-02-06&sr=b&scid=803ce054-c7ad-5ec8-9085-8c876ae0c073&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-13T12%3A04%3A34Z&ske=2026-09-14T12%3A04%3A34Z&sks=b&skv=2026-02-06&sig=C0ryAPCeb%2Bgv2/NgdMhJshO7BLuu2yxB/T5cVZjgIwU%3D'
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 --retry-delay 2 "$SOURCE_URL" -o /tmp/david804.zip
