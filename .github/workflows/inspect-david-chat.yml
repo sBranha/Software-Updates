@@ -7,12 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download current David installer
         run: |
           curl -L --fail --retry 3 -o /tmp/David-6.0.12-Setup.exe https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe
@@ -30,10 +32,7 @@ jobs:
           payload = data[pos+4:pos+4+chunk_size]
           prop = payload[0]
           assert prop <= 40
-          if prop == 40:
-              dict_size = 0xffffffff
-          else:
-              dict_size = (2 | (prop & 1)) << (prop // 2 + 11)
+          dict_size = 0xffffffff if prop == 40 else (2 | (prop & 1)) << (prop // 2 + 11)
           chunk = lzma.decompress(payload[1:], format=lzma.FORMAT_RAW,
                                   filters=[{'id': lzma.FILTER_LZMA2, 'dict_size': dict_size}])
           buf = bytearray(chunk[:314880])
@@ -51,16 +50,20 @@ jobs:
               else:
                   i += 1
           Path('/tmp/David.exe').write_bytes(buf)
-          print('EXTRACTED', len(buf))
 
-      - name: Install ILSpy command line
-        run: dotnet tool install --global ilspycmd
-
-      - name: Show ChatForm type and source
+      - name: Decompile ChatForm diagnostic
         shell: bash
         run: |
+          dotnet tool install --global ilspycmd
           export PATH="$PATH:$HOME/.dotnet/tools"
-          echo '=== TYPE LIST MATCHES ==='
-          ilspycmd -l c /tmp/David.exe | grep -i -E 'ChatForm|DavidCompanion' | head -80 || true
-          echo '=== CHATFORM SOURCE ==='
-          ilspycmd -t DavidCompanion.ChatForm /tmp/David.exe
+          ilspycmd -t DavidCompanion.ChatForm /tmp/David.exe > david/windows/ChatForm-6.0.12-diagnostic.cs.txt
+          grep -n -E 'Render|YES|NO|OKAY|CALL ME|SetBounds|FlowLayout|composer|reply' david/windows/ChatForm-6.0.12-diagnostic.cs.txt | head -200 || true
+
+      - name: Commit diagnostic source
+        shell: bash
+        run: |
+          git config user.name 'David Update Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add david/windows/ChatForm-6.0.12-diagnostic.cs.txt
+          git commit -m 'Add temporary David 6.0.12 ChatForm diagnostic'
+          git push
