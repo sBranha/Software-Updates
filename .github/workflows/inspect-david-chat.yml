@@ -1,0 +1,66 @@
+name: Inspect David 6.0.12 ChatForm
+
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-david-chat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download current David installer
+        run: |
+          curl -L --fail --retry 3 -o /tmp/David-6.0.12-Setup.exe https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.0.12-Setup.exe
+
+      - name: Extract David.exe from installer
+        shell: python
+        run: |
+          import lzma, struct
+          from pathlib import Path
+          data = Path('/tmp/David-6.0.12-Setup.exe').read_bytes()
+          data_offset = 863232
+          chunk_size = 108949
+          pos = data_offset
+          assert data[pos:pos+4] == b'zlb\x1a'
+          payload = data[pos+4:pos+4+chunk_size]
+          prop = payload[0]
+          assert prop <= 40
+          if prop == 40:
+              dict_size = 0xffffffff
+          else:
+              dict_size = (2 | (prop & 1)) << (prop // 2 + 11)
+          chunk = lzma.decompress(payload[1:], format=lzma.FORMAT_RAW,
+                                  filters=[{'id': lzma.FILTER_LZMA2, 'dict_size': dict_size}])
+          buf = bytearray(chunk[:314880])
+          i = 0
+          file_size = len(buf)
+          while i < len(buf) - 5:
+              if buf[i] in (0xE8, 0xE9):
+                  addr = struct.unpack_from('<I', buf, i+1)[0]
+                  offset = i + 5
+                  if addr < file_size:
+                      struct.pack_into('<I', buf, i+1, (addr-offset) & 0xffffffff)
+                  elif addr >= (0x100000000-offset):
+                      struct.pack_into('<I', buf, i+1, (addr-file_size) & 0xffffffff)
+                  i += 5
+              else:
+                  i += 1
+          Path('/tmp/David.exe').write_bytes(buf)
+          print('EXTRACTED', len(buf))
+
+      - name: Install ILSpy command line
+        run: dotnet tool install --global ilspycmd
+
+      - name: Show ChatForm type and source
+        shell: bash
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          echo '=== TYPE LIST MATCHES ==='
+          ilspycmd -l c /tmp/David.exe | grep -i -E 'ChatForm|DavidCompanion' | head -80 || true
+          echo '=== CHATFORM SOURCE ==='
+          ilspycmd -t DavidCompanion.ChatForm /tmp/David.exe
