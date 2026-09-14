@@ -1,7 +1,7 @@
 {
-  "version": "7.1.4",
-  "publishedAt": "2026-09-13T00:48:10Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-7.1.4-Native-macOS.dmg",
-  "sha256": "fa18f8d50ad574e2e31e202e1d3237a5f693d5c6b25005bb11e395e129155f95",
-  "notes": "David 7.1.4 Mac responsiveness and reminder-popup repair. It stops unchanged Connected Care pulls from rewriting the reminder/chat files and churning SwiftUI identities every few seconds. Legacy reminders now receive deterministic IDs, and reminder popup suppression is keyed to the actual caregiver event or scheduled occurrence instead of permanently suppressing matching reminder text."
+  "version": "8.0.4",
+  "publishedAt": "2026-09-14T01:13:14Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.4-Native-macOS.dmg",
+  "sha256": "ac99a7d34d05b0f407ece5e3478397d82c0350c318b094098a3d6dde5777038a",
+  "notes": "David 8.0.4 Mac chat readability and caregiver security update. Chat uses larger readable text, larger message bubbles and quick replies, a larger composer, and better conversation spacing. Caregiver access now locks automatically whenever you leave the Caregiver area, so the PIN is required again the next time Caregiver is opened."
 }
