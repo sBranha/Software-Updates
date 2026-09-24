@@ -1,0 +1,68 @@
+name: Build Call Assistant APK
+
+on:
+  push:
+    branches:
+      - call-assistant-apk-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Restore project
+        run: |
+          mkdir -p call-assistant-build
+          base64 -d call-assistant-src.tar.gz.b64 > call-assistant-src.tar.gz
+          tar -xzf call-assistant-src.tar.gz -C call-assistant-build
+          test -f call-assistant-build/settings.gradle
+          test -f call-assistant-build/app/src/main/AndroidManifest.xml
+
+      - name: Build installable APK
+        working-directory: call-assistant-build
+        run: gradle --no-daemon clean assembleDebug
+
+      - name: Verify and rename APK
+        run: |
+          mkdir -p out
+          APK="call-assistant-build/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK"
+          cp "$APK" out/CallAssistantLocal-0.1.0.apk
+          sha256sum out/CallAssistantLocal-0.1.0.apk > out/SHA256.txt
+          ls -lh out/CallAssistantLocal-0.1.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CallAssistantLocal-APK
+          path: |
+            out/CallAssistantLocal-0.1.0.apk
+            out/SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
