@@ -3,7 +3,7 @@ name: Build Call Assistant APK
 on:
   push:
     branches:
-      - call-assistant-apk-build
+      - 'call-assistant-apk-build*'
   workflow_dispatch:
 
 permissions:
