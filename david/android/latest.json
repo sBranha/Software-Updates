@@ -1,7 +1,7 @@
 {
-  "version": "1.1.6",
-  "publishedAt": "2026-09-25T14:37:11Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.6.apk",
-  "sha256": "296e54d55943fe6ebf91a692c86082def7cac4791a1460c8775f9813ab40e2ee",
-  "notes": "David Android 1.1.6 adds a PIN-protected App Updates screen. Caregivers can check for updates, download the APK from the official GitHub channel, verify SHA-256, and open Android's installer to update over the existing app while preserving David data and activation. It retains the 1.1.5 phone-reset and shared reminder-sync fixes."
+  "version": "1.1.8",
+  "publishedAt": "2026-09-25T16:02:55Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.8.apk",
+  "sha256": "3ff0d17f3ac7d3bed8bda2bb6e00dfc8cf7af4b7b92ffc5873c0273b0a554419",
+  "notes": "David Android 1.1.8 polishes the App Updates screen: cleaner layout, installed/latest version cards, clearer security and download states, extra status-bar spacing, and the Download & Install button only appears when an update is actually available. Reminder, activation, sync, chat, caregiver PIN, licensing, and saved data are unchanged."
 }
