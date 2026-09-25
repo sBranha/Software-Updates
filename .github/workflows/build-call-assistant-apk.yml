@@ -45,8 +45,11 @@ jobs:
           mkdir -p call-assistant-build
           base64 -d call-assistant-src.tar.gz.b64 > call-assistant-src.tar.gz
           tar -xzf call-assistant-src.tar.gz -C call-assistant-build
+          base64 -d call-assistant-overrides-0.2.0.tar.gz.b64 > call-assistant-overrides-0.2.0.tar.gz
+          tar -xzf call-assistant-overrides-0.2.0.tar.gz -C call-assistant-build
           test -f call-assistant-build/settings.gradle
           test -f call-assistant-build/app/src/main/AndroidManifest.xml
+          grep -q 'versionCode 2' call-assistant-build/app/build.gradle
 
       - name: Build installable APK
         working-directory: call-assistant-build
@@ -58,16 +61,16 @@ jobs:
           APK="call-assistant-build/app/build/outputs/apk/debug/app-debug.apk"
           test -f "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK"
-          cp "$APK" out/CallAssistantLocal-0.1.0.apk
-          sha256sum out/CallAssistantLocal-0.1.0.apk > out/SHA256.txt
-          ls -lh out/CallAssistantLocal-0.1.0.apk
+          cp "$APK" out/CallAssistantLocal-0.2.0.apk
+          sha256sum out/CallAssistantLocal-0.2.0.apk > out/SHA256.txt
+          ls -lh out/CallAssistantLocal-0.2.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CallAssistantLocal-APK
+          name: CallAssistantLocal-0.2.0-APK
           path: |
-            out/CallAssistantLocal-0.1.0.apk
+            out/CallAssistantLocal-0.2.0.apk
             out/SHA256.txt
           if-no-files-found: error
           retention-days: 7
