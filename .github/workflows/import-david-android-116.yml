@@ -1,0 +1,50 @@
+name: Import David Android 1.1.6
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-david-android-116.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download verified 1.1.6 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-2ea8-81f5-9296-04f72180c62b/raw?se=2026-09-25T14%3A42%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=24c2650f-9e61-5e3a-84f8-020e462a51c5&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-25T12%3A29%3A53Z&ske=2026-09-26T12%3A29%3A53Z&sks=b&skv=2026-02-06&sig=JeEElHVIXlV9bqezU64%2BhzOzhvLMpFEsvke1P/iF5pk%3D' -o /tmp/david-android-116.zip
+          mkdir -p /tmp/david-android-116
+          unzip -o /tmp/david-android-116.zip -d /tmp/david-android-116
+          test -f /tmp/david-android-116/David-Android-1.1.6-IN-APP-UPDATER.apk
+          echo '296e54d55943fe6ebf91a692c86082def7cac4791a1460c8775f9813ab40e2ee  /tmp/david-android-116/David-Android-1.1.6-IN-APP-UPDATER.apk' | sha256sum -c -
+
+      - name: Publish Android update channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/android
+          cp /tmp/david-android-116/David-Android-1.1.6-IN-APP-UPDATER.apk david/android/David-Android-1.1.6.apk
+          printf '%s  %s\n' '296e54d55943fe6ebf91a692c86082def7cac4791a1460c8775f9813ab40e2ee' 'David-Android-1.1.6.apk' > david/android/David-Android-1.1.6.sha256.txt
+          cat > david/android/latest.json <<'JSON'
+          {
+            "version": "1.1.6",
+            "publishedAt": "2026-09-25T14:37:11Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.6.apk",
+            "sha256": "296e54d55943fe6ebf91a692c86082def7cac4791a1460c8775f9813ab40e2ee",
+            "notes": "David Android 1.1.6 adds a PIN-protected App Updates screen. Caregivers can check for updates, download the APK from the official GitHub channel, verify SHA-256, and open Android's installer to update over the existing app while preserving David data and activation. It retains the 1.1.5 phone-reset and shared reminder-sync fixes."
+          }
+          JSON
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add david/android/David-Android-1.1.6.apk david/android/David-Android-1.1.6.sha256.txt david/android/latest.json
+          git commit -m 'Publish David Android 1.1.6 in-app updater'
+          git push
