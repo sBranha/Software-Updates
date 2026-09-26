@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 root = Path('diagnostics/david-616/payload/DavidCompanion')
 batch = root / 'ReminderBatchForm.cs'
@@ -9,10 +10,26 @@ new_local = '''\t\t\t\t\tif (IsSharedDone(alertWorkItem))\n\t\t\t\t\t{\n\t\t\t\t
 assert s.count(old_local) == 1, f'Expected one local DONE block, found {s.count(old_local)}'
 s = s.replace(old_local, new_local)
 
-old_remote = '''\t\t\t\t\t\tif (done && !finished && index >= 0 && index < items.Count && items[index] != null && string.Equals(items[index].Key, watchedKey, StringComparison.Ordinal))\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tStopEffects();\n\t\t\t\t\t\t\tShowNext();\n\t\t\t\t\t\t}'''
-new_remote = '''\t\t\t\t\t\tif (done)\n\t\t\t\t\t\t{\n\t\t\t\t\t\t\tHandleRemoteDone(watchedKey);\n\t\t\t\t\t\t}'''
-assert s.count(old_remote) == 1, f'Expected one cloud DONE block, found {s.count(old_remote)}'
-s = s.replace(old_remote, new_remote)
+remote_pattern = re.compile(
+    r'(?P<indent>^[ \t]*)if \(done && !finished && index >= 0 && index < items\.Count && items\[index\] != null && string\.Equals\(items\[index\]\.Key, watchedKey, StringComparison\.Ordinal\)\)\s*\r?\n'
+    r'(?P=indent)\{\s*\r?\n'
+    r'(?P=indent)\tStopEffects\(\);\s*\r?\n'
+    r'(?P=indent)\tShowNext\(\);\s*\r?\n'
+    r'(?P=indent)\}',
+    re.MULTILINE
+)
+
+def replace_remote(match):
+    indent = match.group('indent')
+    return (
+        f'{indent}if (done)\n'
+        f'{indent}{{\n'
+        f'{indent}\tHandleRemoteDone(watchedKey);\n'
+        f'{indent}}}'
+    )
+
+s, remote_count = remote_pattern.subn(replace_remote, s)
+assert remote_count == 1, f'Expected one cloud DONE block, found {remote_count}'
 
 marker = '\n\tprivate void ShowNext()\n'
 assert s.count(marker) == 1, 'ShowNext insertion point changed'
