@@ -1,7 +1,7 @@
 {
-  "version": "1.1.10",
-  "publishedAt": "2026-09-26T00:49:58Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.10.apk",
-  "sha256": "35b0826f7cdfc56620594f35a0fba0f13f6f94fbdf83aec9352755fcf33add3f",
-  "notes": "David Android 1.1.10 adds live shared reminder completion. If Windows or another paired David device marks the exact open occurrence DONE, the Android reminder syncs the shared state and closes automatically. Phone DONE continues syncing to Windows. Existing hourly reminders, polished updater, activation, pairing, chat, and data remain in place."
+  "version": "1.1.11",
+  "publishedAt": "2026-09-26T01:12:25Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.11.apk",
+  "sha256": "2a6ab6b18bad2b5d641d1d98a736a3bc1138cb74e35807258b78eecd7cfe9f15",
+  "notes": "David Android 1.1.11 fixes phone-to-computer DONE sync at the source. Pressing DONE now sends the shared occurrence completion immediately instead of waiting for the background sync delay, and DONE is terminal locally so a later pending state cannot undo it. Existing hourly reminders, update UI, licensing, pairing, chat, and data remain in place."
 }
