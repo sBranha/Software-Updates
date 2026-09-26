@@ -1,0 +1,39 @@
+name: David 6.1.7 decompile payload
+on:
+  push:
+    branches:
+      - build/david-6.1.7
+    paths:
+      - .github/workflows/david-617-decompile-payload.yml
+permissions:
+  contents: write
+jobs:
+  decompile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/david-6.1.7
+          fetch-depth: 0
+      - name: Install ILSpy command line
+        shell: pwsh
+        run: |
+          dotnet tool install --global ilspycmd
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+      - name: Decompile exact 6.1.6 David payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $payload = Join-Path $PWD 'diagnostics/david-616/bootstrapper/DavidPayload.exe'
+          if (!(Test-Path $payload)) { throw 'Extracted 6.1.6 DavidPayload.exe not found' }
+          Remove-Item -Recurse -Force 'diagnostics/david-616/payload' -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force 'diagnostics/david-616/payload' | Out-Null
+          ilspycmd -p -o 'diagnostics/david-616/payload' $payload
+      - name: Commit decompiled payload
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add diagnostics/david-616/payload
+          git commit -m 'Add decompiled David 6.1.6 application payload'
+          git push origin HEAD:build/david-6.1.7
