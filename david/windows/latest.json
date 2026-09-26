@@ -1,7 +1,7 @@
 {
-  "version": "6.1.1",
-  "publishedAt": "2026-09-25T17:04:47Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.1-Setup.exe",
-  "sha256": "37332dc293a9766c0ef158745c5ffeb119ea0b6ff761acf76d9d7f7fe3695e7b",
-  "notes": "David Windows 6.1.1 integrates shared cross-device reminder completion directly into David.exe, adds Android-compatible Every N Hours schedules with start and stop times, adds Movement / Activity and expanded reminder categories, preserves Connected Care and caregiver features, downloads future installers from the official GitHub update channel with SHA-256 verification, and retires the temporary DavidSharedSync helper during installation."
+  "version": "6.1.2",
+  "publishedAt": "2026-09-26T00:26:23Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.2-Setup.exe",
+  "sha256": "6cebd6ecd4b36fab7b23d40a798637fde556557051e60f76ec5f7b5c899bde2f",
+  "notes": "David Windows 6.1.2 changes licensing to a reusable person-level license key with separate 6-digit device pairing. The same license key can be used on multiple David devices, each device pairs separately to the person/caregiver account, updates preserve local David data, and the existing cross-device reminder sync, hourly reminders, caregiver tools, chat, and GitHub updater remain in place."
 }
