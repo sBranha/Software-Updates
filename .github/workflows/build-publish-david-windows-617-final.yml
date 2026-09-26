@@ -5,6 +5,7 @@ on:
       - build/david-6.1.7-final
     paths:
       - .github/workflows/build-publish-david-windows-617-final.yml
+      - build/david-617-patch.py
 permissions:
   contents: write
 jobs:
