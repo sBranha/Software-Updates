@@ -1,0 +1,121 @@
+name: Build and Publish David Windows 6.1.7
+on:
+  push:
+    branches:
+      - build/david-6.1.7
+    paths:
+      - .github/workflows/build-publish-david-windows-617.yml
+permissions:
+  contents: write
+jobs:
+  build-test-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/david-6.1.7
+          fetch-depth: 0
+
+      - name: Patch exact 6.1.6 payload to 6.1.7
+        shell: pwsh
+        run: |
+          python build/david-617-patch.py
+          $batch = Get-Content 'diagnostics/david-616/payload/DavidCompanion/ReminderBatchForm.cs' -Raw
+          if ($batch -notmatch 'AppData\.SetState\(occurrenceKey, "done", null\)') { throw 'Exact occurrence is not persisted done locally.' }
+          if ($batch -notmatch 'if \(finished\)[\s\S]{0,200}allowClose = true;[\s\S]{0,120}Close\(\)') { throw 'ALL DONE remote-close guard missing.' }
+          if ($batch -notmatch 'HandleRemoteDone\(watchedKey\)') { throw 'Remote DONE callback is not routed through close handler.' }
+          if ((Get-Content 'diagnostics/david-616/payload/DavidCompanion/Program.cs' -Raw) -notmatch 'Version = "6\.1\.7"') { throw 'Program version was not bumped.' }
+
+      - name: Build David 6.1.7 application payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build 'diagnostics/david-616/payload/DavidPayload.csproj' -c Release
+          $payload = 'diagnostics/david-616/payload/bin/Release/net48/David.exe'
+          if (!(Test-Path $payload)) { throw 'David.exe payload was not built.' }
+          $ver = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $payload)).Version.ToString()
+          if ($ver -ne '6.1.7.0') { throw "Payload assembly version is $ver, expected 6.1.7.0" }
+          Copy-Item $payload 'diagnostics/david-616/bootstrapper/DavidPayload.exe' -Force
+
+      - name: Build full David-6.1.7-Setup.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build 'diagnostics/david-616/bootstrapper/David-6.1.6-Setup.csproj' -c Release
+          $setup = Get-ChildItem 'diagnostics/david-616/bootstrapper/bin/Release' -Recurse -Filter 'David-6.1.7-Setup.exe' | Select-Object -First 1
+          if ($null -eq $setup) { throw 'Full 6.1.7 Setup.exe was not built.' }
+          New-Item -ItemType Directory -Force 'release' | Out-Null
+          Copy-Item $setup.FullName 'release/David-6.1.7-Setup.exe' -Force
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path 'release/David-6.1.7-Setup.exe'))
+          if ($bytes.Length -lt 250000 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw 'Installer is not a valid Windows PE executable.' }
+          $hash = (Get-FileHash 'release/David-6.1.7-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  David-6.1.7-Setup.exe" | Set-Content 'release/David-6.1.7-Setup.sha256.txt' -Encoding ascii
+          "SETUP_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Test direct 6.1.6 to 6.1.7 upgrade and data preservation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $testRoot = Join-Path $env:RUNNER_TEMP 'David617UpgradeTest'
+          Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $testRoot | Out-Null
+          $old = Join-Path $testRoot 'David.exe'
+          Copy-Item 'diagnostics/david-616/bootstrapper/DavidPayload.exe' (Join-Path $testRoot 'new-payload-copy.exe') -Force
+          # Restore exact 6.1.6 payload as the starting installed app.
+          git show 'HEAD:diagnostics/david-616/bootstrapper/DavidPayload.exe' | Out-File -FilePath (Join-Path $testRoot 'git-show.bin') -Encoding Byte
+          # git show through PowerShell's text pipeline is unsafe for binary; copy exact baseline from checkout before patch via git archive.
+          cmd /c "git show HEAD:diagnostics/david-616/bootstrapper/DavidPayload.exe > \"$old\""
+          $before = [System.Reflection.AssemblyName]::GetAssemblyName($old).Version.ToString()
+          if ($before -ne '6.1.6.0') { throw "Upgrade baseline is $before, expected 6.1.6.0" }
+          $dataRoot = Join-Path $env:LOCALAPPDATA 'David'
+          New-Item -ItemType Directory -Force $dataRoot | Out-Null
+          $sentinel = Join-Path $dataRoot 'david-617-preserve-test.txt'
+          'preserve-me' | Set-Content $sentinel -Encoding ascii
+          $proc = Start-Process -FilePath (Resolve-Path 'release/David-6.1.7-Setup.exe') -ArgumentList ('/TARGET="' + $old + '"') -PassThru -Wait
+          if ($proc.ExitCode -ne 0) { throw "6.1.7 updater exited $($proc.ExitCode)" }
+          Start-Sleep -Seconds 2
+          Get-Process David -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          $after = [System.Reflection.AssemblyName]::GetAssemblyName($old).Version.ToString()
+          if ($after -ne '6.1.7.0') { throw "Upgrade installed $after, expected 6.1.7.0" }
+          $backup = Join-Path $testRoot 'David-last-good.exe'
+          if (!(Test-Path $backup)) { throw '6.1.6 last-good backup was not created.' }
+          $backupVer = [System.Reflection.AssemblyName]::GetAssemblyName($backup).Version.ToString()
+          if ($backupVer -ne '6.1.6.0') { throw "Last-good backup is $backupVer, expected 6.1.6.0" }
+          if (!(Test-Path $sentinel) -or (Get-Content $sentinel -Raw).Trim() -ne 'preserve-me') { throw 'Existing user data sentinel was changed or removed.' }
+          Remove-Item $sentinel -Force -ErrorAction SilentlyContinue
+
+      - name: Upload tested installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: David-6.1.7-Windows
+          path: |
+            release/David-6.1.7-Setup.exe
+            release/David-6.1.7-Setup.sha256.txt
+          if-no-files-found: error
+
+      - name: Publish tested 6.1.7 to established Windows update channel
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git fetch origin main
+          $publish = Join-Path $env:RUNNER_TEMP 'publish-main'
+          Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
+          git worktree add $publish origin/main
+          New-Item -ItemType Directory -Force (Join-Path $publish 'david/windows') | Out-Null
+          Copy-Item 'release/David-6.1.7-Setup.exe' (Join-Path $publish 'david/windows/David-6.1.7-Setup.exe') -Force
+          Copy-Item 'release/David-6.1.7-Setup.sha256.txt' (Join-Path $publish 'david/windows/David-6.1.7-Setup.sha256.txt') -Force
+          $manifest = [ordered]@{
+            version = '6.1.7'
+            publishedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            installerUrl = 'https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.7-Setup.exe'
+            sha256 = $env:SETUP_SHA256
+            notes = 'Windows remote DONE close fix. Built from the exact 6.1.6 payload. When the exact reminder occurrence is completed on Android or another synced device, Windows immediately records that occurrence as done locally, closes or advances the active reminder, and closes instead of leaving the ALL DONE FOR NOW window after the last remote completion. Reminder schedules, activation, licensing, caregiver settings, chat, patient data, and other working features are unchanged.'
+          }
+          $manifest | ConvertTo-Json | Set-Content (Join-Path $publish 'david/windows/latest.json') -Encoding utf8
+          Push-Location $publish
+          git config user.name 'David Release Bot'
+          git config user.email 'sgbcdb@gmail.com'
+          git add david/windows/David-6.1.7-Setup.exe david/windows/David-6.1.7-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David Windows 6.1.7 remote DONE close fix'
+          git push origin HEAD:main
+          Pop-Location
