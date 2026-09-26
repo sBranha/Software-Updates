@@ -1,7 +1,7 @@
 {
-  "version": "6.1.6",
-  "publishedAt": "2026-09-26T13:20:00Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.6-Setup.exe",
-  "sha256": "b83f71566051f161167efa3438f88fda9520b7af974f728c6840e682661f4137",
-  "notes": "Windows updater repair. This release keeps the 6.1.5 direct DONE relay and replaces the installer handoff with a robust bootstrapper that detects the exact running David.exe location, closes any remaining David processes, backs up the previous program as David-last-good.exe, replaces that exact program with 6.1.6, and relaunches it. The update still checks, downloads, and verifies directly from the official GitHub Software-Updates channel inside David."
+  "version": "6.1.7",
+  "publishedAt": "2026-09-26T14:05:22Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.7-Setup.exe",
+  "sha256": "40faa665ebe6d3259927af391bcc79dc06838813ce5560fc38d7375738bd49d5",
+  "notes": "Windows remote DONE close fix. Built from the exact 6.1.6 payload. When the exact reminder occurrence is completed on Android or another synced device, Windows immediately records that occurrence as done locally, closes or advances the active reminder, and closes instead of leaving the ALL DONE FOR NOW window after the last remote completion. Reminder schedules, activation, licensing, caregiver settings, chat, patient data, and other working features are unchanged."
 }
