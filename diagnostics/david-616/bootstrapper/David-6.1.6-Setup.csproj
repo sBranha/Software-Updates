@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>David-6.1.6-Setup</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net40</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="DavidPayload.exe" />
+    <None Remove="DavidIcon.ico" />
+    <EmbeddedResource Include="DavidPayload.exe" LogicalName="DavidPayload.exe" />
+    <EmbeddedResource Include="DavidIcon.ico" LogicalName="DavidIcon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Core" />
+  </ItemGroup>
+</Project>

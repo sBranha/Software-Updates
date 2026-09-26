@@ -1,0 +1,15 @@
+diagnostics\david-616\7zip
+diagnostics\david-616\bootstrapper
+diagnostics\david-616\file-list.txt
+diagnostics\david-616\7zip\.rsrc
+diagnostics\david-616\7zip\.reloc
+diagnostics\david-616\7zip\.text
+diagnostics\david-616\7zip\.rsrc\MANIFEST
+diagnostics\david-616\7zip\.rsrc\version.txt
+diagnostics\david-616\7zip\.rsrc\MANIFEST\1
+diagnostics\david-616\bootstrapper\Properties
+diagnostics\david-616\bootstrapper\David-6.1.6-Setup.csproj
+diagnostics\david-616\bootstrapper\DavidIcon.ico
+diagnostics\david-616\bootstrapper\DavidPayload.exe
+diagnostics\david-616\bootstrapper\DavidUpdateBootstrap.cs
+diagnostics\david-616\bootstrapper\Properties\AssemblyInfo.cs
