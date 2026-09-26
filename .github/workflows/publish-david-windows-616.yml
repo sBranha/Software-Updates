@@ -1,0 +1,40 @@
+name: Publish David Windows 6.1.6 Robust Updater
+on:
+  push:
+    paths: ['.github/workflows/publish-david-windows-616.yml']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify Windows 6.1.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/david616
+          curl -fL 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-a314-81f5-b1b7-ee9143f85417/raw?se=2026-09-26T13%3A23%3A37Z&sp=r&sv=2026-02-06&sr=b&scid=622f830f-ae6a-5afd-9778-32ffddb9e175&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-26T11%3A11%3A09Z&ske=2026-09-27T11%3A11%3A09Z&sks=b&skv=2026-02-06&sig=Vb4mPIEVowguOMR2jB8hI3m3Od8M1B1ntesjB/Pr8RQ%3D' -o /tmp/david616.zip
+          unzip -q /tmp/david616.zip -d /tmp/david616
+          test "$(sha256sum /tmp/david616/David-6.1.6-Setup.exe | awk '{print $1}')" = 'b83f71566051f161167efa3438f88fda9520b7af974f728c6840e682661f4137'
+      - name: Publish Windows 6.1.6 and GitHub manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david616/David-6.1.6-Setup.exe david/windows/
+          printf '%s  %s\n' 'b83f71566051f161167efa3438f88fda9520b7af974f728c6840e682661f4137' 'David-6.1.6-Setup.exe' > david/windows/David-6.1.6-Setup.sha256.txt
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.1.6",
+            "publishedAt": "2026-09-26T13:20:00Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.6-Setup.exe",
+            "sha256": "b83f71566051f161167efa3438f88fda9520b7af974f728c6840e682661f4137",
+            "notes": "Windows updater repair. This release keeps the 6.1.5 direct DONE relay and replaces the installer handoff with a robust bootstrapper that detects the exact running David.exe location, closes any remaining David processes, backs up the previous program as David-last-good.exe, replaces that exact program with 6.1.6, and relaunches it. The update still checks, downloads, and verifies directly from the official GitHub Software-Updates channel inside David."
+          }
+          JSON
+          git config user.name 'David Release Bot'
+          git config user.email 'sgbcdb@gmail.com'
+          git add david/windows
+          git commit -m 'Publish David Windows 6.1.6 updater repair'
+          git push origin HEAD:main
