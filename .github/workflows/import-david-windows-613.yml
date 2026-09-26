@@ -1,0 +1,47 @@
+name: Import David Windows 6.1.3
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-david-windows-613.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download verified 6.1.3 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-a174-81f5-80d6-05311b66d3d8/raw?se=2026-09-26T00%3A50%3A45Z&sp=r&sv=2026-02-06&sr=b&scid=5a1c899b-5977-5b6e-bc92-3b466aded742&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-25T23%3A17%3A19Z&ske=2026-09-26T23%3A17%3A19Z&sks=b&skv=2026-02-06&sig=4fGnNKjAMJloQZFoqbLy0qKdaLIfzV3iBtqaGoewkjM%3D' -o /tmp/david-windows-613.zip
+          mkdir -p /tmp/david-windows-613
+          unzip -o /tmp/david-windows-613.zip -d /tmp/david-windows-613
+          test -f /tmp/david-windows-613/David-6.1.3-Setup.exe
+          echo '4e01e85dda805c24437849dfb75970f8594904d06cd9754260163227e9c58461  /tmp/david-windows-613/David-6.1.3-Setup.exe' | sha256sum -c -
+      - name: Publish Windows update channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/windows
+          cp /tmp/david-windows-613/David-6.1.3-Setup.exe david/windows/David-6.1.3-Setup.exe
+          printf '%s  %s\n' '4e01e85dda805c24437849dfb75970f8594904d06cd9754260163227e9c58461' 'David-6.1.3-Setup.exe' > david/windows/David-6.1.3-Setup.sha256.txt
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.1.3",
+            "publishedAt": "2026-09-26T00:44:47Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.3-Setup.exe",
+            "sha256": "4e01e85dda805c24437849dfb75970f8594904d06cd9754260163227e9c58461",
+            "notes": "David Windows 6.1.3 fixes shared reminder completion while a reminder is already open. Windows now polls shared occurrence state while the reminder window is visible, skips occurrences already completed on another paired device, and closes/advances when Android or another David device marks that exact occurrence DONE. Existing person-level licensing, device pairing, reminders, chat, hourly schedules, and local data are preserved."
+          }
+          JSON
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add david/windows/David-6.1.3-Setup.exe david/windows/David-6.1.3-Setup.sha256.txt david/windows/latest.json
+          git commit -m 'Publish David Windows 6.1.3 shared DONE clear'
+          git push
