@@ -1,0 +1,68 @@
+name: Publish David Direct DONE Relay Releases
+on:
+  push:
+    paths: ['.github/workflows/publish-david-2026-09-26-direct-done.yml']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified build artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/david/android /tmp/david/windows /tmp/david/macos
+          curl -fL 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-affc-81f5-a66c-c38ac8b8b548/raw?se=2026-09-26T12%3A57%3A55Z&sp=r&sv=2026-02-06&sr=b&scid=cc4745a0-42a6-55b8-83e0-edff7d5fbdfc&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-26T09%3A03%3A15Z&ske=2026-09-27T09%3A03%3A15Z&sks=b&skv=2026-02-06&sig=hNoNpKKTiGbs%2BTgHLzGld8vk4SQ%2BXY/LxTHoKmKbYsE%3D' -o /tmp/android.zip
+          curl -fL 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-edc0-81f5-95db-917fb16c6cde/raw?se=2026-09-26T12%3A58%3A13Z&sp=r&sv=2026-02-06&sr=b&scid=ba2d9828-ef8b-56cd-b72c-1cbeca65207d&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-26T11%3A10%3A58Z&ske=2026-09-27T11%3A10%3A58Z&sks=b&skv=2026-02-06&sig=CJQRJJ8OemUiYkME7X5/zjl54yglCbSjd9l%2BpyobC%2BM%3D' -o /tmp/windows.zip
+          curl -fL 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-2e78-81f5-bea7-2549986b702f/raw?se=2026-09-26T12%3A58%3A02Z&sp=r&sv=2026-02-06&sr=b&scid=0a3d8bdf-db44-5852-87b7-21b12985fd05&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-26T08%3A59%3A48Z&ske=2026-09-27T08%3A59%3A48Z&sks=b&skv=2026-02-06&sig=QiL56xuJfbIuhX74MHHCHE0V5uxWIupwjqBb8jFUyJM%3D' -o /tmp/mac.zip
+          unzip -q /tmp/android.zip -d /tmp/david/android
+          unzip -q /tmp/windows.zip -d /tmp/david/windows
+          unzip -q /tmp/mac.zip -d /tmp/david/macos
+          test "$(sha256sum /tmp/david/android/David-Android-1.1.13-DIRECT-DONE-RELAY.apk | awk '{print $1}')" = '48bcad68009e3efd49b11d621b478a4fba5b222e9e3a2eb537762c9c2db7477a'
+          test "$(sha256sum /tmp/david/windows/David-6.1.5-Setup.exe | awk '{print $1}')" = '7c484fea1b4463321099db0fdc6840fd77bfc2125046be45a040fd55188c1594'
+          test "$(sha256sum /tmp/david/macos/David-8.0.7-Native-macOS.dmg | awk '{print $1}')" = 'e10406fc566b85413ca0f5cf216519a6771012fb73e646b96169b9543d717760'
+      - name: Publish files and manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/android david/windows david/macos
+          cp /tmp/david/android/David-Android-1.1.13-DIRECT-DONE-RELAY.apk david/android/
+          printf '%s  %s\n' '48bcad68009e3efd49b11d621b478a4fba5b222e9e3a2eb537762c9c2db7477a' 'David-Android-1.1.13-DIRECT-DONE-RELAY.apk' > david/android/David-Android-1.1.13-DIRECT-DONE-RELAY.sha256.txt
+          cp /tmp/david/windows/David-6.1.5-Setup.exe david/windows/
+          printf '%s  %s\n' '7c484fea1b4463321099db0fdc6840fd77bfc2125046be45a040fd55188c1594' 'David-6.1.5-Setup.exe' > david/windows/David-6.1.5-Setup.sha256.txt
+          cp /tmp/david/macos/David-8.0.7-Native-macOS.dmg david/macos/
+          printf '%s  %s\n' 'e10406fc566b85413ca0f5cf216519a6771012fb73e646b96169b9543d717760' 'David-8.0.7-Native-macOS.dmg' > david/macos/David-8.0.7-Native-macOS.dmg.sha256.txt
+          cat > david/android/latest.json <<'JSON'
+          {
+            "version": "1.1.13",
+            "publishedAt": "2026-09-26T12:55:00Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.13-DIRECT-DONE-RELAY.apk",
+            "sha256": "48bcad68009e3efd49b11d621b478a4fba5b222e9e3a2eb537762c9c2db7477a",
+            "notes": "Direct DONE relay: tapping DONE posts the exact occurrence immediately to the David website. Open reminders query only that occurrence. App Updates now checks and downloads directly from the official GitHub Software-Updates channel inside David."
+          }
+          JSON
+          cat > david/windows/latest.json <<'JSON'
+          {
+            "version": "6.1.5",
+            "publishedAt": "2026-09-26T12:55:00Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.5-Setup.exe",
+            "sha256": "7c484fea1b4463321099db0fdc6840fd77bfc2125046be45a040fd55188c1594",
+            "notes": "Direct DONE relay: the open Windows reminder queries the website for its exact occurrence about once per second and closes immediately when another paired device marks it DONE. Windows Update Center continues to download and install directly from GitHub inside David."
+          }
+          JSON
+          cat > david/macos/latest.json <<'JSON'
+          {
+            "version": "8.0.7",
+            "publishedAt": "2026-09-26T12:55:00Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.7-Native-macOS.dmg",
+            "sha256": "e10406fc566b85413ca0f5cf216519a6771012fb73e646b96169b9543d717760",
+            "notes": "Direct exact-occurrence DONE relay and live close of an open Mac reminder. Mac Update Center checks, downloads, verifies, and installs directly from the official GitHub Software-Updates channel."
+          }
+          JSON
+          git config user.name 'David Release Bot'
+          git config user.email 'sgbcdb@gmail.com'
+          git add david/android david/windows david/macos
+          git commit -m 'Publish David direct DONE relay releases'
+          git push origin HEAD:main
