@@ -1,0 +1,47 @@
+name: Import David Android 1.1.11
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-david-android-1111.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download verified Android 1.1.11 build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-1200-81f5-8cc3-0a44ff311662/raw?se=2026-09-26T01%3A17%3A52Z&sp=r&sv=2026-02-06&sr=b&scid=ab6fb211-9fec-5e05-bed2-eac3f5454f45&skoid=77636ecc-ad8d-44df-baa7-163b524a0261&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-25T19%3A51%3A16Z&ske=2026-09-26T19%3A51%3A16Z&sks=b&skv=2026-02-06&sig=lGR3DXCaLefkMmHbYkIzw/6Bi6Oxet%2BzX8EDwVa%2BudA%3D' -o /tmp/david-android-1111.zip
+          mkdir -p /tmp/david-android-1111
+          unzip -o /tmp/david-android-1111.zip -d /tmp/david-android-1111
+          test -f /tmp/david-android-1111/David-Android-1.1.11-IMMEDIATE-DONE-SYNC.apk
+          echo '2a6ab6b18bad2b5d641d1d98a736a3bc1138cb74e35807258b78eecd7cfe9f15  /tmp/david-android-1111/David-Android-1.1.11-IMMEDIATE-DONE-SYNC.apk' | sha256sum -c -
+      - name: Publish Android update channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p david/android
+          cp /tmp/david-android-1111/David-Android-1.1.11-IMMEDIATE-DONE-SYNC.apk david/android/David-Android-1.1.11.apk
+          printf '%s  %s\n' '2a6ab6b18bad2b5d641d1d98a736a3bc1138cb74e35807258b78eecd7cfe9f15' 'David-Android-1.1.11.apk' > david/android/David-Android-1.1.11.sha256.txt
+          cat > david/android/latest.json <<'JSON'
+          {
+            "version": "1.1.11",
+            "publishedAt": "2026-09-26T01:12:25Z",
+            "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.11.apk",
+            "sha256": "2a6ab6b18bad2b5d641d1d98a736a3bc1138cb74e35807258b78eecd7cfe9f15",
+            "notes": "David Android 1.1.11 fixes phone-to-computer DONE sync at the source. Pressing DONE now sends the shared occurrence completion immediately instead of waiting for the background sync delay, and DONE is terminal locally so a later pending state cannot undo it. Existing hourly reminders, update UI, licensing, pairing, chat, and data remain in place."
+          }
+          JSON
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add david/android/David-Android-1.1.11.apk david/android/David-Android-1.1.11.sha256.txt david/android/latest.json
+          git commit -m 'Publish David Android 1.1.11 immediate DONE sync'
+          git push
