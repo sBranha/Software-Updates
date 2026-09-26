@@ -1,7 +1,7 @@
 {
-  "version": "6.1.2",
-  "publishedAt": "2026-09-26T00:26:23Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.2-Setup.exe",
-  "sha256": "6cebd6ecd4b36fab7b23d40a798637fde556557051e60f76ec5f7b5c899bde2f",
-  "notes": "David Windows 6.1.2 changes licensing to a reusable person-level license key with separate 6-digit device pairing. The same license key can be used on multiple David devices, each device pairs separately to the person/caregiver account, updates preserve local David data, and the existing cross-device reminder sync, hourly reminders, caregiver tools, chat, and GitHub updater remain in place."
+  "version": "6.1.3",
+  "publishedAt": "2026-09-26T00:44:47Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.3-Setup.exe",
+  "sha256": "4e01e85dda805c24437849dfb75970f8594904d06cd9754260163227e9c58461",
+  "notes": "David Windows 6.1.3 fixes shared reminder completion while a reminder is already open. Windows now polls shared occurrence state while the reminder window is visible, skips occurrences already completed on another paired device, and closes/advances when Android or another David device marks that exact occurrence DONE. Existing person-level licensing, device pairing, reminders, chat, hourly schedules, and local data are preserved."
 }
