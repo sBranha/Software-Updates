@@ -1,7 +1,7 @@
 {
-  "version": "1.1.11",
-  "publishedAt": "2026-09-26T01:12:25Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.11.apk",
-  "sha256": "2a6ab6b18bad2b5d641d1d98a736a3bc1138cb74e35807258b78eecd7cfe9f15",
-  "notes": "David Android 1.1.11 fixes phone-to-computer DONE sync at the source. Pressing DONE now sends the shared occurrence completion immediately instead of waiting for the background sync delay, and DONE is terminal locally so a later pending state cannot undo it. Existing hourly reminders, update UI, licensing, pairing, chat, and data remain in place."
+  "version": "1.1.13",
+  "publishedAt": "2026-09-26T12:55:00Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.13-DIRECT-DONE-RELAY.apk",
+  "sha256": "48bcad68009e3efd49b11d621b478a4fba5b222e9e3a2eb537762c9c2db7477a",
+  "notes": "Direct DONE relay: tapping DONE posts the exact occurrence immediately to the David website. Open reminders query only that occurrence. App Updates now checks and downloads directly from the official GitHub Software-Updates channel inside David."
 }

@@ -1,7 +1,7 @@
 {
-  "version": "8.0.5",
-  "publishedAt": "2026-09-14T01:44:11Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.5-Native-macOS.dmg",
-  "sha256": "ea26de1d6e2ec1f74e1756d574af0011a4bbb8353734f3945786929d41a215a6",
-  "notes": "David 8.0.5 Mac chat layout update. YES, NO, I'M OKAY, and CALL ME now appear once in a single quick-reply bar at the bottom instead of repeating under every caregiver message. Conversation spacing is tighter and more uniform while retaining the larger readable 20-point message text, 18-point composer, automatic newest-message scrolling, caregiver auto-lock, and the 8.0.2/8.0.3 reliability repairs."
+  "version": "8.0.7",
+  "publishedAt": "2026-09-26T12:55:00Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/macos/David-8.0.7-Native-macOS.dmg",
+  "sha256": "e10406fc566b85413ca0f5cf216519a6771012fb73e646b96169b9543d717760",
+  "notes": "Direct exact-occurrence DONE relay and live close of an open Mac reminder. Mac Update Center checks, downloads, verifies, and installs directly from the official GitHub Software-Updates channel."
 }
