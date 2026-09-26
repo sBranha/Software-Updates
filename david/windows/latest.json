@@ -1,7 +1,7 @@
 {
-  "version": "6.1.5",
-  "publishedAt": "2026-09-26T12:55:00Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.5-Setup.exe",
-  "sha256": "7c484fea1b4463321099db0fdc6840fd77bfc2125046be45a040fd55188c1594",
-  "notes": "Direct DONE relay: the open Windows reminder queries the website for its exact occurrence about once per second and closes immediately when another paired device marks it DONE. Windows Update Center continues to download and install directly from GitHub inside David."
+  "version": "6.1.6",
+  "publishedAt": "2026-09-26T13:20:00Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/windows/David-6.1.6-Setup.exe",
+  "sha256": "b83f71566051f161167efa3438f88fda9520b7af974f728c6840e682661f4137",
+  "notes": "Windows updater repair. This release keeps the 6.1.5 direct DONE relay and replaces the installer handoff with a robust bootstrapper that detects the exact running David.exe location, closes any remaining David processes, backs up the previous program as David-last-good.exe, replaces that exact program with 6.1.6, and relaunches it. The update still checks, downloads, and verifies directly from the official GitHub Software-Updates channel inside David."
 }
