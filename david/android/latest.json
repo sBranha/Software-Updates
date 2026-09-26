@@ -1,7 +1,7 @@
 {
-  "version": "1.1.9",
-  "publishedAt": "2026-09-25T16:24:58Z",
-  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.9.apk",
-  "sha256": "8d005ebec30054febcf0bc618132c9e7989f3cf4d95e435f491f31c428f87ec2",
-  "notes": "David Android 1.1.9 makes the Add Reminder screen easy to read on the dark theme and adds hourly task schedules. Schedule and category selectors now use high-contrast text with clear labels. New choices include Every hour, Every 2, 3, 4, 6, 8, or 12 hours, with a start time and stop time so hourly reminders do not have to run overnight. It also adds Movement / Activity as a reminder type and shows a Medication Dose field when Medication is selected. Recurring reminders schedule their next normal occurrence when they fire. Existing activation, reminders, chat, sync, caregiver PIN, update system, licensing, and saved data are preserved."
+  "version": "1.1.10",
+  "publishedAt": "2026-09-26T00:49:58Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/android/David-Android-1.1.10.apk",
+  "sha256": "35b0826f7cdfc56620594f35a0fba0f13f6f94fbdf83aec9352755fcf33add3f",
+  "notes": "David Android 1.1.10 adds live shared reminder completion. If Windows or another paired David device marks the exact open occurrence DONE, the Android reminder syncs the shared state and closes automatically. Phone DONE continues syncing to Windows. Existing hourly reminders, polished updater, activation, pairing, chat, and data remain in place."
 }
