@@ -1,0 +1,7 @@
+{
+  "version": "5.2.75",
+  "publishedAt": "2026-09-26T12:50:00Z",
+  "installerUrl": "https://raw.githubusercontent.com/sBranha/Software-Updates/main/david/website/David-v5.2.75-DIRECT-DONE-GITHUB-UPDATER-WEBSITE-UPDATE.zip",
+  "sha256": "3ff7ab909e553446cc39cbe8908fb9e9799ac3f267e8faad36136be2d863af8f",
+  "notes": "David Website 5.2.75 adds direct exact-occurrence DONE relay endpoints and a GitHub Website Update Center. Phone/web DONE is recorded immediately and native clients can query the exact open occurrence. Future website ZIP updates can be checked, downloaded, verified, and installed from GitHub inside David."
+}
