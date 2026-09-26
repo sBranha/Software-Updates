@@ -1,0 +1,52 @@
+name: David 6.1.7 inspect baseline
+on:
+  push:
+    branches:
+      - build/david-6.1.7
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/david-6.1.7
+          fetch-depth: 0
+      - name: Install ILSpy command line
+        shell: pwsh
+        run: |
+          dotnet tool install --global ilspycmd
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+      - name: Decompile 6.1.6 bootstrapper and extract payload resources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $setup = Join-Path $PWD 'david/windows/David-6.1.6-Setup.exe'
+          if (!(Test-Path $setup)) { throw 'David-6.1.6-Setup.exe not found' }
+          Remove-Item -Recurse -Force 'diagnostics/david-616' -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force 'diagnostics/david-616/bootstrapper' | Out-Null
+          ilspycmd -p -o 'diagnostics/david-616/bootstrapper' $setup
+          # Ask 7-Zip to expose anything embedded in the managed executable as a second view.
+          New-Item -ItemType Directory -Force 'diagnostics/david-616/7zip' | Out-Null
+          & 'C:\Program Files\7-Zip\7z.exe' x -y "-odiagnostics/david-616/7zip" $setup | Out-Host
+          # Record assembly strings and file inventory for easier inspection.
+          Get-ChildItem -Recurse 'diagnostics/david-616' | ForEach-Object { $_.FullName.Substring($PWD.Path.Length + 1) } | Set-Content 'diagnostics/david-616/file-list.txt'
+          Get-ChildItem -Recurse 'diagnostics/david-616' -File | Where-Object { $_.Length -lt 5000000 } | ForEach-Object {
+            try {
+              $text = Get-Content $_.FullName -Raw -ErrorAction Stop
+              if ($text -match 'David|DONE|ALL DONE|Reminder') {
+                Add-Content 'diagnostics/david-616/hits.txt' "===== $($_.FullName.Substring($PWD.Path.Length + 1)) ====="
+                Select-String -Path $_.FullName -Pattern '6\.1\.6|DONE|ALL DONE|Reminder|payload|David\.exe|resource' -Context 2,2 | ForEach-Object { Add-Content 'diagnostics/david-616/hits.txt' $_.ToString() }
+              }
+            } catch {}
+          }
+      - name: Commit diagnostics to branch
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add diagnostics/david-616
+          if (git diff --cached --quiet) { Write-Host 'No diagnostics changes'; exit 0 }
+          git commit -m 'Add David 6.1.6 decompilation diagnostics'
+          git push origin HEAD:build/david-6.1.7
