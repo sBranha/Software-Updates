@@ -68,7 +68,13 @@ public final class MultiCameraSupport {
         return usesPhoneHotspot(p)?"Turn on Android Mobile Hotspot and connect the "+x.model+" to it.":"Turn on the "+x.model+" FTP Wi‑Fi access-point profile. No outside Wi‑Fi is required.";
     }
 
-    public static View artwork(Context c, SharedPreferences p){return new CameraFrontView(c,selected(p));}
+    public static View artwork(Context c, SharedPreferences p){
+        Profile x=selected(p);
+        if("Nikon".equals(x.brand)&&"Z8".equals(x.model)){
+            ImageView image=new ImageView(c);image.setImageResource(R.drawable.z8_camera);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setAdjustViewBounds(true);return image;
+        }
+        return new CameraFrontView(c,x);
+    }
 
     public static void showSelector(Activity a, SharedPreferences p, Runnable redraw){
         final String[] labels=new String[PROFILES.length];int checked=0;Profile cur=selected(p);
