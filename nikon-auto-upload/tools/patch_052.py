@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 # ----- MainActivity: editable FTP credentials -----
 p = Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java')
@@ -10,16 +11,16 @@ insert = '''        body.addView(camChoice);
         sectionHeader("FTP Login");
         LinearLayout ftpLogin=cardBox();
         ftpLogin.addView(txt("Use these exact credentials in the camera FTP profile.",12,muted,false));
-        EditText ftpUser=input("FTP username",p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER));
-        ftpUser.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        ftpLogin.addView(ftpUser,new LinearLayout.LayoutParams(-1,dp(52)));
-        EditText ftpPass=input("FTP password",p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD));
-        ftpPass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        ftpLogin.addView(ftpPass,new LinearLayout.LayoutParams(-1,dp(52)));
+        EditText ftpUserEdit=input("FTP username",p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER));
+        ftpUserEdit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        ftpLogin.addView(ftpUserEdit,new LinearLayout.LayoutParams(-1,dp(52)));
+        EditText ftpPassEdit=input("FTP password",p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD));
+        ftpPassEdit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        ftpLogin.addView(ftpPassEdit,new LinearLayout.LayoutParams(-1,dp(52)));
         TextView ftpPort=txt("Port: 2121  •  Use 02121 when the camera requires five digits",12,muted,false);ftpLogin.addView(ftpPort);
         Button saveFtp=smallButton("SAVE FTP LOGIN & RESTART RECEIVER",green);
         saveFtp.setOnClickListener(v->{
-            String u=clean(ftpUser.getText().toString()),pw=ftpPass.getText().toString().trim();
+            String u=clean(ftpUserEdit.getText().toString()),pw=ftpPassEdit.getText().toString().trim();
             if(u.isEmpty()){toast("FTP username cannot be blank");return;}
             if(pw.isEmpty()){toast("FTP password cannot be blank");return;}
             p.edit().putString("ftp_user",u).putString("ftp_password",pw).apply();
@@ -43,6 +44,11 @@ if marker not in s:
     raise SystemExit('0.5.2 could not locate camera settings insertion point')
 s = s.replace(marker, insert, 1)
 
+# Remove the old password-only Z8 FTP block so there is one camera-neutral FTP login editor.
+s, n = re.subn(r'\s*sectionHeader\("Advanced Z8 FTP"\);LinearLayout ftp=cardBox\(\);.*?body\.addView\(ftp\);', '', s, count=1, flags=re.S)
+if n != 1:
+    raise SystemExit('0.5.2 could not remove legacy Advanced Z8 FTP block')
+
 s = s.replace('Nikon Auto Upload 0.5.1', 'Nikon Auto Upload 0.5.2')
 p.write_text(s)
 
@@ -54,6 +60,7 @@ s = s.replace('if(!p.contains("flickr_upload_enabled"))e.putBoolean("flickr_uplo
               'if(!p.contains("ftp_user"))e.putString("ftp_user",DEFAULT_FTP_USER);\n        if(!p.contains("flickr_upload_enabled"))e.putBoolean("flickr_upload_enabled",true);',1)
 s = s.replace('new SimpleFtpServer(FTP_PORT,FTP_USER,p.getString("ftp_password",DEFAULT_FTP_PASSWORD),temp,this);',
               'new SimpleFtpServer(FTP_PORT,p.getString("ftp_user",DEFAULT_FTP_USER),p.getString("ftp_password",DEFAULT_FTP_PASSWORD),temp,this);')
+s = s.replace('i.putExtra("ftp_user",FTP_USER);', 'i.putExtra("ftp_user",p.getString("ftp_user",DEFAULT_FTP_USER));')
 needle = 'if("resume_receiver".equals(cmd)){resumeReceiver();return START_STICKY;}'
 if needle not in s:
     raise SystemExit('0.5.2 could not locate service command block')
