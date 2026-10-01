@@ -85,7 +85,7 @@ public class MainActivity extends Activity {
         status=txt("● Ready for direct Z8 transfer — no SnapBridge required",16,green,true);body.addView(status);space();
 
         Button openHotspot=big("OPEN PHONE HOTSPOT SETTINGS");
-        openHotspot.setOnClickListener(v->{try{startActivity(new Intent(Settings.ACTION_TETHER_SETTINGS));}catch(Exception e){startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));}});body.addView(openHotspot);
+        openHotspot.setOnClickListener(v->{try{startActivity(new Intent("android.settings.TETHER_SETTINGS"));}catch(Exception e){startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));}});body.addView(openHotspot);
         Button startReceiver=big("START RECEIVER ON PHONE HOTSPOT");startReceiver.setOnClickListener(v->startDirect("server"));body.addView(startReceiver);
 
         section("Recommended at a ball game");
