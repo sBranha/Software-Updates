@@ -16,8 +16,8 @@
     <application
         android:theme="@style/Theme.NikonAutoUpload"
         android:label="Nikon Auto Upload"
-        android:icon="@drawable/ic_camera"
-        android:roundIcon="@drawable/ic_camera"
+        android:icon="@drawable/launcher_z8"
+        android:roundIcon="@drawable/launcher_z8"
         android:allowBackup="true">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
