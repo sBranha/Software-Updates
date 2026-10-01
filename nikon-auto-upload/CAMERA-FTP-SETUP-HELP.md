@@ -1,6 +1,6 @@
 # Camera Auto Upload — FTP Camera Setup Help
 
-This document matches the in-app help included in **0.5.1 beta**. The Android app runs a local FTP server on port **2121**, saves incoming JPEGs to the phone, and can then upload them to Flickr over cellular.
+This document matches the in-app help included in **0.5.1 beta**. It covers **48 camera profiles**. The Android app runs a local FTP server on port **2121**, saves incoming JPEGs to the phone, and can then upload them to Flickr over cellular.
 
 ## Common FTP settings
 
@@ -81,7 +81,7 @@ Official manuals:
 
 ## Sony — phone hotspot + FTP
 
-Supported profiles: **α7 V, α1 II, α1, α9 III, α9 II, α9, α7 IV, α7 III, α7S III, α7R V, α7R IV, α7R IVA, α7R III, α7R IIIA, α7C II, α7CR, α7C, FX3, FX30**.
+Supported profiles: **α7 V, α1 II, α1, α9 III, α9 II, α9, α7 IV, α7 III, α7S III, α7R V, α7R IV, α7R IVA, α7R III, α7R IIIA, α7C II, α7CR, α7C, FX3, FX30, FX2, ILX-LR1**.
 
 1. Turn Android **Mobile Hotspot** on and connect the Sony camera using **Network → Wi-Fi / Access Point Set**.
 2. Open **Network → FTP Transfer → FTP Transfer Func. → Server Setting**.
@@ -103,6 +103,8 @@ Official manuals:
 - α7CR: https://helpguide.sony.net/ilc/2370/v1/en/contents/0704L_ftp_transfer.html
 - FX3: https://helpguide.sony.net/di/ftp_2210/v1/en/contents/FTP_server_connection.html
 - FX30: https://helpguide.sony.net/di/ftp_2220/v1/en/contents/FTP_server_connection.html
+- FX2: https://helpguide.sony.net/di/ftp_2530/v1/en/contents/FTP_server_connection.html
+- ILX-LR1: https://helpguide.sony.net/di/ftp_2390/v1/en/contents/FTP_server_connection.html
 
 ## Fujifilm — phone hotspot + FTP
 
