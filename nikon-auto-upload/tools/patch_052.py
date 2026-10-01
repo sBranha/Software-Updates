@@ -88,7 +88,8 @@ repls = {
 }
 for a,b in repls.items(): s=s.replace(a,b)
 old = 'String msg=x.setupSteps+accessory+"\\n\\nCurrent phone FTP address: "+ip+":2121";'
-new = 'String user=p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER),pass=p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD);\\n        String msg=x.setupSteps+accessory+"\\n\\nCurrent phone FTP address: "+ip+":2121\\nFTP username: "+user+"\\nFTP password: "+pass;'
+new = '''String user=p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER),pass=p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD);
+        String msg=x.setupSteps+accessory+"\\n\\nCurrent phone FTP address: "+ip+":2121\\nFTP username: "+user+"\\nFTP password: "+pass;'''
 if old not in s:
     raise SystemExit('0.5.2 could not locate setup credential text')
 s = s.replace(old,new,1)
