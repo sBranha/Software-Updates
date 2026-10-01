@@ -5,12 +5,14 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.*;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.InputType;
+import android.util.Size;
 import android.view.*;
 import android.widget.*;
 import java.text.SimpleDateFormat;
@@ -57,7 +59,11 @@ public class MainActivity extends Activity {
     @Override protected void onResume(){super.onResume();if(status!=null)refreshLiveViews(null);}
     @Override protected void onDestroy(){if(receiverRegistered)unregisterReceiver(directReceiver);super.onDestroy();}
 
-    void registerDirectReceiver(){IntentFilter f=new IntentFilter(DirectTransferService.ACTION_STATUS);if(Build.VERSION.SDK_INT>=33)registerReceiver(directReceiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(directReceiver,f);receiverRegistered=true;}
+    void registerDirectReceiver(){
+        IntentFilter f=new IntentFilter(DirectTransferService.ACTION_STATUS);
+        if(Build.VERSION.SDK_INT>=33)registerReceiver(directReceiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(directReceiver,f);
+        receiverRegistered=true;
+    }
 
     void handleCallback(Intent i){
         Uri d=i.getData();
@@ -74,7 +80,11 @@ public class MainActivity extends Activity {
         ScrollView sv=new ScrollView(this);sv.setFillViewport(true);sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
         nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);nav.setGravity(Gravity.CENTER);nav.setPadding(0,dp(4),0,dp(10));nav.setBackgroundColor(Color.rgb(10,15,20));
         String[] ns={"Home","Photos","Uploads","Settings"};
-        for(String n:ns){Button b=button(n);b.setSingleLine(true);b.setTextSize(12);b.setMinHeight(0);b.setMinWidth(0);b.setPadding(dp(2),0,dp(2),0);b.setOnClickListener(v->{if(n.equals("Home"))drawHome();else if(n.equals("Photos"))drawPhotos();else if(n.equals("Uploads"))drawUploads();else drawSettings();});nav.addView(b,new LinearLayout.LayoutParams(0,dp(54),1));}
+        for(String n:ns){
+            Button b=button(n);b.setSingleLine(true);b.setTextSize(12);b.setMinHeight(0);b.setMinWidth(0);b.setPadding(dp(2),0,dp(2),0);
+            b.setOnClickListener(v->{if(n.equals("Home"))drawHome();else if(n.equals("Photos"))drawPhotos();else if(n.equals("Uploads"))drawUploads();else drawSettings();});
+            nav.addView(b,new LinearLayout.LayoutParams(0,dp(54),1));
+        }
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(68));lp.setMargins(0,dp(4),0,dp(6));root.addView(nav,lp);setContentView(root);
         if(Build.VERSION.SDK_INT>=20){root.setOnApplyWindowInsetsListener((v,insets)->{int bottom=insets.getSystemWindowInsetBottom();root.setPadding(dp(18),dp(12),dp(18),Math.max(dp(18),bottom+dp(8)));return insets;});root.requestApplyInsets();}
     }
@@ -101,7 +111,6 @@ public class MainActivity extends Activity {
 
         section("Live connection");
         connectionInfo=txt("",15,white,false);LinearLayout info=panelBox();info.addView(connectionInfo);body.addView(info);refreshLiveViews(null);
-
         if(flickrOn&&p.getString("access_token","").isEmpty()){space();body.addView(txt("Flickr upload is ON, but Flickr is not connected. Open Settings to connect it. Photos will still save to the phone.",14,amber,true));}
 
         section("Game-day use");
@@ -114,21 +123,64 @@ public class MainActivity extends Activity {
         if(connectionInfo!=null){
             String ip=p.getString("last_ip","waiting for Z8 Wi-Fi"),ftp=p.getString("ftp_state","Waiting for Z8"),cell=p.getString("cellular_state","Checking cellular data"),flickr=p.getString("flickr_name","");
             boolean on=p.getBoolean("flickr_upload_enabled",true);int pending=p.getStringSet("pending_uploads",Collections.emptySet()).size();
-            StringBuilder b=new StringBuilder();b.append(p.getBoolean("receiver_running",false)?"✓ RECEIVER RUNNING":"○ RECEIVER STOPPED").append("\n");b.append("Save to phone: ALWAYS ON\n");b.append("Wi-Fi IP: ").append(ip).append("\n");b.append("Z8 FTP: ").append(ftp).append("\n");b.append("Flickr uploads: ").append(on?"ON":"OFF — phone only").append("\n");if(on){b.append("Cellular: ").append(cell).append("\n");b.append("Flickr account: ").append(flickr.isEmpty()?"Not connected":flickr).append("\n");}b.append("Queue: ").append(pending).append(" pending");connectionInfo.setText(b.toString());
+            StringBuilder b=new StringBuilder();
+            b.append(p.getBoolean("receiver_running",false)?"✓ RECEIVER RUNNING":"○ RECEIVER STOPPED").append("\n");
+            b.append("Save to phone: ALWAYS ON\n");b.append("Wi-Fi IP: ").append(ip).append("\n");b.append("Z8 FTP: ").append(ftp).append("\n");b.append("Flickr uploads: ").append(on?"ON":"OFF — phone only").append("\n");
+            if(on){b.append("Cellular: ").append(cell).append("\n");b.append("Flickr account: ").append(flickr.isEmpty()?"Not connected":flickr).append("\n");}
+            b.append("Queue: ").append(pending).append(" pending");connectionInfo.setText(b.toString());
         }
     }
 
     int statusColor(String s){String x=s==null?"":s.toLowerCase(Locale.US);if(x.contains("error")||x.contains("rejected")||x.contains("failed"))return amber;if(x.contains("waiting")||x.contains("stopped")||x.contains("not ready"))return muted;return green;}
 
-    void startDirect(boolean toastIt){Intent i=new Intent(this,DirectTransferService.class).putExtra("mode","z8ap");if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);p.edit().putBoolean("receiver_running",true).apply();if(status!=null){status.setText("● Starting Z8 receiver…");status.setTextColor(blue);}if(toastIt)toast("Z8 receiver started");}
+    void startDirect(boolean toastIt){
+        Intent i=new Intent(this,DirectTransferService.class).putExtra("mode","z8ap");if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
+        p.edit().putBoolean("receiver_running",true).apply();if(status!=null){status.setText("● Starting Z8 receiver…");status.setTextColor(blue);}if(toastIt)toast("Z8 receiver started");
+    }
 
     void drawPhotos(){
-        base("Photos");section("Photos received from Z8");body.addView(txt("Every photo received from the camera is saved here whether Flickr is ON or OFF.",14,muted,false));
-        ArrayList<String> rows=new ArrayList<>();
-        try(Cursor c=getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,new String[]{MediaStore.Images.Media.DISPLAY_NAME,MediaStore.Images.Media.DATE_ADDED,MediaStore.Images.Media.RELATIVE_PATH},Build.VERSION.SDK_INT>=29?MediaStore.Images.Media.RELATIVE_PATH+" LIKE ?":null,Build.VERSION.SDK_INT>=29?new String[]{"Pictures/Nikon Auto Upload%"}:null,MediaStore.Images.Media.DATE_ADDED+" DESC")){
-            int n=0;while(c!=null&&c.moveToNext()&&n<30){rows.add(c.getString(0)+"\n"+formatTime(c.getLong(1)*1000L));n++;}
-        }catch(Exception e){rows.add("Could not read photo list: "+e.getMessage());}
-        body.addView(txt(rows.isEmpty()?"No Nikon photos saved on this phone yet.":rows.size()+" most recent photo(s)",16,rows.isEmpty()?muted:green,true));for(String r:rows){space();LinearLayout box=panelBox();box.addView(txt(r,14,white,false));body.addView(box);}
+        base("Photos");
+        section("Photos received from Z8");
+        body.addView(txt("Tap any picture to open it full size.",14,muted,false));
+
+        ArrayList<Uri> photos=new ArrayList<>();
+        try(Cursor c=getContentResolver().query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                new String[]{MediaStore.Images.Media._ID,MediaStore.Images.Media.RELATIVE_PATH},
+                Build.VERSION.SDK_INT>=29?MediaStore.Images.Media.RELATIVE_PATH+" LIKE ?":null,
+                Build.VERSION.SDK_INT>=29?new String[]{"Pictures/Nikon Auto Upload%"}:null,
+                MediaStore.Images.Media.DATE_ADDED+" DESC")){
+            int n=0;
+            while(c!=null&&c.moveToNext()&&n<30){
+                long id=c.getLong(0);
+                photos.add(ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,id));
+                n++;
+            }
+        }catch(Exception e){
+            body.addView(txt("Could not load Nikon photos: "+e.getMessage(),14,amber,false));
+            return;
+        }
+
+        if(photos.isEmpty()){
+            space();body.addView(txt("No Nikon photos saved on this phone yet.",16,muted,true));return;
+        }
+
+        body.addView(txt(photos.size()+" most recent photo(s)",16,green,true));space();
+        LinearLayout row=null;
+        for(int i=0;i<photos.size();i++){
+            if(i%2==0){row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER);body.addView(row,new LinearLayout.LayoutParams(-1,dp(178)));}
+            Uri uri=photos.get(i);
+            ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackgroundColor(panel);image.setContentDescription("Nikon photo");
+            LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(0,dp(170),1);ip.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(image,ip);
+            try{
+                Bitmap thumb=getContentResolver().loadThumbnail(uri,new Size(900,650),null);
+                image.setImageBitmap(thumb);
+            }catch(Exception e){image.setImageResource(R.drawable.ic_camera);image.setPadding(dp(48),dp(48),dp(48),dp(48));}
+            image.setOnClickListener(v->{
+                try{Intent open=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,"image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(open);}catch(Exception ex){toast("Could not open photo");}
+            });
+            if(i==photos.size()-1&&photos.size()%2==1){Space filler=new Space(this);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(0,dp(170),1);fp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(filler,fp);}
+        }
     }
 
     void drawUploads(){
@@ -150,7 +202,9 @@ public class MainActivity extends Activity {
         Button save=big("SAVE FLICKR API KEY");save.setOnClickListener(v->{p.edit().putString("flickr_key",k.getText().toString().trim()).putString("flickr_secret",s.getText().toString().trim()).apply();toast("Saved");});body.addView(save);
         Button conn=big(p.getString("access_token","").isEmpty()?"CONNECT FLICKR":"RECONNECT FLICKR");conn.setOnClickListener(v->{p.edit().putString("flickr_key",k.getText().toString().trim()).putString("flickr_secret",s.getText().toString().trim()).apply();new Thread(()->{try{String u=new FlickrClient(this).beginAuth();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start();});body.addView(conn);if(!p.getString("flickr_name","").isEmpty())body.addView(txt("Connected as: "+p.getString("flickr_name",""),15,green,true));
 
-        section("Upload defaults");EditText tags=input("Default Flickr tags",p.getString("tags","nikon z8"));body.addView(tags);tags.setOnFocusChangeListener((v,f)->{if(!f)p.edit().putString("tags",tags.getText().toString()).apply();});Switch pub=new Switch(this);pub.setText("Upload as Public");pub.setTextColor(white);pub.setChecked(p.getBoolean("public",true));pub.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("public",c).apply());body.addView(pub);
+        section("Upload defaults");
+        EditText tags=input("Default Flickr tags",p.getString("tags","nikon z8"));body.addView(tags);tags.setOnFocusChangeListener((v,f)->{if(!f)p.edit().putString("tags",tags.getText().toString()).apply();});
+        Switch pub=new Switch(this);pub.setText("Upload as Public");pub.setTextColor(white);pub.setChecked(p.getBoolean("public",true));pub.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("public",c).apply());body.addView(pub);
 
         section("Permanent Z8 FTP login");
         body.addView(txt("Use these same settings in the Nikon Z8. They no longer change automatically.",13,muted,false));
@@ -158,18 +212,21 @@ public class MainActivity extends Activity {
         EditText ftpPass=input("FTP password",p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD));ftpPass.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);body.addView(ftpPass);
         Button ftpSave=big("SAVE PERMANENT FTP PASSWORD");ftpSave.setOnClickListener(v->{String x=ftpPass.getText().toString().trim();if(x.length()<4){toast("Use at least 4 digits");return;}p.edit().putString("ftp_password",x).putBoolean("ftp_fixed_password_v031",true).apply();stopService(new Intent(this,DirectTransferService.class));startDirect(false);toast("FTP password saved. Only change the Z8 if you deliberately change this value.");});body.addView(ftpSave);
         Button reset=big("RESET PASSWORD TO 47250558");reset.setOnClickListener(v->{p.edit().putString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD).putBoolean("ftp_fixed_password_v031",true).apply();ftpPass.setText(DirectTransferService.DEFAULT_FTP_PASSWORD);stopService(new Intent(this,DirectTransferService.class));startDirect(false);toast("Permanent FTP password reset to 47250558");});body.addView(reset);
-        body.addView(txt("Version 0.3.1 keeps the dark dashboard layout, permanent FTP credentials, phone-only transfer mode, Flickr toggle, upload history and Nikon-compatible FTP receiver.",13,muted,false));
+        body.addView(txt("Version 0.3.3 adds the in-app photo gallery with real picture thumbnails while keeping permanent FTP credentials, phone-only mode and Flickr upload controls.",13,muted,false));
     }
 
-    String formatPrefTime(String key){long t=p.getLong(key,0);return t==0?"":formatTime(t);}String formatTime(long t){return new SimpleDateFormat("MMM d, yyyy  h:mm:ss a",Locale.US).format(new Date(t));}
+    String formatPrefTime(String key){long t=p.getLong(key,0);return t==0?"":formatTime(t);}
+    String formatTime(long t){return new SimpleDateFormat("MMM d, yyyy  h:mm:ss a",Locale.US).format(new Date(t));}
     LinearLayout statBox(String label,String value){LinearLayout x=panelBox();x.setGravity(Gravity.CENTER);x.addView(txt(value,23,green,true));x.addView(txt(label,10,muted,true));return x;}
     LinearLayout panelBox(){LinearLayout x=new LinearLayout(this);x.setOrientation(LinearLayout.VERTICAL);x.setPadding(dp(12),dp(10),dp(12),dp(10));x.setBackgroundColor(panel);return x;}
     void requestPerms(){ArrayList<String>x=new ArrayList<>();if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)x.add(Manifest.permission.POST_NOTIFICATIONS);if(!x.isEmpty())requestPermissions(x.toArray(new String[0]),7);}
     void card(String a,String b,int c){LinearLayout x=new LinearLayout(this);x.setOrientation(LinearLayout.VERTICAL);x.setPadding(dp(18),dp(18),dp(18),dp(18));x.setBackgroundColor(panel);x.addView(txt(a,26,white,true));x.addView(txt(b,15,muted,false));body.addView(x,new LinearLayout.LayoutParams(-1,dp(120)));space();}
-    void section(String s){space();body.addView(txt(s,18,blue,true));space();}void space(){Space s=new Space(this);body.addView(s,new LinearLayout.LayoutParams(1,dp(12)));}
+    void section(String s){space();body.addView(txt(s,18,blue,true));space();}
+    void space(){Space s=new Space(this);body.addView(s,new LinearLayout.LayoutParams(1,dp(12)));}
     TextView txt(String s,int z,int c,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setTextColor(c);if(bold)t.setTypeface(null,1);t.setGravity(Gravity.CENTER_VERTICAL);t.setLineSpacing(0,1.08f);return t;}
     Button button(String s){Button b=new Button(this);b.setText(s);b.setTextColor(white);b.setBackgroundColor(Color.TRANSPARENT);return b;}
     Button big(String s){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setTextSize(15);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(blue));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(54));lp.setMargins(0,dp(8),0,dp(8));b.setLayoutParams(lp);return b;}
     EditText input(String hint,String val){EditText e=new EditText(this);e.setHint(hint);e.setHintTextColor(muted);e.setTextColor(white);e.setText(val);e.setSingleLine(true);e.setPadding(dp(14),0,dp(14),0);e.setBackgroundColor(panel);e.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(54)));return e;}
-    void toast(String s){Toast.makeText(this,s==null?"Error":s,Toast.LENGTH_LONG).show();}int dp(int x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}
+    void toast(String s){Toast.makeText(this,s==null?"Error":s,Toast.LENGTH_LONG).show();}
+    int dp(int x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}
 }
