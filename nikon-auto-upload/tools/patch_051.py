@@ -32,3 +32,32 @@ if nikon_needle not in s:
     raise SystemExit('0.5.1 could not locate Nikon transmitter profile line')
 s = s.replace(nikon_needle, nikon_replacement, 1)
 p.write_text(s)
+
+# ----- Offline help: keep profile count and Nikon transmitter list in sync -----
+p = Path('nikon-auto-upload/app/src/main/assets/CAMERA_SETUP_HELP.txt')
+s = p.read_text()
+s = s.replace('Verified camera profiles: 48', 'Verified camera profiles: 57')
+old = '''- Nikon D850 + WT-7
+- Nikon D6 + WT-6'''
+new = '''- Nikon D850 + WT-7
+- Nikon D780 + WT-7
+- Nikon D500 + WT-7
+- Nikon D810A + WT-7
+- Nikon D810 + WT-7
+- Nikon D750 + WT-7
+- Nikon D7200 + WT-7
+- Nikon D6 + WT-6
+- Nikon D5 + WT-6 / WT-5
+- Nikon D4S + WT-5
+- Nikon D4 + WT-5'''
+if old not in s:
+    raise SystemExit('0.5.1 could not locate Nikon help accessory list')
+s = s.replace(old, new, 1)
+refneedle = 'D6 WT-6: https://onlinemanual.nikonimglib.com/d6/en/13_ethernet_wt-6_05.html'
+refreplacement = refneedle + '''
+D780 WT-7: https://onlinemanual.nikonimglib.com/d780/en/11_network_connections_04.html
+WT-7 supported cameras: https://downloadcenter.nikonimglib.com/en/download/fw/378.html
+Nikon network-device compatibility: https://downloadcenter.nikonimglib.com/en/download/sw/272.html'''
+if refneedle in s:
+    s = s.replace(refneedle, refreplacement, 1)
+p.write_text(s)
