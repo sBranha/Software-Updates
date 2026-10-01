@@ -1,0 +1,16 @@
+package com.nikonautoupload;
+
+import android.app.*;import android.content.*;import android.database.ContentObserver;import android.net.*;import android.os.*;import android.provider.MediaStore;import java.util.concurrent.*;
+
+public class PhotoMonitorService extends Service {
+    public static final String CH="nikon_monitor"; private ContentObserver observer; private final ExecutorService pool=Executors.newSingleThreadExecutor(); private SharedPreferences p;
+    @Override public void onCreate(){super.onCreate();p=getSharedPreferences("settings",MODE_PRIVATE);createChannel();startForeground(41,new Notification.Builder(this,CH).setContentTitle("Nikon Auto Upload").setContentText("Watching for new Nikon Z8 photos").setSmallIcon(com.nikonautoupload.R.drawable.ic_camera).build());
+        observer=new ContentObserver(new Handler(Looper.getMainLooper())){@Override public void onChange(boolean self, Uri uri){if(uri!=null)handle(uri);}};getContentResolver().registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,true,observer);}
+    private void handle(Uri uri){ if(!p.getBoolean("auto_upload",true))return; pool.submit(()->{try{Thread.sleep(1200); if(!looksLikeCameraPhoto(uri))return; String name=fileName(uri); if(name==null)name="Nikon photo"; new FlickrClient(this).upload(uri,name,p.getString("tags","nikon z8"),p.getBoolean("public",true)); notifyDone(name);}catch(Exception e){notifyError(e.getMessage());}}); }
+    private boolean looksLikeCameraPhoto(Uri uri){try(android.database.Cursor c=getContentResolver().query(uri,new String[]{MediaStore.Images.Media.DISPLAY_NAME,MediaStore.Images.Media.RELATIVE_PATH},null,null,null)){if(c!=null&&c.moveToFirst()){String n=c.getString(0), path=c.getString(1);String f=(n+" "+path).toLowerCase();return f.endsWith(".jpg")||f.endsWith(".jpeg") ? (f.contains("snapbridge")||f.contains("nikon")||f.contains("dsc_")||p.getBoolean("all_jpegs",false)) : false;}}catch(Exception ignored){}return false;}
+    private String fileName(Uri uri){try(android.database.Cursor c=getContentResolver().query(uri,new String[]{MediaStore.Images.Media.DISPLAY_NAME},null,null,null)){return c!=null&&c.moveToFirst()?c.getString(0):null;}catch(Exception e){return null;}}
+    private void notifyDone(String n){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify((int)(System.currentTimeMillis()%100000),new Notification.Builder(this,CH).setSmallIcon(R.drawable.ic_camera).setContentTitle("Uploaded to Flickr").setContentText(n).setAutoCancel(true).build());}
+    private void notifyError(String m){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(42,new Notification.Builder(this,CH).setSmallIcon(R.drawable.ic_camera).setContentTitle("Upload waiting").setContentText(m==null?"Will retry after you check settings/network":m).build());}
+    private void createChannel(){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"Photo transfer",NotificationManager.IMPORTANCE_LOW));}
+    @Override public int onStartCommand(Intent i,int f,int id){return START_STICKY;} @Override public void onDestroy(){if(observer!=null)getContentResolver().unregisterContentObserver(observer);pool.shutdownNow();super.onDestroy();} @Override public android.os.IBinder onBind(Intent i){return null;}
+}
