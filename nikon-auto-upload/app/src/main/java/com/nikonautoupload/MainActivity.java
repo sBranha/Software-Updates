@@ -104,7 +104,7 @@ public class MainActivity extends Activity {
     void drawHome(){
         base("Nikon Auto Upload");
         card("Nikon Z8","Bluetooth visibility + automatic photo workflow",green);
-        status=txt("● Ready to look for Nikon Z8",16,green,true);
+        status=txt("● Ready — on the Z8 turn on Connect to smart device",16,green,true);
         body.addView(status);
 
         Button scan=big("Find Nikon Z8");
@@ -115,8 +115,11 @@ public class MainActivity extends Activity {
         service.setOnClickListener(v->startMonitor());
         body.addView(service);
 
+        section("Z8 setup");
+        body.addView(txt("On the camera go to:\nNetwork Menu → Connect to smart device → Pairing (Bluetooth).\n\nIf Connect to smart device shows OFF, enter that menu and start the Bluetooth pairing process. Keep the camera on its Pairing (Bluetooth) screen while the phone/SnapBridge completes pairing.",15,white,false));
+
         section("Camera setup");
-        body.addView(txt("Pair the Z8 with Nikon SnapBridge first. When the camera is on the Pairing (Bluetooth) screen, this app can recognize Z8 Bluetooth names such as Z_8_3036941 and confirm that the camera is visible. SnapBridge handles Nikon's camera pairing and camera-to-phone transfer; Nikon Auto Upload takes over when the JPEG reaches your phone.",15,white,false));
+        body.addView(txt("Pair the Z8 with Nikon SnapBridge first. This app recognizes Z8 Bluetooth names such as Z_8_3036941 and confirms that the camera is visible. SnapBridge handles Nikon's camera pairing and camera-to-phone transfer; Nikon Auto Upload takes over when the JPEG reaches your phone.",15,white,false));
 
         section("Workflow");
         body.addView(txt("1. Pair the Nikon Z8 to this phone with SnapBridge.\n\n2. Z8/SnapBridge automatically transfers each new JPEG to the phone.\n\n3. Nikon Auto Upload detects the new JPEG.\n\n4. The photo uploads to Flickr automatically.\n\n5. If Flickr or internet is unavailable, the original remains safely on your phone.",16,white,false));
@@ -172,7 +175,7 @@ public class MainActivity extends Activity {
         body.addView(pub);
 
         section("Camera Transfer");
-        body.addView(txt("Version 0.1.2 recognizes Nikon Z8 Bluetooth advertising names including Z_8-style names. SnapBridge remains responsible for Nikon pairing and the camera-to-phone transfer. This app monitors the phone for the incoming JPEG and handles the Flickr upload.",14,muted,false));
+        body.addView(txt("Version 0.1.2 recognizes Nikon Z8 Bluetooth advertising names including Z_8-style names. On the Z8 use Network Menu → Connect to smart device → Pairing (Bluetooth). SnapBridge remains responsible for Nikon pairing and the camera-to-phone transfer. This app monitors the phone for the incoming JPEG and handles the Flickr upload.",14,muted,false));
     }
 
     void placeholder(String n){
@@ -226,7 +229,7 @@ public class MainActivity extends Activity {
             @Override public void onScanResult(int type,ScanResult r){
                 String n=scanName(r);
                 if(isZ8Name(n)){
-                    status.setText("● Camera visible: "+n+"\nPairing/transfer is handled by SnapBridge");
+                    status.setText("● Camera visible: "+n+"\nFinish Nikon pairing in SnapBridge");
                     status.setTextColor(green);
                     p.edit().putString("last_camera_name",n).apply();
                     try{sc.stopScan(this);}catch(Exception ignored){}
@@ -237,7 +240,7 @@ public class MainActivity extends Activity {
                 for(ScanResult r:results){
                     String n=scanName(r);
                     if(isZ8Name(n)){
-                        status.setText("● Camera visible: "+n+"\nPairing/transfer is handled by SnapBridge");
+                        status.setText("● Camera visible: "+n+"\nFinish Nikon pairing in SnapBridge");
                         status.setTextColor(green);
                         p.edit().putString("last_camera_name",n).apply();
                         try{sc.stopScan(this);}catch(Exception ignored){}
@@ -256,7 +259,7 @@ public class MainActivity extends Activity {
         new Handler(Looper.getMainLooper()).postDelayed(()->{
             try{sc.stopScan(cb);}catch(Exception ignored){}
             if(status.getText().toString().contains("Looking for")){
-                status.setText("No Z8 Bluetooth signal found yet — put the Z8 on its Pairing (Bluetooth) screen and try again");
+                status.setText("No Z8 signal found. On the camera: Network Menu → Connect to smart device → Pairing (Bluetooth), then try again.");
                 status.setTextColor(muted);
             }
         },12000);
