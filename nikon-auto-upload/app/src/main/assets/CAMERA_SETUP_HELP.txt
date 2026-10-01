@@ -1,0 +1,249 @@
+CAMERA AUTO UPLOAD — FTP CAMERA SETUP HELP
+Version 0.5.1 beta
+Verified camera profiles: 46
+Last reviewed: October 2026
+
+WHAT THIS APP DOES
+Camera -> FTP receiver on Android phone -> save JPEG on phone -> optional Flickr upload over cellular.
+
+COMMON FTP SETTINGS
+Protocol: FTP (plain FTP; do not choose FTPS or SFTP)
+Server/Host: use the phone IP displayed in the app
+Port: 2121 (some cameras display this as 02121)
+User: nikon
+Password: use the value shown in Settings > Advanced FTP
+Passive/PASV mode: ON when available
+Destination folder: Root/Home folder
+Recommended transfer file: JPEG only
+Automatic transfer: ON
+Delete after transfer: OFF
+
+IMPORTANT
+The phone IP can change when you change from the camera's Wi-Fi to the phone hotspot or another network. Always use the current IP shown by the app.
+For Nikon direct-access-point models, the CAMERA creates the Wi-Fi and the phone joins it.
+For Canon, Sony, and Fujifilm profiles, the PHONE hotspot is the easiest field workflow and the camera joins the phone.
+Older Nikon/Canon bodies and Fujifilm X-H2/X-H2S require the listed wireless transmitter accessory.
+
+============================================================
+NIKON — BUILT-IN WIRELESS FTP
+============================================================
+Supported:
+- Nikon Z9
+- Nikon Z8
+- Nikon Z6III
+- Nikon Z5II
+- Nikon Zf
+- Nikon Z50II
+- Nikon ZR
+
+Setup:
+1. Network menu > Connect to FTP server > Network settings > Create profile > Connection wizard.
+2. Choose Direct connection / Wi-Fi access point mode.
+3. The camera shows its SSID and password. On Android, join that camera Wi-Fi.
+4. Back on the camera, choose FTP.
+5. Enter port 2121.
+6. Choose Enter user ID.
+7. User = nikon.
+8. Password = the app's Advanced FTP password.
+9. Destination = Home/root folder.
+10. Connect. The FTP profile should show connected/green.
+11. Connect to FTP server > Options > Auto upload = ON.
+12. If shooting RAW+JPEG, choose JPEG-only transfer when available.
+13. Keep Delete after upload OFF.
+
+Official Nikon references:
+Z9: https://onlinemanual.nikonimglib.com/z9/en/ftp_servers_connecting_via_ethernet_or_wlan_67.html
+Z8: https://onlinemanual.nikonimglib.com/z8/en/ftp_servers_connecting_via_wireless_lan_92.html
+Z6III: https://onlinemanual.nikonimglib.com/z6III/en/ftp_servers_connecting_via_wireless_lan_95.html
+Z5II: https://onlinemanual.nikonimglib.com/z5II/en/ftp_servers_connecting_via_wireless_lan_101.html
+Zf: https://onlinemanual.nikonimglib.com/zf/en/ftp_servers_connecting_via_wireless_lan_89.html
+Z50II: https://onlinemanual.nikonimglib.com/z50II/en/25-04.html
+ZR: https://onlinemanual.nikonimglib.com/zr/en/09-09-07.html
+
+============================================================
+NIKON — WIRELESS TRANSMITTER REQUIRED
+============================================================
+Supported:
+- Nikon Z7II + WT-7
+- Nikon Z6II + WT-7
+- Nikon Z7 + WT-7
+- Nikon Z6 + WT-7
+- Nikon D850 + WT-7
+- Nikon D6 + WT-6
+
+Setup:
+1. Attach and power the listed Nikon wireless transmitter.
+2. Enable the transmitter/network option in the camera.
+3. Create an FTP Upload profile.
+4. Use access-point mode if available, then join that Wi-Fi from the Android phone.
+5. Use FTP server port 2121, user nikon, app FTP password, root folder.
+6. Enable upload as pictures are taken / automatic FTP upload.
+7. Use JPEG transfer for this app/Flickr workflow.
+
+Official Nikon references:
+Z7II/Z6II WT-7: https://onlinemanual.nikonimglib.com/z7II_z6II/en/10_establishing_wireless_connections_04.html
+Z7/Z6 WT-7: https://onlinemanual.nikonimglib.com/z7_z6/en/10_connections_02.html
+D850 WT-7: https://onlinemanual.nikonimglib.com/d850/en/19_technical_notes_02.html
+D6 WT-6: https://onlinemanual.nikonimglib.com/d6/en/13_ethernet_wt-6_05.html
+
+============================================================
+CANON — PHONE HOTSPOT + FTP
+============================================================
+Supported with built-in Wi-Fi FTP:
+- Canon EOS R1
+- Canon EOS R5 Mark II
+- Canon EOS R3
+- Canon EOS R5
+- Canon EOS R6 Mark III
+- Canon EOS R6 Mark II
+- Canon EOS R6 V
+- Canon EOS R6
+
+Wireless accessory profiles:
+- Canon EOS-1D X Mark III + WFT-E9
+- Canon EOS-1D X Mark II + WFT-E8
+
+Setup:
+1. Android Settings > Mobile Hotspot > ON.
+2. Connect the Canon camera to that hotspot.
+3. Communication functions / Wireless features > Transfer images to FTP server.
+4. Create/add a connection.
+5. Choose FTP, not FTPS.
+6. Server address = phone IP shown by the app.
+7. Port = 2121. If the Canon screen uses five digits, enter 02121.
+8. Passive mode = Enable.
+9. Login method = user/password.
+10. User = nikon.
+11. Password = app Advanced FTP password.
+12. Target folder = Root folder.
+13. FTP transfer settings > Automatic transfer = Enable.
+14. Images to transfer = JPEG when shooting RAW+JPEG.
+
+Official Canon references:
+EOS R1: https://cam.start.canon/en/C018/manual/html/UG-06_Network_0030.html
+EOS R5 Mark II: https://cam.start.canon/en/C017/manual/html/UG-06_Network_0060.html
+EOS R3: https://cam.start.canon/en/C010/manual/html/UG-06_Network_0070.html
+EOS R5: https://cam.start.canon/en/C003/manual/html/UG-06_Network_0070.html
+EOS R6 Mark III: https://cam.start.canon/en/C022/manual/html/UG-07_Network_0070.html
+EOS R6 Mark II: https://cam.start.canon/en/C012/manual/html/UG-07_Network_0070.html
+EOS R6 V: https://cam.start.canon/en/C023/manual/html/index.html
+EOS R6: https://cam.start.canon/en/C004/manual/html/UG-06_Network_0070.html
+Canon compatibility reference: https://cam.start.canon/en/S013/manual/html/UG-00_Before_0020.html
+
+============================================================
+SONY — PHONE HOTSPOT + FTP
+============================================================
+Supported:
+- Sony α7 V
+- Sony α1 II
+- Sony α1
+- Sony α9 III
+- Sony α9 II
+- Sony α9
+- Sony α7 IV
+- Sony α7 III
+- Sony α7S III
+- Sony α7R V
+- Sony α7R IV
+- Sony α7R IVA
+- Sony α7R III
+- Sony α7R IIIA
+- Sony α7C II
+- Sony α7CR
+- Sony α7C
+- Sony FX3
+- Sony FX30
+
+Setup:
+1. Android Mobile Hotspot = ON.
+2. Connect the Sony camera to the hotspot using Network > Wi-Fi > Access Point Set.
+3. Network > FTP Transfer > FTP Transfer Func. > Server Setting.
+4. Host Name = phone IP shown by the app.
+5. Port = 2121.
+6. Secure Protocol = Off / plain FTP.
+7. User = nikon.
+8. Password = app Advanced FTP password.
+9. FTP Function = On.
+10. Auto FTP Transfer / Auto Trans When Shot = On.
+11. For RAW+JPEG, select JPEG as the transfer target.
+12. If transfer fails, keep the app open and verify the phone IP, hotspot, and FTP password.
+
+Official Sony references:
+α7 V: https://helpguide.sony.net/di/ftp_2540/v1/en/index.html
+α1 II: https://helpguide.sony.net/di/ftp_2440/v1/en/contents/auto_transfer.html
+α1: https://helpguide.sony.net/di/ftp_2420/v1/en/contents/auto_transfer.html
+α9 III: https://helpguide.sony.net/di/ftp_2380/v1/en/contents/auto_transfer.html
+α7 IV: https://helpguide.sony.net/di/ftp_2110/v1/en/contents/TP1000657885.html
+α7 III / α9 / α9 II / α7R III / IIIA / α7R IV / IVA / α7C:
+https://helpguide.sony.net/di/ftp/v1/en/contents/TP0002043783.html
+α7S III: https://helpguide.sony.net/di/ftp_2410/v1/en/contents/FTP_server_connection.html
+α7R V: https://helpguide.sony.net/di/ftp_2230/v1/en/index.html
+α7C II: https://helpguide.sony.net/ilc/2360/v1/en/contents/0704L_ftp_transfer.html
+α7CR: https://helpguide.sony.net/ilc/2370/v1/en/contents/0704L_ftp_transfer.html
+FX3: https://helpguide.sony.net/di/ftp_2210/v1/en/contents/FTP_server_connection.html
+FX30: https://helpguide.sony.net/di/ftp_2220/v1/en/contents/FTP_server_connection.html
+
+============================================================
+FUJIFILM — PHONE HOTSPOT + FTP
+============================================================
+Supported with built-in FTP:
+- Fujifilm GFX100 II
+- Fujifilm GFX100S II
+
+Requires FT-XH:
+- Fujifilm X-H2 + FT-XH
+- Fujifilm X-H2S + FT-XH
+
+Setup:
+1. Android Mobile Hotspot = ON.
+2. Connect the Fujifilm camera/file transmitter to that hotspot.
+3. Network/USB Setting > Create/Edit Connection Setting > Create Using Wizard > FTP Transfer.
+4. Choose Wireless LAN.
+5. Configure the phone hotspot network.
+6. Create FTP server settings.
+7. FTP server type = FTP.
+8. Server address = phone IP shown by the app.
+9. Port = 2121.
+10. Proxy = Disable.
+11. PASV = Enable.
+12. User Name & Password = nikon + app Advanced FTP password.
+13. Destination = Root Folder.
+14. FTP Optional Setting > Auto Image Transfer Order = ON.
+15. Use JPEG for this app/Flickr workflow.
+
+Official Fujifilm references:
+GFX100 II: https://fujifilm-dsc.com/en-int/manual/gfx100ii/connections/ftp_upload/index.html
+GFX100S II: https://fujifilm-dsc.com/en/manual/gfx100s-ii/connections/ftp_upload/index.html
+X-H2: https://fujifilm-dsc.com/en/manual/x-h2_connection/overview_usage/ftp_upload/index.html
+X-H2S: https://app.fujifilm-dsc.com/en/manual/x-h2s_connection/overview_usage/ftp_upload/index.html
+
+============================================================
+TROUBLESHOOTING
+============================================================
+Camera cannot connect:
+- Confirm the app receiver is running.
+- Confirm the camera and phone are on the same Wi-Fi network.
+- Re-check the phone IP shown in the app.
+- Port must be 2121.
+- User must be nikon.
+- Re-enter the FTP password exactly.
+- Use plain FTP, not FTPS/SFTP.
+- Enable Passive/PASV when available.
+- Temporarily disable VPNs.
+- On Android, allow the app to run in the background and exclude it from aggressive battery optimization if transfers stop when the screen is off.
+
+Camera connects but no photo arrives:
+- Turn Automatic transfer / Auto FTP Transfer / Auto upload ON.
+- Set the camera to send JPEG.
+- If shooting RAW+JPEG, choose JPEG only.
+- Make sure the camera is actually connected to the FTP profile while shooting.
+
+Phone receives photos but Flickr does not:
+- Camera-to-phone FTP and Flickr are separate.
+- Leave Flickr Upload enabled in the app.
+- Make sure mobile data is on.
+- The app should report cellular/5G-LTE ready.
+- Pending uploads stay on the phone and retry later.
+
+SECURITY
+The app intentionally uses a local FTP server on the camera/phone network. Do not expose port 2121 to the public internet or forward it through a router. Use a strong FTP password.
