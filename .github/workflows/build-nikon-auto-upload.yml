@@ -36,11 +36,11 @@ jobs:
         run: gradle --no-daemon clean assembleDebug
 
       - name: Rename APK
-        run: cp nikon-auto-upload/app/build/outputs/apk/debug/app-debug.apk NikonAutoUpload-0.2.0.apk
+        run: cp nikon-auto-upload/app/build/outputs/apk/debug/app-debug.apk NikonAutoUpload-0.2.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NikonAutoUpload-0.2.0-APK
-          path: NikonAutoUpload-0.2.0.apk
+          name: NikonAutoUpload-0.2.1-APK
+          path: NikonAutoUpload-0.2.1.apk
           if-no-files-found: error
