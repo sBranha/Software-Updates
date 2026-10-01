@@ -31,16 +31,23 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
+      - name: Build unsigned release APK
         working-directory: nikon-auto-upload
-        run: gradle --no-daemon clean assembleDebug
+        run: gradle --no-daemon clean assembleRelease
 
-      - name: Rename APK
-        run: cp nikon-auto-upload/app/build/outputs/apk/debug/app-debug.apk NikonAutoUpload-0.3.1.apk
+      - name: Package signing tools
+        shell: bash
+        run: |
+          mkdir -p signing-tools/lib
+          cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" signing-tools/apksigner
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/lib/apksigner.jar
+          cp nikon-auto-upload/app/build/outputs/apk/release/app-release-unsigned.apk NikonAutoUpload-0.3.2-unsigned.apk
 
-      - name: Upload APK artifact
+      - name: Upload unsigned APK and signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: NikonAutoUpload-0.3.1-APK
-          path: NikonAutoUpload-0.3.1.apk
+          name: NikonAutoUpload-0.3.2-UNSIGNED
+          path: |
+            NikonAutoUpload-0.3.2-unsigned.apk
+            signing-tools/
           if-no-files-found: error
