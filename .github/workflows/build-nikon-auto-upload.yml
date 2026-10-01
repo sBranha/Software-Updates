@@ -31,6 +31,17 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java')
+          s = p.read_text()
+          s = s.replace('share.setOnClickListener(v->sharePhoto(photos.get(index[0]));', 'share.setOnClickListener(v->sharePhoto(photos.get(index[0])));')
+          p.write_text(s)
+          PY
+
       - name: Build unsigned release APK
         working-directory: nikon-auto-upload
         run: gradle --no-daemon clean assembleRelease
