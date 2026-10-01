@@ -1,6 +1,6 @@
 # Camera Auto Upload — FTP Camera Setup Help
 
-This document matches the in-app help included in **0.5.1 beta**. It covers **48 camera profiles**. The Android app runs a local FTP server on port **2121**, saves incoming JPEGs to the phone, and can then upload them to Flickr over cellular.
+This document matches the in-app help included in **0.5.1 beta**. It covers **57 camera profiles**. The Android app runs a local FTP server on port **2121**, saves incoming JPEGs to the phone, and can then upload them to Flickr over cellular.
 
 ## Common FTP settings
 
@@ -45,15 +45,27 @@ Supported profiles:
 - Z7 + WT-7
 - Z6 + WT-7
 - D850 + WT-7
+- D780 + WT-7
+- D500 + WT-7
+- D810A + WT-7
+- D810 + WT-7
+- D750 + WT-7
+- D7200 + WT-7
 - D6 + WT-6
+- D5 + WT-6 / WT-5
+- D4S + WT-5
+- D4 + WT-5
 
 Attach and enable the listed transmitter, create an FTP Upload profile, use access-point mode when available, join that network from Android, then use the common FTP settings above. Enable upload-as-taken/automatic FTP upload.
 
-Official manuals:
+Official references:
 - Z7II/Z6II: https://onlinemanual.nikonimglib.com/z7II_z6II/en/10_establishing_wireless_connections_04.html
 - Z7/Z6: https://onlinemanual.nikonimglib.com/z7_z6/en/10_connections_02.html
 - D850: https://onlinemanual.nikonimglib.com/d850/en/19_technical_notes_02.html
+- D780: https://onlinemanual.nikonimglib.com/d780/en/11_network_connections_04.html
 - D6: https://onlinemanual.nikonimglib.com/d6/en/13_ethernet_wt-6_05.html
+- WT-7 compatible-camera reference: https://downloadcenter.nikonimglib.com/en/download/fw/378.html
+- Nikon network-device compatibility: https://downloadcenter.nikonimglib.com/en/download/sw/272.html
 
 ## Canon — phone hotspot + FTP
 
