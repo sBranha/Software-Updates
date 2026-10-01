@@ -69,10 +69,14 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
                     }catch(Exception ignored){}
                     final String fs=ssid==null?"":ssid, fp=pass==null?"":pass;
                     io.submit(()->{
-                        try{Thread.sleep(700);}catch(Exception ignored){}
-                        startFtp();
-                        String ip=findBestLocalIp();
-                        broadcast("Private camera Wi-Fi is ready",fs,fp,ip);
+                        try{
+                            Thread.sleep(700);
+                            startFtp();
+                            String ip=findBestLocalIp();
+                            broadcast("Private camera Wi-Fi is ready",fs,fp,ip);
+                        }catch(Exception e){
+                            broadcast("FTP receiver error: "+e.getMessage(),fs,fp,findBestLocalIp());
+                        }
                     });
                 }
                 @Override public void onStopped(){
