@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -31,6 +31,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare source
+        shell: bash
+        run: |
+          if ! grep -q '^import java.io.File;' nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java; then
+            sed -i '/^import java.io.OutputStream;/i import java.io.File;' nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java
+          fi
+
       - name: Build unsigned release APK
         working-directory: nikon-auto-upload
         run: gradle --no-daemon clean assembleRelease
@@ -41,13 +48,13 @@ jobs:
           mkdir -p signing-tools/lib
           cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" signing-tools/apksigner
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/lib/apksigner.jar
-          cp nikon-auto-upload/app/build/outputs/apk/release/app-release-unsigned.apk NikonAutoUpload-0.3.4-unsigned.apk
+          cp nikon-auto-upload/app/build/outputs/apk/release/app-release-unsigned.apk NikonAutoUpload-0.3.5-unsigned.apk
 
       - name: Upload unsigned APK and signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: NikonAutoUpload-0.3.4-UNSIGNED
+          name: NikonAutoUpload-0.3.5-UNSIGNED
           path: |
-            NikonAutoUpload-0.3.4-unsigned.apk
+            NikonAutoUpload-0.3.5-unsigned.apk
             signing-tools/
           if-no-files-found: error
