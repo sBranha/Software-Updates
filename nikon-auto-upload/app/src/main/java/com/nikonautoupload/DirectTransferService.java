@@ -3,10 +3,11 @@ package com.nikonautoupload;
 import android.app.*;
 import android.content.*;
 import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
-import android.net.wifi.SoftApConfiguration;
-import android.net.wifi.WifiConfiguration;
-import android.net.wifi.WifiManager;
 import android.os.*;
 import android.provider.MediaStore;
 import android.content.ContentValues;
@@ -19,86 +20,53 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     public static final String ACTION_STATUS="com.nikonautoupload.DIRECT_STATUS";
     public static final String CH="nikon_direct";
     public static final int FTP_PORT=2121;
+
     private SharedPreferences p;
-    private WifiManager.LocalOnlyHotspotReservation reservation;
     private SimpleFtpServer ftp;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private final ScheduledExecutorService retry=Executors.newSingleThreadScheduledExecutor();
     private volatile boolean processing;
-    private String mode="server";
+    private volatile Network cellularNetwork;
+    private volatile boolean cellularRequestActive;
+    private String cellularState="checking cellular data";
+    private ConnectivityManager cm;
+    private ConnectivityManager.NetworkCallback cellularCallback;
+    private String mode="z8ap";
 
     @Override public void onCreate(){
         super.onCreate();
         p=getSharedPreferences("settings",MODE_PRIVATE);
         ensureFtpPassword();
         createChannel();
+        cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
         startForeground(71,new Notification.Builder(this,CH)
                 .setSmallIcon(R.drawable.ic_camera)
                 .setContentTitle("Nikon Auto Upload")
-                .setContentText("Direct Z8 receiver is starting")
+                .setContentText("Z8 direct receiver is starting")
                 .setOngoing(true).build());
-        retry.scheduleWithFixedDelay(this::processPending,20,60,TimeUnit.SECONDS);
+        requestCellular();
+        retry.scheduleWithFixedDelay(()->{
+            if(cellularNetwork==null&&!cellularRequestActive)requestCellular();
+            processPending();
+            broadcast("Z8 receiver running",findBestLocalIp());
+        },20,30,TimeUnit.SECONDS);
     }
 
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        String requested=intent==null?"server":intent.getStringExtra("mode");
-        if(requested==null)requested="server";
-        mode=requested;
-        stopTransportOnly();
-        if("local".equals(mode)) startLocalHotspot(); else startServerOnly();
+        String requested=intent==null?"z8ap":intent.getStringExtra("mode");
+        mode=requested==null?"z8ap":requested;
+        startServerOnly();
         return START_STICKY;
-    }
-
-    private void startLocalHotspot(){
-        broadcast("Starting private camera Wi-Fi…",null,null,null);
-        WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-        try{
-            wm.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback(){
-                @Override public void onStarted(WifiManager.LocalOnlyHotspotReservation r){
-                    reservation=r;
-                    String ssid="", pass="";
-                    try{
-                        if(Build.VERSION.SDK_INT>=30){
-                            SoftApConfiguration c=r.getSoftApConfiguration();
-                            ssid=c.getSsid();
-                            pass=c.getPassphrase();
-                        }else{
-                            WifiConfiguration c=r.getWifiConfiguration();
-                            if(c!=null){ssid=stripQuotes(c.SSID);pass=stripQuotes(c.preSharedKey);}
-                        }
-                    }catch(Exception ignored){}
-                    final String fs=ssid==null?"":ssid, fp=pass==null?"":pass;
-                    io.submit(()->{
-                        try{
-                            Thread.sleep(700);
-                            startFtp();
-                            String ip=findBestLocalIp();
-                            broadcast("Private camera Wi-Fi is ready",fs,fp,ip);
-                        }catch(Exception e){
-                            broadcast("FTP receiver error: "+e.getMessage(),fs,fp,findBestLocalIp());
-                        }
-                    });
-                }
-                @Override public void onStopped(){
-                    broadcast("Private camera Wi-Fi stopped",null,null,null);
-                }
-                @Override public void onFailed(int reason){
-                    broadcast("Could not start private hotspot (error "+reason+"). Try Phone Hotspot mode instead.",null,null,null);
-                }
-            },new Handler(Looper.getMainLooper()));
-        }catch(SecurityException e){
-            broadcast("Nearby Wi-Fi permission is required",null,null,null);
-        }catch(Exception e){
-            broadcast("Hotspot error: "+e.getMessage(),null,null,null);
-        }
     }
 
     private void startServerOnly(){
         io.submit(()->{
             try{
                 startFtp();
-                broadcast("FTP receiver ready. Connect the Z8 to this phone's hotspot.",null,null,findBestLocalIp());
-            }catch(Exception e){broadcast("FTP receiver error: "+e.getMessage(),null,null,null);}
+                broadcast("FTP receiver ready — join the Z8 Wi-Fi and continue the camera wizard",findBestLocalIp());
+            }catch(Exception e){
+                broadcast("FTP receiver error: "+e.getMessage(),findBestLocalIp());
+            }
         });
     }
 
@@ -109,6 +77,45 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
         ftp.start();
     }
 
+    private synchronized void requestCellular(){
+        if(cm==null||cellularRequestActive||cellularNetwork!=null)return;
+        cellularRequestActive=true;
+        cellularState="requesting 5G/LTE";
+        broadcast("Requesting cellular data for Flickr…",findBestLocalIp());
+        NetworkRequest req=new NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build();
+        cellularCallback=new ConnectivityManager.NetworkCallback(){
+            @Override public void onAvailable(Network network){
+                cellularNetwork=network;
+                cellularRequestActive=false;
+                cellularState="5G/LTE ready";
+                broadcast("Cellular Flickr path ready — Z8 Wi-Fi can stay connected",findBestLocalIp());
+                io.submit(DirectTransferService.this::processPending);
+            }
+            @Override public void onLost(Network network){
+                if(network.equals(cellularNetwork))cellularNetwork=null;
+                cellularRequestActive=false;
+                cellularState="cellular temporarily unavailable";
+                broadcast("Cellular data lost — photos will stay queued",findBestLocalIp());
+            }
+            @Override public void onUnavailable(){
+                cellularNetwork=null;
+                cellularRequestActive=false;
+                cellularState="cellular not ready — check Mobile data";
+                broadcast("Cellular data not ready — photos will stay queued",findBestLocalIp());
+            }
+        };
+        try{
+            cm.requestNetwork(req,cellularCallback,30000);
+        }catch(Exception e){
+            cellularRequestActive=false;
+            cellularState="cellular request failed";
+            broadcast("Could not request cellular data: "+e.getMessage(),findBestLocalIp());
+        }
+    }
+
     @Override public void onPhotoReceived(File file,String originalName){
         io.submit(()->{
             try{
@@ -116,16 +123,17 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
                 addPending(uri);
                 file.delete();
                 notifyEvent("Photo received from Nikon Z8",originalName);
-                broadcast("Received "+originalName+" — queued for Flickr",null,null,findBestLocalIp());
+                broadcast("Received "+originalName+" — saved on phone and queued for Flickr",findBestLocalIp());
                 processPending();
             }catch(Exception e){
                 notifyEvent("Photo receive error",e.getMessage());
+                broadcast("Photo receive error: "+e.getMessage(),findBestLocalIp());
             }
         });
     }
 
     @Override public void onStatus(String text){
-        broadcast(text,null,null,findBestLocalIp());
+        broadcast(text,findBestLocalIp());
     }
 
     private Uri saveToGallery(File file,String name) throws Exception {
@@ -144,23 +152,35 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
             if(out==null)throw new IOException("Could not open phone photo");
             byte[] b=new byte[128*1024];int n;while((n=in.read(b))!=-1)out.write(b,0,n);
         }
-        if(Build.VERSION.SDK_INT>=29){ContentValues done=new ContentValues();done.put(MediaStore.Images.Media.IS_PENDING,0);getContentResolver().update(u,done,null,null);}
+        if(Build.VERSION.SDK_INT>=29){
+            ContentValues done=new ContentValues();done.put(MediaStore.Images.Media.IS_PENDING,0);getContentResolver().update(u,done,null,null);
+        }
         return u;
     }
 
     private synchronized void addPending(Uri u){
         Set<String>s=new HashSet<>(p.getStringSet("pending_uploads",Collections.emptySet()));
-        s.add(u.toString());p.edit().putStringSet("pending_uploads",s).apply();
+        s.add(u.toString());
+        p.edit().putStringSet("pending_uploads",s).apply();
     }
 
     private synchronized void removePending(String u){
         Set<String>s=new HashSet<>(p.getStringSet("pending_uploads",Collections.emptySet()));
-        s.remove(u);p.edit().putStringSet("pending_uploads",s).apply();
+        s.remove(u);
+        p.edit().putStringSet("pending_uploads",s).apply();
     }
 
     private void processPending(){
         if(processing)return;
-        if(p.getString("access_token","").isEmpty())return;
+        if(p.getString("access_token","").isEmpty()){
+            broadcast("Flickr is not connected — photo uploads will stay queued",findBestLocalIp());
+            return;
+        }
+        Network cell=cellularNetwork;
+        if(cell==null){
+            if(!cellularRequestActive)requestCellular();
+            return;
+        }
         processing=true;
         try{
             Set<String> items=new HashSet<>(p.getStringSet("pending_uploads",Collections.emptySet()));
@@ -168,16 +188,18 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
                 try{
                     Uri u=Uri.parse(s);
                     String name=displayName(u);
-                    new FlickrClient(this).upload(u,name,p.getString("tags","nikon z8"),p.getBoolean("public",true));
+                    new FlickrClient(this).upload(u,name,p.getString("tags","nikon z8"),p.getBoolean("public",true),cell);
                     removePending(s);
                     notifyEvent("Uploaded to Flickr",name);
-                    broadcast("Uploaded "+name+" to Flickr using the phone's internet connection",null,null,findBestLocalIp());
+                    broadcast("Uploaded "+name+" to Flickr over cellular data",findBestLocalIp());
                 }catch(Exception e){
-                    broadcast("Photo is saved on phone; Flickr upload will retry automatically",null,null,findBestLocalIp());
+                    broadcast("Photo is saved; Flickr upload will retry over cellular",findBestLocalIp());
                     break;
                 }
             }
-        }finally{processing=false;}
+        }finally{
+            processing=false;
+        }
     }
 
     private String displayName(Uri u){
@@ -194,59 +216,57 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
         }
     }
 
-    private void broadcast(String status,String ssid,String wifiPass,String ip){
+    private void broadcast(String status,String ip){
         Intent i=new Intent(ACTION_STATUS).setPackage(getPackageName());
         i.putExtra("status",status);
         i.putExtra("mode",mode);
         i.putExtra("ftp_user","nikon");
         i.putExtra("ftp_pass",p.getString("ftp_password",""));
         i.putExtra("ftp_port",FTP_PORT);
-        if(ssid!=null)i.putExtra("ssid",ssid);
-        if(wifiPass!=null)i.putExtra("wifi_pass",wifiPass);
+        i.putExtra("cellular",cellularState);
         if(ip!=null)i.putExtra("ip",ip);
         sendBroadcast(i);
         NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(71,new Notification.Builder(this,CH).setSmallIcon(R.drawable.ic_camera).setContentTitle("Nikon Auto Upload").setContentText(status).setOngoing(true).build());
+        nm.notify(71,new Notification.Builder(this,CH)
+                .setSmallIcon(R.drawable.ic_camera)
+                .setContentTitle("Nikon Auto Upload")
+                .setContentText(status)
+                .setOngoing(true).build());
     }
 
     private String findBestLocalIp(){
-        String fallback="";
         try{
             Enumeration<NetworkInterface> en=NetworkInterface.getNetworkInterfaces();
             while(en.hasMoreElements()){
                 NetworkInterface ni=en.nextElement();
                 String nn=ni.getName().toLowerCase(Locale.US);
+                if(!(nn.contains("wlan")||nn.contains("wifi")))continue;
                 Enumeration<InetAddress> aa=ni.getInetAddresses();
                 while(aa.hasMoreElements()){
                     InetAddress a=aa.nextElement();
-                    if(!(a instanceof Inet4Address)||a.isLoopbackAddress()||!a.isSiteLocalAddress())continue;
-                    String h=a.getHostAddress();
-                    if(nn.contains("wlan")||nn.contains("ap")||nn.contains("swlan")||nn.contains("wifi"))return h;
-                    if(fallback.isEmpty()&&!nn.contains("rmnet")&&!nn.contains("ccmni"))fallback=h;
+                    if(a instanceof Inet4Address&&!a.isLoopbackAddress()&&a.isSiteLocalAddress())return a.getHostAddress();
                 }
             }
         }catch(Exception ignored){}
-        return fallback.isEmpty()?"(IP appears after hotspot starts)":fallback;
+        return "waiting for Z8 Wi-Fi";
     }
 
-    private static String stripQuotes(String s){if(s==null)return "";if(s.length()>1&&s.startsWith("\"")&&s.endsWith("\""))return s.substring(1,s.length()-1);return s;}
-
     private void notifyEvent(String title,String text){
-        ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify((int)(System.currentTimeMillis()%100000),new Notification.Builder(this,CH).setSmallIcon(R.drawable.ic_camera).setContentTitle(title).setContentText(text==null?"":text).setAutoCancel(true).build());
+        ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify((int)(System.currentTimeMillis()%100000),new Notification.Builder(this,CH)
+                .setSmallIcon(R.drawable.ic_camera).setContentTitle(title).setContentText(text==null?"":text).setAutoCancel(true).build());
     }
 
     private void createChannel(){
         ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"Direct Nikon transfer",NotificationManager.IMPORTANCE_LOW));
     }
 
-    private synchronized void stopTransportOnly(){
+    @Override public void onDestroy(){
         if(ftp!=null){ftp.stop();ftp=null;}
-        if(reservation!=null){try{reservation.close();}catch(Exception ignored){}reservation=null;}
+        if(cm!=null&&cellularCallback!=null){try{cm.unregisterNetworkCallback(cellularCallback);}catch(Exception ignored){}}
+        retry.shutdownNow();
+        io.shutdownNow();
+        super.onDestroy();
     }
 
-    @Override public void onDestroy(){
-        stopTransportOnly();
-        retry.shutdownNow();io.shutdownNow();super.onDestroy();
-    }
     @Override public IBinder onBind(Intent intent){return null;}
 }
