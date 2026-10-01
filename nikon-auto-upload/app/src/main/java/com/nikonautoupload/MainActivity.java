@@ -50,29 +50,56 @@ public class MainActivity extends Activity {
     void base(String title){
         root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18),dp(12),dp(18),dp(6));
+        root.setPadding(dp(18),dp(12),dp(18),dp(18));
         root.setBackgroundColor(Color.rgb(8,12,16));
+
         TextView t=txt(title,24,white,true);
         root.addView(t,new LinearLayout.LayoutParams(-1,dp(58)));
+
         body=new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(0,0,0,dp(8));
         ScrollView sv=new ScrollView(this);
+        sv.setFillViewport(true);
         sv.addView(body);
         root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
+
         nav=new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER);
+        nav.setPadding(0,dp(4),0,dp(10));
+        nav.setBackgroundColor(Color.rgb(10,15,20));
+
         String[] ns={"Home","Photos","Uploads","Settings"};
         for(String n:ns){
             Button b=button(n);
+            b.setSingleLine(true);
+            b.setTextSize(12);
+            b.setMinHeight(0);
+            b.setMinWidth(0);
+            b.setPadding(dp(2),0,dp(2),0);
             b.setOnClickListener(v->{
                 if(n.equals("Home")) drawHome();
                 else if(n.equals("Settings")) drawSettings();
                 else placeholder(n);
             });
-            nav.addView(b,new LinearLayout.LayoutParams(0,dp(56),1));
+            nav.addView(b,new LinearLayout.LayoutParams(0,dp(54),1));
         }
-        root.addView(nav);
+
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(68));
+        navLp.setMargins(0,dp(4),0,dp(6));
+        root.addView(nav,navLp);
         setContentView(root);
+
+        // Keep bottom navigation above Samsung/Android gesture and back controls.
+        if(Build.VERSION.SDK_INT>=20){
+            root.setOnApplyWindowInsetsListener((v,insets)->{
+                int bottom=insets.getSystemWindowInsetBottom();
+                root.setPadding(dp(18),dp(12),dp(18),Math.max(dp(18),bottom+dp(8)));
+                return insets;
+            });
+            root.requestApplyInsets();
+        }
     }
 
     void drawHome(){
@@ -135,7 +162,7 @@ public class MainActivity extends Activity {
         body.addView(pub);
 
         section("Camera Transfer");
-        body.addView(txt("Version 0.1 uses the Nikon Z8's supported SnapBridge Bluetooth auto-transfer for the camera-to-phone hop, then this app takes over automatically for Flickr. Direct Nikon BLE image-transfer protocol is not publicly documented, so this avoids unreliable reverse-engineered camera control.",14,muted,false));
+        body.addView(txt("Version 0.1.1 uses the Nikon Z8's supported SnapBridge Bluetooth auto-transfer for the camera-to-phone hop, then this app takes over automatically for Flickr. Direct Nikon BLE image-transfer protocol is not publicly documented, so this avoids unreliable reverse-engineered camera control.",14,muted,false));
     }
 
     void placeholder(String n){base(n);body.addView(txt(n+" view is scaffolded for the next build.",18,white,false));}
