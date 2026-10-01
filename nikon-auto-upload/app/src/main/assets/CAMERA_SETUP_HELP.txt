@@ -1,6 +1,6 @@
 CAMERA AUTO UPLOAD — FTP CAMERA SETUP HELP
 Version 0.5.1 beta
-Verified camera profiles: 46
+Verified camera profiles: 48
 Last reviewed: October 2026
 
 WHAT THIS APP DOES
@@ -153,6 +153,8 @@ Supported:
 - Sony α7C
 - Sony FX3
 - Sony FX30
+- Sony FX2
+- Sony ILX-LR1
 
 Setup:
 1. Android Mobile Hotspot = ON.
@@ -182,6 +184,8 @@ https://helpguide.sony.net/di/ftp/v1/en/contents/TP0002043783.html
 α7CR: https://helpguide.sony.net/ilc/2370/v1/en/contents/0704L_ftp_transfer.html
 FX3: https://helpguide.sony.net/di/ftp_2210/v1/en/contents/FTP_server_connection.html
 FX30: https://helpguide.sony.net/di/ftp_2220/v1/en/contents/FTP_server_connection.html
+FX2: https://helpguide.sony.net/di/ftp_2530/v1/en/contents/FTP_server_connection.html
+ILX-LR1: https://helpguide.sony.net/di/ftp_2390/v1/en/contents/FTP_server_connection.html
 
 ============================================================
 FUJIFILM — PHONE HOTSPOT + FTP
