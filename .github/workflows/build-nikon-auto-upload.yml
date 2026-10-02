@@ -31,7 +31,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Prepare 0.7.0 USB-C camera module
+      - name: Prepare 0.7.0 USB-C and shared status dashboard
         shell: bash
         run: |
           mkdir -p nikon-auto-upload/app/src/main/res/drawable-nodpi
@@ -48,6 +48,7 @@ jobs:
           python3 nikon-auto-upload/tools/patch_063.py
           python3 nikon-auto-upload/tools/patch_064.py
           python3 nikon-auto-upload/tools/patch_065.py
+          python3 nikon-auto-upload/tools/patch_066.py
 
       - name: Build unsigned release APK
         working-directory: nikon-auto-upload
