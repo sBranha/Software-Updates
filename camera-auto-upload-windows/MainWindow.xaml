@@ -1,0 +1,245 @@
+<Window x:Class="CameraAutoUpload.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Camera Auto Upload - Windows" Width="1500" Height="940" MinWidth="1100" MinHeight="700"
+        Background="#0A0E13" Foreground="#F5F7FA" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#26323D"/>
+            <Setter Property="BorderBrush" Value="#43515F"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#17202A"/>
+            <Setter Property="BorderBrush" Value="#43515F"/>
+            <Setter Property="Padding" Value="7"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Margin" Value="7"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#17202A"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Padding" Value="6"/>
+        </Style>
+        <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Height" Value="54"/>
+            <Setter Property="Margin" Value="8,5"/>
+        </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="#121820"/>
+            <Setter Property="BorderBrush" Value="#283542"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="190"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="#0F151C" BorderBrush="#273440" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="10,18,10,8">
+                    <TextBlock Text="CAMERA" FontWeight="Bold" FontSize="24"/>
+                    <TextBlock Text="AUTO UPLOAD" Foreground="#8FA2B5" FontSize="14"/>
+                    <TextBlock Text="WINDOWS" Foreground="#2196F3" FontWeight="Bold" Margin="0,2,0,15"/>
+                    <Button Style="{StaticResource NavButton}" Content="⌂  Home" Click="Home_Click"/>
+                    <Button Style="{StaticResource NavButton}" Content="✎  Editor" Click="Editor_Click"/>
+                    <Button Style="{StaticResource NavButton}" Content="📷  Camera" Click="Camera_Click"/>
+                    <Button Style="{StaticResource NavButton}" Content="⇧  Uploads" Click="Uploads_Click"/>
+                    <Button Style="{StaticResource NavButton}" Content="⚙  Settings" Click="Settings_Click"/>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom" Margin="12">
+                    <TextBlock Text="Camera Auto Upload" FontWeight="Bold"/>
+                    <TextBlock Text="Windows 1.0.0" Foreground="#8797A7"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1">
+            <Grid x:Name="HomePage" Visibility="Visible">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="Camera Auto Upload" FontSize="30" FontWeight="Bold"/>
+                        <TextBlock Text="Camera → Windows → locked editor layout → Flickr" Foreground="#91A3B4" FontSize="16" Margin="0,4,0,18"/>
+                        <UniformGrid Columns="3">
+                            <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="CAMERA INPUT" FontWeight="Bold" Foreground="#2196F3"/><TextBlock x:Name="HomeCameraStatus" Text="Not running" FontSize="20" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel></Border>
+                            <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="LOCKED LAYOUT" FontWeight="Bold" Foreground="#FFC107"/><TextBlock x:Name="HomeLockStatus" Text="Off" FontSize="20" Margin="0,8,0,0"/></StackPanel></Border>
+                            <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="FLICKR QUEUE" FontWeight="Bold" Foreground="#55CE6C"/><TextBlock x:Name="HomeQueueStatus" Text="0 pending" FontSize="20" Margin="0,8,0,0"/></StackPanel></Border>
+                        </UniformGrid>
+                        <Border Style="{StaticResource Card}" Margin="6,15,6,6">
+                            <StackPanel>
+                                <TextBlock Text="QUICK START" FontSize="18" FontWeight="Bold"/>
+                                <TextBlock Text="1. Open Editor and build your card/layout.  2. Lock it.  3. Start FTP or choose a tether folder.  4. New JPEGs can automatically run through the locked layout and enter the Flickr queue." TextWrapping="Wrap" Foreground="#C7D0D8" Margin="0,8,0,10"/>
+                                <WrapPanel>
+                                    <Button Content="OPEN EDITOR" Background="#1976D2" Click="Editor_Click"/>
+                                    <Button Content="CAMERA CONNECTIONS" Background="#2E7D32" Click="Camera_Click"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="ACTIVITY" FontWeight="Bold" FontSize="18"/>
+                                <TextBox x:Name="ActivityLog" Height="280" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="EditorPage" Visibility="Collapsed" Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="OPEN PHOTO" Background="#1976D2" Click="OpenPhoto_Click"/>
+                        <Button Content="ADD PNG / IMAGE" Background="#2E7D32" Click="AddImage_Click"/>
+                        <Button Content="ADD TEXT" Background="#1976D2" Click="AddText_Click"/>
+                        <Button Content="CROP" Background="#8A6D00" Click="Crop_Click"/>
+                        <Button Content="RESET CROP" Click="ResetCrop_Click"/>
+                        <Button Content="UNDO" Click="Undo_Click"/>
+                        <Button Content="REDO" Click="Redo_Click"/>
+                        <Button Content="BACK" Click="SendBack_Click"/>
+                        <Button Content="FRONT" Click="BringFront_Click"/>
+                        <Button Content="DUPLICATE" Click="Duplicate_Click"/>
+                        <Button Content="DELETE" Background="#B43A38" Click="Delete_Click"/>
+                        <Button Content="SAVE LAYOUT" Background="#2E7D32" Click="SaveLayout_Click"/>
+                        <Button x:Name="LockLayoutButton" Content="LOCK LAYOUT" Background="#B43A38" Click="LockLayout_Click"/>
+                        <Button Content="EXPORT JPEG" Background="#6A4C93" Click="Export_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="280"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#080B0F" BorderBrush="#34424F" BorderThickness="1" Margin="4" ClipToBounds="True">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <Viewbox x:Name="EditorViewbox" Stretch="Uniform" StretchDirection="Both" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas x:Name="Artboard" Width="1080" Height="1350" Background="#1D2630" MouseDown="Artboard_MouseDown" MouseMove="Artboard_MouseMove" MouseUp="Artboard_MouseUp" MouseWheel="Artboard_MouseWheel" IsManipulationEnabled="True" ManipulationDelta="Artboard_ManipulationDelta"/>
+                            </Viewbox>
+                        </ScrollViewer>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top">
+                                <TextBlock Text="LAYERS" FontWeight="Bold" FontSize="17"/>
+                                <TextBlock Text="Double-click text or image for properties." Foreground="#91A3B4" TextWrapping="Wrap" Margin="0,4,0,8"/>
+                            </StackPanel>
+                            <ListBox x:Name="LayerList" Background="#0F151C" Foreground="White" BorderBrush="#33414E" SelectionChanged="LayerList_SelectionChanged"/>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+                <TextBlock Grid.Row="2" x:Name="EditorStatus" Text="Open a photo. Click a layer to select it, drag it, use the mouse wheel to resize, or use touch to pinch/rotate." Foreground="#AEBBC6" Margin="8,5" TextWrapping="Wrap"/>
+            </Grid>
+
+            <Grid x:Name="CameraPage" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="Camera Connections" FontSize="30" FontWeight="Bold"/>
+                        <TextBlock Text="Windows camera input is independent from the Android app." Foreground="#91A3B4" Margin="0,3,0,15"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="WI-FI / FTP RECEIVER" FontWeight="Bold" FontSize="18"/>
+                                <TextBlock Text="For cameras that upload by FTP. Nikon can use this computer's IP, port 2121, passive mode, and the username/password below." TextWrapping="Wrap" Foreground="#B7C3CC" Margin="0,5,0,8"/>
+                                <WrapPanel>
+                                    <TextBlock Text="Port" VerticalAlignment="Center" Margin="4"/><TextBox x:Name="FtpPortBox" Width="90" Text="2121"/>
+                                    <TextBlock Text="User" VerticalAlignment="Center" Margin="4"/><TextBox x:Name="FtpUserBox" Width="130" Text="nikon"/>
+                                    <TextBlock Text="Password" VerticalAlignment="Center" Margin="4"/><TextBox x:Name="FtpPasswordBox" Width="150" Text="nikon"/>
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <Button x:Name="FtpStartButton" Content="START FTP RECEIVER" Background="#2E7D32" Click="FtpStart_Click"/>
+                                    <Button Content="STOP FTP" Click="FtpStop_Click"/>
+                                    <Button Content="OPEN WINDOWS HOTSPOT" Background="#1976D2" Click="Hotspot_Click"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="FtpStatusText" Text="FTP stopped" Foreground="#FFC107" Margin="4"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="USB / TETHER FOLDER" FontWeight="Bold" FontSize="18"/>
+                                <TextBlock Text="Choose the folder where Nikon NX Tether or another camera tether program saves new captures. The app watches it automatically. It can also scan removable/DCIM camera drives." TextWrapping="Wrap" Foreground="#B7C3CC" Margin="0,5,0,8"/>
+                                <TextBox x:Name="WatchFolderBox"/>
+                                <WrapPanel>
+                                    <Button Content="CHOOSE TETHER FOLDER" Background="#1976D2" Click="ChooseWatchFolder_Click"/>
+                                    <Button Content="START WATCHING" Background="#2E7D32" Click="StartWatch_Click"/>
+                                    <Button Content="SCAN CAMERA / DCIM" Background="#6A4C93" Click="ScanCamera_Click"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="WatchStatusText" Text="No tether folder selected" Foreground="#FFC107" Margin="4"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="AUTOMATIC WORKFLOW" FontWeight="Bold" FontSize="18"/>
+                                <CheckBox x:Name="AutoProcessCheck" Content="Automatically process new JPEGs through the locked editor layout" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged"/>
+                                <ComboBox x:Name="UploadChoiceCombo" SelectionChanged="SettingsChanged">
+                                    <ComboBoxItem Content="Original only" Tag="OriginalOnly"/>
+                                    <ComboBoxItem Content="Edited only" Tag="EditedOnly" IsSelected="True"/>
+                                    <ComboBoxItem Content="Both" Tag="Both"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="UploadsPage" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="Flickr Uploads" FontSize="30" FontWeight="Bold"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="FlickrEnabledCheck" Content="Enable automatic Flickr upload" Checked="SettingsChanged" Unchecked="SettingsChanged"/>
+                                <TextBlock Text="Flickr API Key"/><TextBox x:Name="FlickrApiKeyBox" TextChanged="SettingsChanged"/>
+                                <TextBlock Text="Flickr API Secret"/><TextBox x:Name="FlickrApiSecretBox" TextChanged="SettingsChanged"/>
+                                <TextBlock Text="OAuth Token"/><TextBox x:Name="FlickrTokenBox" TextChanged="SettingsChanged"/>
+                                <TextBlock Text="OAuth Token Secret"/><TextBox x:Name="FlickrTokenSecretBox" TextChanged="SettingsChanged"/>
+                                <TextBlock Text="The Windows app keeps its own Flickr queue and credentials; it does not use Android's settings." Foreground="#91A3B4" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="QUEUE" FontWeight="Bold" FontSize="18"/>
+                                <TextBlock x:Name="QueueCountText" Text="0 pending" FontSize="24" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="SettingsPage" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <TextBlock Text="Settings" FontSize="30" FontWeight="Bold"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Output Folder" FontWeight="Bold"/>
+                                <TextBox x:Name="OutputRootBox" TextChanged="SettingsChanged"/>
+                                <Button Content="CHOOSE OUTPUT FOLDER" HorizontalAlignment="Left" Click="ChooseOutput_Click"/>
+                                <TextBlock Text="Originals are preserved. Edited files are created separately." Foreground="#91A3B4" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
