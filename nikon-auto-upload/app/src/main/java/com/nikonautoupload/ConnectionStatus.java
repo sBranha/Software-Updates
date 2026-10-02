@@ -21,13 +21,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Small shared status helper. It does not own any connection. */
+/** Small shared status helper. It reports state but never owns a connection. */
 public final class ConnectionStatus {
     private ConnectionStatus() {}
 
     public static String cameraConnection(SharedPreferences p) {
         String usb = p.getString("usb_state", "").toLowerCase(Locale.US);
-        if (usb.contains("connected") || usb.contains("import") || usb.contains("ready")) return "USB-C Wired";
+        if (usb.contains("connected") || usb.contains("import") || usb.contains("ready") || usb.contains("transfer") || usb.contains("complete")) return "USB-C Wired";
 
         String handoff = p.getString("nikon_handoff_state", "").toLowerCase(Locale.US);
         if (handoff.contains("wi-fi connected") || handoff.contains("ptp") || handoff.contains("ready for new") || handoff.contains("download")) {
@@ -38,9 +38,7 @@ public final class ConnectionStatus {
         if (bt.contains("connected")) return "Nikon Bluetooth";
 
         String ftp = p.getString("ftp_state", "").toLowerCase(Locale.US);
-        if (ftp.contains("connected") || ftp.contains("logged") || ftp.contains("receiv") || ftp.contains("transfer") || ftp.contains("photo")) {
-            return "Wi-Fi / FTP";
-        }
+        if (ftp.contains("connected") || ftp.contains("logged") || ftp.contains("receiv") || ftp.contains("transfer") || ftp.contains("photo")) return "Wi-Fi / FTP";
         return "Waiting for camera";
     }
 
@@ -55,8 +53,7 @@ public final class ConnectionStatus {
         try {
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm != null) {
-                Network[] networks = cm.getAllNetworks();
-                for (Network n : networks) {
+                for (Network n : cm.getAllNetworks()) {
                     NetworkCapabilities c = cm.getNetworkCapabilities(n);
                     if (c == null) continue;
                     if (c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
@@ -65,9 +62,7 @@ public final class ConnectionStatus {
                             Object t = c.getTransportInfo();
                             if (t instanceof WifiInfo) {
                                 String ssid = ((WifiInfo) t).getSSID();
-                                if (ssid != null && !ssid.isEmpty() && !"<unknown ssid>".equalsIgnoreCase(ssid)) {
-                                    label += ": " + stripQuotes(ssid);
-                                }
+                                if (ssid != null && !ssid.isEmpty() && !"<unknown ssid>".equalsIgnoreCase(ssid)) label += ": " + stripQuotes(ssid);
                             }
                         }
                         out.add(label);
