@@ -46,7 +46,8 @@ jobs:
           python3 nikon-auto-upload/tools/patch_061.py
           python3 nikon-auto-upload/tools/patch_062.py
           python3 nikon-auto-upload/tools/patch_063.py
-          python3 nikon-auto-upload/tools/patch_070.py
+          python3 nikon-auto-upload/tools/patch_064.py
+          python3 nikon-auto-upload/tools/patch_065.py
 
       - name: Build unsigned release APK
         working-directory: nikon-auto-upload
