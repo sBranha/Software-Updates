@@ -6,6 +6,7 @@ on:
     branches: [ nikon-auto-upload-build ]
     paths:
       - 'camera-auto-upload-windows/**'
+      - 'nikon-auto-upload/assets/launcher_z8.webp.b64'
       - '.github/workflows/build-camera-auto-upload-windows.yml'
 
 jobs:
@@ -19,6 +20,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Build matching app icon
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python camera-auto-upload-windows/make_icon.py
 
       - name: Prepare Windows source
         run: python camera-auto-upload-windows/prepare_build.py
