@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Standard USB Still Image / PTP interface. This keeps the USB module brand-neutral. -->
+    <usb-device class="6" subclass="1" protocol="1" />
+    <usb-device class="6" />
+</resources>
