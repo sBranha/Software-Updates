@@ -31,7 +31,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Prepare 0.7.1 USB-C and shared status dashboard
+      - name: Prepare 0.8.0 USB-C, shared status dashboard, and photo overlays
         shell: bash
         run: |
           mkdir -p nikon-auto-upload/app/src/main/res/drawable-nodpi
@@ -51,6 +51,7 @@ jobs:
           python3 nikon-auto-upload/tools/patch_066.py
           python3 nikon-auto-upload/tools/patch_067.py
           python3 nikon-auto-upload/tools/patch_068.py
+          python3 nikon-auto-upload/tools/patch_069.py
 
       - name: Build unsigned release APK
         working-directory: nikon-auto-upload
@@ -62,13 +63,13 @@ jobs:
           mkdir -p signing-tools/lib
           cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" signing-tools/apksigner
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/lib/apksigner.jar
-          cp nikon-auto-upload/app/build/outputs/apk/release/app-release-unsigned.apk NikonAutoUpload-0.7.1-unsigned.apk
+          cp nikon-auto-upload/app/build/outputs/apk/release/app-release-unsigned.apk CameraAutoUpload-0.8.0-unsigned.apk
 
       - name: Upload unsigned APK and signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: NikonAutoUpload-0.7.1-UNSIGNED
+          name: CameraAutoUpload-0.8.0-UNSIGNED
           path: |
-            NikonAutoUpload-0.7.1-unsigned.apk
+            CameraAutoUpload-0.8.0-unsigned.apk
             signing-tools/
           if-no-files-found: error
