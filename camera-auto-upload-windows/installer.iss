@@ -13,6 +13,7 @@ DefaultGroupName=Camera Auto Upload
 DisableProgramGroupPage=yes
 OutputDir=installer-output
 OutputBaseFilename=CameraAutoUpload-Windows-Setup-1.0.1
+SetupIconFile=app.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
