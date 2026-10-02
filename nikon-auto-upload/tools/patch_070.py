@@ -22,20 +22,20 @@ new='''            StringBuilder b=new StringBuilder();
 if old not in s: raise SystemExit('0.7.0 Home status target missing')
 s=s.replace(old,new,1)
 
-old='''        base("Settings","Settings");
-        sectionHeader("Camera Connection");LinearLayout camera=cardBox();camera.addView(statusRow("Wi-Fi FTP",isCameraConnected()?"Nikon Z8 Connected":"Waiting for Nikon Z8",isCameraConnected()?green:muted));Button wifi=smallButton("OPEN PHONE WI-FI SETTINGS",blue);wifi.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));camera.addView(wifi);Button restart=smallButton("START / RESTART Z8 RECEIVER",green);restart.setOnClickListener(v->startDirect(true));camera.addView(restart);body.addView(camera);
-'''
-new='''        base("Settings","Settings");
+# Earlier camera-profile patches expanded the original Camera Connection card,
+# so inject the new modular chooser immediately after Settings opens instead of
+# replacing that existing working card.
+old='''    void drawSettings(){
+        base("Settings","Settings");'''
+new='''    void drawSettings(){
+        base("Settings","Settings");
         sectionHeader("Connection Methods");LinearLayout methods=cardBox();
         methods.addView(statusRow("Current connection",ConnectionStatus.cameraConnection(p),green));
         methods.addView(statusRow("IP address",ConnectionStatus.ipv4(this,p),muted));
         methods.addView(statusRow("Network",ConnectionStatus.networkSummary(this),muted));
         Button choose=smallButton("OPEN CAMERA CONNECTIONS",blue);choose.setOnClickListener(v->startActivity(new Intent(this,ConnectionActivity.class)));methods.addView(choose);
-        Button usb=smallButton("USB-C WIRED IMPORT",green);usb.setOnClickListener(v->startActivity(new Intent(this,UsbCameraActivity.class)));methods.addView(usb);body.addView(methods);
-
-        sectionHeader("Wi-Fi / Hotspot / FTP");LinearLayout camera=cardBox();camera.addView(statusRow("Wi-Fi FTP",isCameraConnected()?"Nikon Z8 Connected":"Waiting for Nikon Z8",isCameraConnected()?green:muted));Button wifi=smallButton("OPEN PHONE WI-FI SETTINGS",blue);wifi.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));camera.addView(wifi);Button restart=smallButton("START / RESTART Z8 RECEIVER",green);restart.setOnClickListener(v->startDirect(true));camera.addView(restart);body.addView(camera);
-'''
-if old not in s: raise SystemExit('0.7.0 Settings connection target missing')
+        Button usb=smallButton("USB-C WIRED IMPORT",green);usb.setOnClickListener(v->startActivity(new Intent(this,UsbCameraActivity.class)));methods.addView(usb);body.addView(methods);'''
+if old not in s: raise SystemExit('0.7.0 Settings insertion target missing')
 s=s.replace(old,new,1)
 
 for oldver in ['Nikon Auto Upload 0.6.2','Nikon Auto Upload 0.6.1','Nikon Auto Upload 0.6.0']:
