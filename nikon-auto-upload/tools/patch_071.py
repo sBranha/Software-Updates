@@ -13,7 +13,6 @@ new='''    TextView status,connectionInfo;
 if old not in s: raise SystemExit('0.7.1 dashboard fields target missing')
 s=s.replace(old,new,1)
 
-# Put the dashboard immediately below the camera hero and above the older readiness card.
 old='''        body.addView(hero);space(10);
 
         Health h=health();'''
@@ -24,7 +23,6 @@ new='''        body.addView(hero);space(10);
 if old not in s: raise SystemExit('0.7.1 dashboard insertion target missing')
 s=s.replace(old,new,1)
 
-# Refresh shared dashboard whenever the existing live status refresh runs.
 old='''    void refreshLiveViews(String newest){
         if(status!=null){'''
 new='''    void refreshLiveViews(String newest){
@@ -33,7 +31,6 @@ new='''    void refreshLiveViews(String newest){
 if old not in s: raise SystemExit('0.7.1 live refresh target missing')
 s=s.replace(old,new,1)
 
-# Add reusable dashboard helpers before statusColor().
 marker='''    int statusColor(String s){'''
 helpers=r'''    void addConnectionDashboard(){
         LinearLayout box=cardBox();
@@ -48,7 +45,7 @@ helpers=r'''    void addConnectionDashboard(){
         dashUpload=txt("",13,white,true);dashUpload.setPadding(dp(4),dp(3),dp(4),dp(3));box.addView(dashUpload,new LinearLayout.LayoutParams(-1,dp(32)));
         dashDetailsBox=new LinearLayout(this);dashDetailsBox.setOrientation(LinearLayout.VERTICAL);dashDetailsBox.setPadding(dp(4),dp(8),dp(4),0);dashDetailsBox.setVisibility(p.getBoolean("status_details_open",false)?View.VISIBLE:View.GONE);
         dashDetails=txt("",12,muted,false);dashDetailsBox.addView(dashDetails);
-        Button connections=smallButton("CAMERA CONNECTIONS",blue);connections.setOnClickListener(v->startActivity(new Intent(this,ConnectionActivity.class)));dashDetailsBox.addView(connections);
+        Button connections=smallButton("CONNECTION SETTINGS",blue);connections.setOnClickListener(v->drawSettings());dashDetailsBox.addView(connections);
         box.addView(dashDetailsBox);body.addView(box);refreshConnectionDashboard();
     }
 
@@ -80,7 +77,6 @@ helpers=r'''    void addConnectionDashboard(){
 '''
 if marker not in s: raise SystemExit('0.7.1 dashboard helper marker missing')
 s=s.replace(marker,helpers+marker,1)
-
 for oldver in ['Nikon Auto Upload 0.7.0','Nikon Auto Upload 0.6.2']:
     s=s.replace(oldver,'Nikon Auto Upload 0.7.1')
 p.write_text(s)
@@ -89,8 +85,10 @@ p.write_text(s)
 p=Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/UsbCameraActivity.java')
 s=p.read_text()
 
-old='''                String name=cameraName(d);p.edit().putString("usb_state","Connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();'''
-new='''                String name=cameraName(d);p.edit().putString("usb_state","Connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).putString("usb_transfer_state","Idle").putString("status_transfer_state","Idle").putInt("status_photo_current",0).putInt("status_photo_total",0).putLong("status_transfer_speed_bps",0L).apply();'''
+old='''                String name=cameraName(d);p.edit().putString("usb_state","USB-C connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();'''
+if old not in s:
+    old='''                String name=cameraName(d);p.edit().putString("usb_state","Connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();'''
+new='''                String name=cameraName(d);p.edit().putString("usb_state","USB-C connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).putString("usb_transfer_state","Idle").putString("status_transfer_state","Idle").putInt("status_photo_current",0).putInt("status_photo_total",0).putLong("status_transfer_speed_bps",0L).apply();'''
 if old not in s: raise SystemExit('0.7.1 USB connect publisher target missing')
 s=s.replace(old,new,1)
 
@@ -138,7 +136,7 @@ if old not in s: raise SystemExit('0.7.1 USB fail target missing')
 s=s.replace(old,new,1)
 p.write_text(s)
 
-# ---------- Flickr queue: publish an active-upload count without changing queue logic ----------
+# ---------- Flickr queue: active-upload count; queue itself remains unchanged ----------
 p=Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/DirectTransferService.java')
 s=p.read_text()
 old='''        Network cell=cellularNetwork;if(cell==null){if(!cellularRequestActive)requestCellular();return;}processing=true;
