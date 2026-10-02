@@ -5,10 +5,18 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>CameraAutoUpload.Windows</AssemblyName>
     <RootNamespace>CameraAutoUpload.Windows</RootNamespace>
-    <ApplicationIcon></ApplicationIcon>
     <Version>1.0.0</Version>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
 </Project>
