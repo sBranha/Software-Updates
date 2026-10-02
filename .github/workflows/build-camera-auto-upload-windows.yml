@@ -1,0 +1,42 @@
+name: Build Camera Auto Upload Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ nikon-auto-upload-build ]
+    paths:
+      - 'camera-auto-upload-windows/**'
+      - '.github/workflows/build-camera-auto-upload-windows.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
+
+      - name: Publish self-contained Windows EXE
+        run: dotnet publish camera-auto-upload-windows/CameraAutoUpload.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o publish
+
+      - name: Rename executable
+        shell: pwsh
+        run: |
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.0.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.0.zip -Force
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: CameraAutoUpload-Windows-1.0.0
+          path: |
+            CameraAutoUpload-Windows-1.0.0.exe
+            CameraAutoUpload-Windows-1.0.0.zip
+          if-no-files-found: error
