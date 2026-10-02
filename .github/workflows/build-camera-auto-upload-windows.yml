@@ -26,20 +26,33 @@ jobs:
       - name: Restore
         run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
 
-      - name: Publish self-contained Windows EXE
+      - name: Publish self-contained Windows app
         run: dotnet publish camera-auto-upload-windows/CameraAutoUpload.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o publish
 
-      - name: Rename executable
+      - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.0.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.0.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.1.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.1-portable.zip -Force
 
-      - name: Upload Windows build
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build real Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found" }
+          & $iscc "camera-auto-upload-windows\installer.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-1.0.0
+          name: CameraAutoUpload-Windows-Setup-1.0.1
           path: |
-            CameraAutoUpload-Windows-1.0.0.exe
-            CameraAutoUpload-Windows-1.0.0.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.1.exe
+            CameraAutoUpload-Windows-1.0.1.exe
+            CameraAutoUpload-Windows-1.0.1-portable.zip
           if-no-files-found: error
