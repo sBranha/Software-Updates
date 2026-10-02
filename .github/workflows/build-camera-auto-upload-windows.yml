@@ -20,6 +20,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Prepare Windows source
+        run: python camera-auto-upload-windows/prepare_build.py
+
       - name: Restore
         run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
 
