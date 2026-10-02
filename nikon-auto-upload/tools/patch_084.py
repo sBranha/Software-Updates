@@ -4,7 +4,6 @@ from pathlib import Path
 # Photo-first Photoshop-style touch editor + locked automatic photo placement.
 # Runs after 0.8.3. Camera transports remain untouched.
 
-# OverlayProcessor: save photo placement in each template and use it for auto render.
 p=Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/OverlayProcessor.java')
 s=p.read_text()
 old='''        public String orientation="landscape"; // portrait / landscape\n        public final ArrayList<Element> elements=new ArrayList<>();'''
@@ -25,17 +24,14 @@ if old not in s: raise SystemExit('0.8.4 photo transform render target missing')
 s=s.replace(old,new,1)
 p.write_text(s)
 
-# MainActivity: Editor is a bottom navigation destination and primary overlay shortcut.
 p=Path('nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java')
 s=p.read_text()
-if 'addNav("✎","Editor",active);' not in s:
-    marker='addNav("⚙","Settings",active);'
-    if marker not in s: raise SystemExit('0.8.4 Settings nav marker missing')
-    s=s.replace(marker,'addNav("✎","Editor",active);'+marker,1)
-if 'label.equals("Editor")' not in s:
-    marker='else drawSettings();});nav.addView(t,new LinearLayout.LayoutParams(0,-1,1));'
-    if marker not in s: raise SystemExit('0.8.4 nav action marker missing')
-    s=s.replace(marker,'else if(label.equals("Editor")){Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);}else drawSettings();});nav.addView(t,new LinearLayout.LayoutParams(0,-1,1));',1)
+# Attach Editor directly to whatever bottom navigation the current build already has.
+if 'photo_editor_bottom_nav' not in s:
+    marker='''        LinearLayout.LayoutParams nlp=new LinearLayout.LayoutParams(-1,dp(68));'''
+    if marker not in s: raise SystemExit('0.8.4 bottom nav container marker missing')
+    editor='''        // photo_editor_bottom_nav\n        TextView editorNav=txt("✎\\nEditor",11,muted,false);editorNav.setGravity(Gravity.CENTER);editorNav.setLineSpacing(0,.95f);editorNav.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});nav.addView(editorNav,new LinearLayout.LayoutParams(0,-1,1));\n'''
+    s=s.replace(marker,editor+marker,1)
 
 old='''Button overlays=smallButton("PHOTO OVERLAYS / SPORTS CARDS",blue);overlays.setOnClickListener(v->startActivity(new Intent(this,OverlayStudioActivity.class)));'''
 new='''Button overlays=smallButton("PHOTO EDITOR",blue);overlays.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});'''
@@ -44,23 +40,21 @@ old='''Button overlayMethod=smallButton("PHOTO OVERLAYS / SPORTS CARDS",blue);ov
 new='''Button overlayMethod=smallButton("PHOTO EDITOR",blue);overlayMethod.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});'''
 if old in s:s=s.replace(old,new,1)
 
-editor='''        sectionHeader("Editor automation");LinearLayout editorCard=cardBox();boolean editorLocked=p.getBoolean("editor_layout_locked",false);editorCard.addView(txt(editorLocked?"●  LOCKED AUTO LAYOUT":"○  Manual editor",14,editorLocked?green:muted,true));editorCard.addView(txt(editorLocked?"Incoming JPEGs keep the original, create the edited copy automatically, then follow your Flickr output choice.":"Open Editor from the bottom bar, build the layout, then tap LOCK when you want incoming photos processed automatically.",12,muted,false));Button openEditor=smallButton("OPEN PHOTO EDITOR",blue);openEditor.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});editorCard.addView(openEditor);body.addView(editorCard);\n\n'''
+editorCard='''        sectionHeader("Editor automation");LinearLayout editorAutoCard=cardBox();boolean editorLocked=p.getBoolean("editor_layout_locked",false);editorAutoCard.addView(txt(editorLocked?"●  LOCKED AUTO LAYOUT":"○  Manual editor",14,editorLocked?green:muted,true));editorAutoCard.addView(txt(editorLocked?"Incoming JPEGs keep the original, create the edited copy automatically, then follow your Flickr output choice.":"Open Editor from the bottom bar, build the layout, then tap LOCK when you want incoming photos processed automatically.",12,muted,false));Button openEditor=smallButton("OPEN PHOTO EDITOR",blue);openEditor.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});editorAutoCard.addView(openEditor);body.addView(editorAutoCard);\n\n'''
 if 'sectionHeader("Editor automation")' not in s:
     marker='''        sectionHeader("Activity");connectionInfo=null;status='''
-    if marker in s:s=s.replace(marker,editor+marker,1)
+    if marker in s:s=s.replace(marker,editorCard+marker,1)
     else:
         marker='''        sectionHeader("Status");LinearLayout statusCard=cardBox();'''
-        if marker not in s: raise SystemExit('0.8.4 Home activity/status marker missing')
-        s=s.replace(marker,editor+marker,1)
+        if marker in s:s=s.replace(marker,editorCard+marker,1)
+
 s=s.replace('Camera Auto Upload 0.8.3','Camera Auto Upload 0.8.4').replace('Nikon Auto Upload 0.8.3','Camera Auto Upload 0.8.4').replace('Version 0.8.3 beta','Version 0.8.4 beta')
 p.write_text(s)
 
-# Version after 0.8.3.
 p=Path('nikon-auto-upload/app/build.gradle')
 s=p.read_text().replace('versionCode 28','versionCode 29').replace("versionName '0.8.3'","versionName '0.8.4'")
 p.write_text(s)
 
-# Help.
 p=Path('nikon-auto-upload/app/src/main/assets/CAMERA_SETUP_HELP.txt')
 if p.exists():
     s=p.read_text().replace('Version 0.8.3 beta','Version 0.8.4 beta')
