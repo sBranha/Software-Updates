@@ -80,7 +80,8 @@ public final class AppStatusHub {
         s.failedUploads=failed.size();
         s.completedUploads=p.getInt("total_uploaded",0);
         String last=p.getString("last_status","").toLowerCase(Locale.US);
-        s.uploadingUploads=last.contains("uploading")?1:0;
+        s.uploadingUploads=p.getInt("status_uploading_count",0);
+        if(s.uploadingUploads<=0&&last.contains("uploading"))s.uploadingUploads=1;
         s.uploadDestination=p.getBoolean("flickr_upload_enabled",true)?"Flickr":"Phone only";
         if(!p.getBoolean("flickr_upload_enabled",true))s.uploadState="Off — phone only";
         else if(p.getString("access_token","").isEmpty())s.uploadState="Flickr not connected";
