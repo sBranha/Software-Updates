@@ -8,7 +8,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -31,8 +30,9 @@ public final class ConnectionStatusDashboard extends LinearLayout {
         internet=text("",14,white,false);addView(internet);
         transfer=text("",14,white,false);addView(transfer);
         upload=text("",14,white,false);addView(upload);
+        details=text("",12,muted,false);details.setPadding(0,dp(4),0,dp(4));details.setVisibility(GONE);
         toggle=text("SHOW DETAILS  ▾",12,blue,true);toggle.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);toggle.setPadding(0,dp(8),0,dp(6));toggle.setOnClickListener(v->{expanded=!expanded;details.setVisibility(expanded?VISIBLE:GONE);toggle.setText(expanded?"HIDE DETAILS  ▴":"SHOW DETAILS  ▾");});addView(toggle);
-        details=text("",12,muted,false);details.setPadding(0,dp(4),0,dp(4));details.setVisibility(GONE);addView(details);
+        addView(details);
         refresh();
     }
 
@@ -41,7 +41,7 @@ public final class ConnectionStatusDashboard extends LinearLayout {
 
     public void refresh(){
         AppStatusHub.Snapshot s=AppStatusHub.snapshot(getContext(),p);
-        int overall=color(s.overallColor);GradientDrawable bg=card(panel,16,overall,1);setBackground(bg);
+        int overall=color(s.overallColor);setBackground(card(panel,16,overall,1));
         camera.setText("●  "+s.cameraModel+" — "+(s.cameraConnected?s.connectionType+" Connected":"Disconnected"));camera.setTextColor(color(s.cameraColor));
         internet.setText("●  Internet — "+s.internet);internet.setTextColor(color(s.internetColor));
         String transferText="●  Transfer — "+s.transfer;
