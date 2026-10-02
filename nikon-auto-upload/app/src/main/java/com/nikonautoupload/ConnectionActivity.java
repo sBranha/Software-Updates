@@ -21,7 +21,7 @@ public class ConnectionActivity extends Activity {
         LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("‹");back.setTextSize(28);back.setOnClickListener(v->finish());top.addView(back,new LinearLayout.LayoutParams(dp(54),dp(52)));TextView title=text("Camera Connections",22,white,true);top.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));root.addView(top);
         ScrollView sv=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
 
-        ConnectionStatus.Snapshot snap=toSnapshot();
+        String snap=toSnapshot();
         LinearLayout status=card();status.addView(text("CURRENT STATUS",13,blue,true));status.addView(text(snap,13,white,false));body.addView(status);
 
         LinearLayout usb=card();usb.addView(text("USB-C WIRED",18,green,true));usb.addView(text("Easiest offline option. Plug the camera directly into the phone, browse full-resolution files, select/import, or automatically import newly-shot pictures. No IP address or internet is required.",13,muted,false));Button ub=button("OPEN USB-C WIRED IMPORT",green);ub.setOnClickListener(v->startActivity(new Intent(this,UsbCameraActivity.class)));usb.addView(ub);body.addView(usb);
