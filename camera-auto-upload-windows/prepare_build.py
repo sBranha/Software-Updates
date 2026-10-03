@@ -13,6 +13,13 @@ s = s.replace('using System.Windows.Shapes;\n', 'using Rectangle = System.Window
 s = s.replace('    bool loadingSettings;\n', '    bool loadingSettings = true;\n')
 p.write_text(s, encoding='utf-8')
 
+# Android-parity helper uses the WPF mouse event type for the Photos page.
+p = Path('camera-auto-upload-windows/AndroidParity.cs')
+s = p.read_text(encoding='utf-8')
+if 'using System.Windows.Input;' not in s:
+    s = s.replace('using System.Windows.Controls;\n', 'using System.Windows.Controls;\nusing System.Windows.Input;\n', 1)
+p.write_text(s, encoding='utf-8')
+
 # C# does not allow yield-return inside a try block that has catch.
 p = Path('camera-auto-upload-windows/Services.cs')
 s = p.read_text(encoding='utf-8')
