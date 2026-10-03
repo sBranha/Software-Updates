@@ -73,13 +73,16 @@ public sealed class AppSettings
     public string WatchFolder { get; set; } = "";
     public bool AutoProcess { get; set; } = true;
     public bool LayoutLocked { get; set; }
-    public bool FlickrEnabled { get; set; }
+    public bool FlickrEnabled { get; set; } = true;
     public UploadChoice UploadChoice { get; set; } = UploadChoice.EditedOnly;
     public string FlickrApiKey { get; set; } = "";
     public string FlickrApiSecret { get; set; } = "";
     public string FlickrToken { get; set; } = "";
     public string FlickrTokenSecret { get; set; } = "";
     public string OutputRoot { get; set; } = AppPaths.DefaultOutputRoot;
+    public string CameraBrand { get; set; } = "Nikon";
+    public string CameraModel { get; set; } = "Z8";
+    public bool ReceiverPaused { get; set; }
 }
 
 public sealed class UploadItem
