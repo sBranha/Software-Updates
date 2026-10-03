@@ -42,14 +42,11 @@ jobs:
           $exe = Join-Path $PWD 'publish\CameraAutoUpload.Windows.exe'
           $p = Start-Process -FilePath $exe -PassThru
           $visible = $false
-          for ($i = 0; $i -lt 20; $i++) {
+          for ($i = 0; $i -lt 24; $i++) {
             Start-Sleep -Milliseconds 500
             $p.Refresh()
             if ($p.HasExited) { break }
-            if ($p.MainWindowHandle -ne 0 -or -not [string]::IsNullOrWhiteSpace($p.MainWindowTitle)) {
-              $visible = $true
-              break
-            }
+            if ($p.MainWindowHandle -ne 0 -or -not [string]::IsNullOrWhiteSpace($p.MainWindowTitle)) { $visible = $true; break }
           }
           if ($p.HasExited) {
             Write-Host "App exited during startup with code $($p.ExitCode)"
@@ -59,8 +56,6 @@ jobs:
           }
           if (-not $visible) {
             Write-Host 'App stayed alive but did not expose a visible top-level window.'
-            $log = Join-Path $env:LOCALAPPDATA 'CameraAutoUpload\Logs\startup.log'
-            if (Test-Path $log) { Get-Content $log }
             Stop-Process -Id $p.Id -Force
             exit 1
           }
@@ -70,8 +65,8 @@ jobs:
       - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.2.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.2-portable.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.3.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.3-portable.zip -Force
 
       - name: Install Inno Setup
         shell: pwsh
@@ -88,9 +83,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-Setup-1.0.2
+          name: CameraAutoUpload-Windows-Setup-1.0.3
           path: |
-            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.2.exe
-            CameraAutoUpload-Windows-1.0.2.exe
-            CameraAutoUpload-Windows-1.0.2-portable.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.3.exe
+            CameraAutoUpload-Windows-1.0.3.exe
+            CameraAutoUpload-Windows-1.0.3-portable.zip
           if-no-files-found: error
