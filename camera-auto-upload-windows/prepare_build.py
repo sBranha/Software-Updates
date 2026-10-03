@@ -6,6 +6,11 @@ from pathlib import Path
 p = Path('camera-auto-upload-windows/MainWindow.xaml.cs')
 s = p.read_text(encoding='utf-8')
 s = s.replace('using System.Windows.Shapes;\n', 'using Rectangle = System.Windows.Shapes.Rectangle;\n')
+
+# XAML controls with Checked/SelectionChanged/TextChanged handlers can fire while
+# InitializeComponent is still constructing the window. Keep settings writes
+# disabled until ApplySettingsToUi has populated every control.
+s = s.replace('    bool loadingSettings;\n', '    bool loadingSettings = true;\n')
 p.write_text(s, encoding='utf-8')
 
 # C# does not allow yield-return inside a try block that has catch.
