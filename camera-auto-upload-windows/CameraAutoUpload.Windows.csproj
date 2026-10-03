@@ -8,8 +8,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>CameraAutoUpload.Windows</AssemblyName>
     <RootNamespace>CameraAutoUpload.Windows</RootNamespace>
-    <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.1</Version>
+    <ApplicationIcon>camera-auto-upload.ico</ApplicationIcon>
+    <Version>1.0.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <Using Include="System" />
