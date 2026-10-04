@@ -31,7 +31,7 @@ jobs:
         run: python camera-auto-upload-windows/prepare_build.py
 
       - name: Apply Windows 1.0.5 desktop UI
-        run: python camera-auto-upload-windows/patch_windows_105.py
+        run: python camera-auto-upload-windows/run_patch_windows_105.py
 
       - name: Restore
         run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
