@@ -9,7 +9,7 @@
     <AssemblyName>CameraAutoUpload.Windows</AssemblyName>
     <RootNamespace>CameraAutoUpload.Windows</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
   </PropertyGroup>
   <ItemGroup>
     <Using Include="System" />
