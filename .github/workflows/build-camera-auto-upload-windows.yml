@@ -30,6 +30,9 @@ jobs:
       - name: Prepare Windows source
         run: python camera-auto-upload-windows/prepare_build.py
 
+      - name: Apply Windows 1.0.5 desktop UI
+        run: python camera-auto-upload-windows/patch_windows_105.py
+
       - name: Restore
         run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
 
@@ -65,8 +68,8 @@ jobs:
       - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.4.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.4-portable.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.5.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.5-portable.zip -Force
 
       - name: Install Inno Setup
         shell: pwsh
@@ -83,9 +86,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-Setup-1.0.4
+          name: CameraAutoUpload-Windows-Setup-1.0.5
           path: |
-            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.4.exe
-            CameraAutoUpload-Windows-1.0.4.exe
-            CameraAutoUpload-Windows-1.0.4-portable.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.5.exe
+            CameraAutoUpload-Windows-1.0.5.exe
+            CameraAutoUpload-Windows-1.0.5-portable.zip
           if-no-files-found: error
