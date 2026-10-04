@@ -89,7 +89,7 @@ public partial class MainWindow
             Canvas.SetLeft(shutter, bodyX + bodyW - 78); Canvas.SetTop(shutter, bodyY + 18); canvas.Children.Add(shutter);
         }
 
-        var brand = new TextBlock { Text = cp.Brand.ToUpperInvariant(), Foreground = Brushes.White, FontSize = 18, FontWeight = FontWeights.Bold, LetterSpacing = 1.2 };
+        var brand = new TextBlock { Text = cp.Brand.ToUpperInvariant(), Foreground = Brushes.White, FontSize = 18, FontWeight = FontWeights.Bold };
         Canvas.SetLeft(brand, 28); Canvas.SetTop(brand, 18); canvas.Children.Add(brand);
         var accentLine = new Rectangle { Width = 145, Height = 5, Fill = accentBrush, RadiusX = 2, RadiusY = 2 };
         Canvas.SetLeft(accentLine, 28); Canvas.SetTop(accentLine, 47); canvas.Children.Add(accentLine);
