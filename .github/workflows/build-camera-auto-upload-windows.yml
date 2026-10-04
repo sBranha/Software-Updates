@@ -65,8 +65,8 @@ jobs:
       - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.3.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.3-portable.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.4.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.4-portable.zip -Force
 
       - name: Install Inno Setup
         shell: pwsh
@@ -83,9 +83,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-Setup-1.0.3
+          name: CameraAutoUpload-Windows-Setup-1.0.4
           path: |
-            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.3.exe
-            CameraAutoUpload-Windows-1.0.3.exe
-            CameraAutoUpload-Windows-1.0.3-portable.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.4.exe
+            CameraAutoUpload-Windows-1.0.4.exe
+            CameraAutoUpload-Windows-1.0.4-portable.zip
           if-no-files-found: error
