@@ -1,5 +1,5 @@
 #define MyAppName "Camera Auto Upload"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Camera Auto Upload"
 #define MyAppExeName "CameraAutoUpload.Windows.exe"
 
@@ -12,7 +12,7 @@ DefaultDirName={autopf}\Camera Auto Upload
 DefaultGroupName=Camera Auto Upload
 DisableProgramGroupPage=yes
 OutputDir=installer-output
-OutputBaseFilename=CameraAutoUpload-Windows-Setup-1.0.5
+OutputBaseFilename=CameraAutoUpload-Windows-Setup-1.0.6
 SetupIconFile=app.ico
 Compression=lzma2/max
 SolidCompression=yes
