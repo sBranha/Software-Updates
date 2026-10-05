@@ -7,6 +7,7 @@ on:
     paths:
       - 'camera-auto-upload-windows/**'
       - 'nikon-auto-upload/assets/launcher_z8.webp.b64'
+      - 'nikon-auto-upload/assets/z8_camera.webp.b64'
       - '.github/workflows/build-camera-auto-upload-windows.yml'
 
 jobs:
@@ -35,6 +36,22 @@ jobs:
 
       - name: Apply Windows 1.0.6 real-camera-photo UI
         run: python camera-auto-upload-windows/patch_windows_106.py
+
+      - name: Apply Windows 1.0.7 professional camera UI
+        run: python camera-auto-upload-windows/patch_windows_107.py
+
+      - name: Build curated official camera photo library
+        shell: pwsh
+        run: |
+          python camera-auto-upload-windows/build_camera_assets.py
+          $required = @(
+            'camera-auto-upload-windows\CameraAssets\Nikon_Z8.png',
+            'camera-auto-upload-windows\CameraAssets\Sony_α7_III.png',
+            'camera-auto-upload-windows\CameraAssets\Sony_α9_III.png'
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) { throw "Required professional camera image was not built: $f" }
+          }
 
       - name: Restore
         run: dotnet restore camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
@@ -71,8 +88,8 @@ jobs:
       - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.6.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.6-portable.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.7.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.7-portable.zip -Force
 
       - name: Install Inno Setup
         shell: pwsh
@@ -89,9 +106,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-Setup-1.0.6
+          name: CameraAutoUpload-Windows-Setup-1.0.7
           path: |
-            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.6.exe
-            CameraAutoUpload-Windows-1.0.6.exe
-            CameraAutoUpload-Windows-1.0.6-portable.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.7.exe
+            CameraAutoUpload-Windows-1.0.7.exe
+            CameraAutoUpload-Windows-1.0.7-portable.zip
           if-no-files-found: error
