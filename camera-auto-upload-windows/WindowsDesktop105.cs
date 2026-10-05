@@ -1,105 +1,130 @@
+using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
+using System.Windows.Media.Imaging;
 
 namespace CameraAutoUpload.Windows;
 
 public partial class MainWindow
 {
-    void RefreshCameraArtwork105(CameraProfile cp)
+    async void RefreshCameraArtwork105(CameraProfile cp)
     {
         if (HomeCameraArt == null) return;
-        DrawCameraArtwork105(HomeCameraArt, cp);
-    }
 
-    void DrawCameraArtwork105(Canvas canvas, CameraProfile cp)
-    {
-        canvas.Children.Clear();
-        canvas.Width = 560;
-        canvas.Height = 330;
+        HomeCameraArt.Children.Clear();
+        HomeCameraArt.Width = 560;
+        HomeCameraArt.Height = 330;
 
-        var accent = cp.Brand switch
+        var loading = new TextBlock
         {
-            "Nikon" => Color.FromRgb(246, 210, 26),
-            "Canon" => Color.FromRgb(218, 38, 46),
-            "Sony" => Color.FromRgb(58, 132, 255),
-            "Fujifilm" => Color.FromRgb(53, 190, 154),
-            _ => Color.FromRgb(110, 170, 230)
+            Text = $"Loading real {cp.DisplayName} photo…",
+            Foreground = new SolidColorBrush(Color.FromRgb(160, 171, 181)),
+            FontSize = 16,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            Width = 520
         };
-        var accentBrush = new SolidColorBrush(accent);
-        var bodyBrush = new LinearGradientBrush(Color.FromRgb(47, 52, 58), Color.FromRgb(17, 20, 24), 90);
-        var dark = new SolidColorBrush(Color.FromRgb(11, 13, 16));
-        var metal = new SolidColorBrush(Color.FromRgb(82, 88, 95));
+        Canvas.SetLeft(loading, 20);
+        Canvas.SetTop(loading, 145);
+        HomeCameraArt.Children.Add(loading);
 
-        var halo = new Ellipse { Width = 460, Height = 150, Fill = new SolidColorBrush(Color.FromArgb(35, accent.R, accent.G, accent.B)) };
-        Canvas.SetLeft(halo, 50); Canvas.SetTop(halo, 145); canvas.Children.Add(halo);
+        string? path = null;
+        try { path = await CameraPhotoService.GetPhotoAsync(cp); }
+        catch { }
 
-        bool dslr = cp.Model.StartsWith("D", StringComparison.OrdinalIgnoreCase) || cp.Model.Contains("1D X", StringComparison.OrdinalIgnoreCase);
-        bool cinema = cp.Brand == "Sony" && cp.Model.StartsWith("FX", StringComparison.OrdinalIgnoreCase);
-        bool gfx = cp.Brand == "Fujifilm" && cp.Model.StartsWith("GFX", StringComparison.OrdinalIgnoreCase);
-        bool integratedGrip = cp.Model is "Z9" or "D6" || cp.Model.Contains("1D X", StringComparison.OrdinalIgnoreCase);
+        // The user may have selected a different camera while the photo was downloading.
+        var current = CameraProfiles.Find(settings.CameraBrand, settings.CameraModel);
+        if (!current.Brand.Equals(cp.Brand, StringComparison.OrdinalIgnoreCase) || !current.Model.Equals(cp.Model, StringComparison.OrdinalIgnoreCase)) return;
 
-        if (cinema)
+        HomeCameraArt.Children.Clear();
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            var body = new Border { Width = 330, Height = 190, Background = bodyBrush, BorderBrush = metal, BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(12) };
-            Canvas.SetLeft(body, 115); Canvas.SetTop(body, 82); canvas.Children.Add(body);
-            for (int i = 0; i < 4; i++)
+            var noPhoto = new StackPanel { Width = 500 };
+            noPhoto.Children.Add(new TextBlock
             {
-                var slot = new Rectangle { Width = 12, Height = 42, RadiusX = 3, RadiusY = 3, Fill = dark };
-                Canvas.SetLeft(slot, 132 + i * 24); Canvas.SetTop(slot, 102); canvas.Children.Add(slot);
-            }
-            var lens = new Ellipse { Width = 155, Height = 155, Fill = dark, Stroke = metal, StrokeThickness = 6 };
-            Canvas.SetLeft(lens, 205); Canvas.SetTop(lens, 100); canvas.Children.Add(lens);
-            var glass = new Ellipse { Width = 112, Height = 112, Fill = new RadialGradientBrush(Color.FromRgb(57, 102, 133), Color.FromRgb(5, 10, 18)), Stroke = accentBrush, StrokeThickness = 3 };
-            Canvas.SetLeft(glass, 226.5); Canvas.SetTop(glass, 121.5); canvas.Children.Add(glass);
+                Text = cp.DisplayName,
+                Foreground = Brushes.White,
+                FontSize = 30,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            noPhoto.Children.Add(new TextBlock
+            {
+                Text = "Real camera photo unavailable right now.\nNo generic or clip-art camera will be substituted.",
+                Foreground = new SolidColorBrush(Color.FromRgb(160, 171, 181)),
+                FontSize = 14,
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0)
+            });
+            Canvas.SetLeft(noPhoto, 30);
+            Canvas.SetTop(noPhoto, 115);
+            HomeCameraArt.Children.Add(noPhoto);
+            return;
         }
-        else
+
+        try
         {
-            double bodyW = integratedGrip ? 395 : (gfx ? 365 : 345);
-            double bodyH = integratedGrip ? 215 : (gfx ? 190 : 175);
-            double bodyX = (560 - bodyW) / 2;
-            double bodyY = integratedGrip ? 70 : 92;
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(path, UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
 
-            var body = new Border { Width = bodyW, Height = bodyH, Background = bodyBrush, BorderBrush = metal, BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(dslr ? 18 : 13) };
-            Canvas.SetLeft(body, bodyX); Canvas.SetTop(body, bodyY); canvas.Children.Add(body);
+            var photo = new Image
+            {
+                Source = bitmap,
+                Width = 520,
+                Height = 260,
+                Stretch = Stretch.Uniform,
+                SnapsToDevicePixels = true
+            };
+            Canvas.SetLeft(photo, 20);
+            Canvas.SetTop(photo, 8);
+            HomeCameraArt.Children.Add(photo);
 
-            var grip = new Border { Width = integratedGrip ? 90 : 72, Height = integratedGrip ? 205 : 150, Background = new SolidColorBrush(Color.FromRgb(23, 26, 30)), BorderBrush = metal, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(18, 28, 18, 18) };
-            Canvas.SetLeft(grip, bodyX + bodyW - (integratedGrip ? 72 : 56)); Canvas.SetTop(grip, bodyY + (integratedGrip ? 5 : 15)); canvas.Children.Add(grip);
-
-            double humpW = dslr ? 125 : 108;
-            double humpH = dslr ? 70 : 52;
-            var hump = new Border { Width = humpW, Height = humpH, Background = new SolidColorBrush(Color.FromRgb(28, 31, 35)), BorderBrush = metal, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(14, 14, 5, 5) };
-            Canvas.SetLeft(hump, 280 - humpW / 2); Canvas.SetTop(hump, bodyY - humpH + 12); canvas.Children.Add(hump);
-
-            var hotshoe = new Rectangle { Width = 55, Height = 8, RadiusX = 2, RadiusY = 2, Fill = metal };
-            Canvas.SetLeft(hotshoe, 252.5); Canvas.SetTop(hotshoe, bodyY - humpH + 6); canvas.Children.Add(hotshoe);
-
-            double lensSize = gfx ? 180 : (dslr ? 172 : 162);
-            var lens = new Ellipse { Width = lensSize, Height = lensSize, Fill = dark, Stroke = metal, StrokeThickness = 7 };
-            Canvas.SetLeft(lens, 280 - lensSize / 2); Canvas.SetTop(lens, bodyY + bodyH / 2 - lensSize / 2); canvas.Children.Add(lens);
-            var ring = new Ellipse { Width = lensSize - 28, Height = lensSize - 28, Fill = new SolidColorBrush(Color.FromRgb(18, 23, 28)), Stroke = accentBrush, StrokeThickness = 3 };
-            Canvas.SetLeft(ring, 280 - (lensSize - 28) / 2); Canvas.SetTop(ring, bodyY + bodyH / 2 - (lensSize - 28) / 2); canvas.Children.Add(ring);
-            var glass = new Ellipse { Width = lensSize - 62, Height = lensSize - 62, Fill = new RadialGradientBrush(Color.FromRgb(65, 121, 153), Color.FromRgb(4, 8, 14)) };
-            Canvas.SetLeft(glass, 280 - (lensSize - 62) / 2); Canvas.SetTop(glass, bodyY + bodyH / 2 - (lensSize - 62) / 2); canvas.Children.Add(glass);
-            var shine = new Ellipse { Width = 32, Height = 18, Fill = new SolidColorBrush(Color.FromArgb(120, 190, 225, 255)) };
-            Canvas.SetLeft(shine, 245); Canvas.SetTop(shine, bodyY + 62); canvas.Children.Add(shine);
-
-            var shutter = new Ellipse { Width = 23, Height = 23, Fill = accentBrush, Stroke = Brushes.White, StrokeThickness = 1 };
-            Canvas.SetLeft(shutter, bodyX + bodyW - 78); Canvas.SetTop(shutter, bodyY + 18); canvas.Children.Add(shutter);
+            var strip = new Border
+            {
+                Width = 520,
+                Height = 48,
+                Background = new SolidColorBrush(Color.FromArgb(235, 10, 13, 17)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(44, 52, 61)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12, 6, 12, 6)
+            };
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var label = new StackPanel { Orientation = Orientation.Vertical };
+            label.Children.Add(new TextBlock { Text = cp.DisplayName, Foreground = Brushes.White, FontSize = 16, FontWeight = FontWeights.SemiBold });
+            label.Children.Add(new TextBlock { Text = cp.Mode, Foreground = new SolidColorBrush(Color.FromRgb(154, 166, 178)), FontSize = 10 });
+            row.Children.Add(label);
+            var real = new TextBlock { Text = "REAL MODEL PHOTO", Foreground = new SolidColorBrush(Color.FromRgb(106, 216, 135)), FontSize = 10, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(real, 1);
+            row.Children.Add(real);
+            strip.Child = row;
+            Canvas.SetLeft(strip, 20);
+            Canvas.SetTop(strip, 274);
+            HomeCameraArt.Children.Add(strip);
         }
-
-        var brand = new TextBlock { Text = cp.Brand.ToUpperInvariant(), Foreground = Brushes.White, FontSize = 18, FontWeight = FontWeights.Bold };
-        Canvas.SetLeft(brand, 28); Canvas.SetTop(brand, 18); canvas.Children.Add(brand);
-        var accentLine = new Rectangle { Width = 145, Height = 5, Fill = accentBrush, RadiusX = 2, RadiusY = 2 };
-        Canvas.SetLeft(accentLine, 28); Canvas.SetTop(accentLine, 47); canvas.Children.Add(accentLine);
-
-        var model = new TextBlock { Text = cp.Model, Foreground = Brushes.White, FontSize = 34, FontWeight = FontWeights.SemiBold };
-        Canvas.SetLeft(model, 28); Canvas.SetTop(model, 263); canvas.Children.Add(model);
-        var mode = new TextBlock { Text = cp.Mode, Foreground = new SolidColorBrush(Color.FromRgb(169, 179, 190)), FontSize = 13 };
-        Canvas.SetLeft(mode, 30); Canvas.SetTop(mode, 306); canvas.Children.Add(mode);
-
-        var selected = new Border { Background = new SolidColorBrush(Color.FromArgb(215, 17, 22, 29)), BorderBrush = accentBrush, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(7), Padding = new Thickness(9, 4, 9, 4), Child = new TextBlock { Text = "SELECTED CAMERA", Foreground = Brushes.White, FontSize = 11, FontWeight = FontWeights.Bold } };
-        Canvas.SetLeft(selected, 398); Canvas.SetTop(selected, 18); canvas.Children.Add(selected);
+        catch
+        {
+            var bad = new TextBlock
+            {
+                Text = $"Could not display the cached {cp.DisplayName} photo.",
+                Foreground = new SolidColorBrush(Color.FromRgb(239, 83, 80)),
+                FontSize = 15,
+                Width = 520,
+                TextAlignment = TextAlignment.Center
+            };
+            Canvas.SetLeft(bad, 20);
+            Canvas.SetTop(bad, 145);
+            HomeCameraArt.Children.Add(bad);
+        }
     }
 }
