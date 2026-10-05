@@ -5,8 +5,8 @@ on:
     branches:
       - gostream-studio-0.1.1
     paths:
-      - '.build/gostream-studio-0.1.1/source.zip'
       - '.github/workflows/build-gostream-studio-cross-0.1.1.yml'
+      - '.build/gostream-studio-0.1.0/**'
   workflow_dispatch:
 
 jobs:
@@ -16,13 +16,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Expand v0.1.1 source package
+      - name: Reconstruct v0.1.0 baseline source
         shell: bash
         run: |
           set -euo pipefail
-          test -f .build/gostream-studio-0.1.1/source.zip
-          unzip -q -o .build/gostream-studio-0.1.1/source.zip
-          test -f gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj
+          test "$(find .build/gostream-studio-0.1.0 -maxdepth 1 -name 'part*' | wc -l)" -eq 8
+          cat $(find .build/gostream-studio-0.1.0 -maxdepth 1 -name 'part*' | sort) | base64 -d > gostream-source.zip
+          unzip -q -o gostream-source.zip
+          test -f gostream-studio-0.1.0/src/GoStreamStudio/GoStreamStudio.csproj
+          mv gostream-studio-0.1.0 gostream-studio-0.1.1
+
+      - name: Apply v0.1.1 Program and Preview bus changes
+        shell: bash
+        env:
+          PATCH_B64: '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'
+        run: |
+          python - <<'PY'
+          import os, base64, zlib
+          script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
+          exec(compile(script, '/tmp/patch011.py', 'exec'))
+          PY
 
       - name: Apply WinForms callback compatibility patch
         shell: python
@@ -52,8 +65,7 @@ jobs:
 
       - name: Decode application icon
         shell: bash
-        run: |
-          base64 -d gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico.b64 > gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico
+        run: base64 -d gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico.b64 > gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico
 
       - name: Restore Windows target
         shell: bash
@@ -63,7 +75,7 @@ jobs:
         shell: bash
         run: dotnet publish gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj -c Release -r win-x64 --self-contained true --no-restore -p:EnableWindowsTargeting=true -o gostream-studio-0.1.1/publish
 
-      - name: Verify application EXE
+      - name: Verify Windows application EXE
         shell: bash
         run: |
           set -euo pipefail
@@ -84,8 +96,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p gostream-studio-0.1.1/artifacts
-          cat > gostream-studio-0.1.1/installer/GoStreamStudio.nsi <<'EOF'
+          mkdir -p gostream-studio-0.1.1/artifacts gostream-studio-0.1.1/installer
+          cat > gostream-studio-0.1.1/installer/GoStreamStudio.nsi <<'EOFNSIS'
           Unicode True
           !include "MUI2.nsh"
           Name "GoStream Studio"
@@ -102,7 +114,6 @@ jobs:
           !insertmacro MUI_UNPAGE_CONFIRM
           !insertmacro MUI_UNPAGE_INSTFILES
           !insertmacro MUI_LANGUAGE "English"
-
           Section "GoStream Studio" SEC01
             SetOutPath "$INSTDIR"
             File /r "../publish/*.*"
@@ -110,13 +121,12 @@ jobs:
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.1"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
             WriteUninstaller "$INSTDIR\Uninstall.exe"
             CreateDirectory "$SMPROGRAMS\GoStream Studio"
             CreateShortcut "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
             CreateShortcut "$DESKTOP\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
           SectionEnd
-
           Section "Uninstall"
             Delete "$DESKTOP\GoStream Studio.lnk"
             Delete "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk"
@@ -125,7 +135,7 @@ jobs:
             DeleteRegKey HKLM "Software\GoStream Studio"
             DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio"
           SectionEnd
-          EOF
+          EOFNSIS
           cd gostream-studio-0.1.1/installer
           makensis GoStreamStudio.nsi
 
@@ -150,5 +160,3 @@ jobs:
             gostream-studio-0.1.1/artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 30
-
-# v0.1.1 build trigger
