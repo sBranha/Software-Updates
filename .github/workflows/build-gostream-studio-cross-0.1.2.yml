@@ -1,4 +1,4 @@
-name: Inspect GoStream Studio v0.1.2 UI
+name: Build GoStream Studio v0.1.2 Windows Installer
 
 on:
   push:
@@ -37,20 +37,337 @@ jobs:
           exec(compile(script, '/tmp/patch011.py', 'exec'))
           PY
 
-      - name: Inspect current navigation and scrolling code
+      - name: Apply v0.1.2 navigation and no-scrollbar fixes
         shell: bash
         run: |
-          set -euo pipefail
-          f=gostream-studio-0.1.1/src/GoStreamStudio/MainForm.cs
-          echo '--- NAV/TAB MATCHES ---'
-          grep -n -E 'Switcher|Audio|MultiView|Media|Macros|Streaming|Settings|tab|Tab|nav|Nav' "$f" | head -n 220 || true
-          echo '--- SCROLL/FLOW MATCHES ---'
-          grep -n -E 'AutoScroll|HorizontalScroll|VerticalScroll|FlowLayoutPanel|WrapContents|PROGRAM / LIVE|PREVIEW' "$f" | head -n 220 || true
-          echo '--- MAINFORM LINES 420-780 ---'
-          sed -n '420,780p' "$f"
-          echo '--- AUDIO CHANNEL STRIP ---'
-          cat gostream-studio-0.1.1/src/GoStreamStudio/Controls/AudioChannelStrip.cs
-          exit 1
+          python - <<'PY'
+          from pathlib import Path
+
+          main = Path('gostream-studio-0.1.1/src/GoStreamStudio/MainForm.cs')
+          text = main.read_text()
+
+          def rep(old, new, count=1):
+              global text
+              if old not in text:
+                  raise SystemExit(f'Expected MainForm text not found: {old[:100]!r}')
+              text = text.replace(old, new, count)
+
+          rep(
+              '    private readonly List<AudioChannelStrip> _audioStrips = new();\n',
+              '''    private readonly List<AudioChannelStrip> _audioStrips = new();
+    private readonly List<AudioChannelStrip> _audioPageStrips = new();
+    private readonly Panel _workspaceHost = new();
+    private readonly Dictionary<string, Control> _workspacePages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Button> _navButtons = new(StringComparer.OrdinalIgnoreCase);
+''')
+
+          rep(
+              '''        root.Controls.Add(BuildTopNav(), 0, 0);
+        root.Controls.Add(BuildStatusStrip(), 0, 1);
+        root.Controls.Add(BuildWorkspace(), 0, 2);
+''',
+              '''        root.Controls.Add(BuildTopNav(), 0, 0);
+        root.Controls.Add(BuildStatusStrip(), 0, 1);
+
+        _workspaceHost.Dock = DockStyle.Fill;
+        _workspaceHost.BackColor = Theme.Background;
+        root.Controls.Add(_workspaceHost, 0, 2);
+
+        RegisterWorkspace("Switcher", BuildWorkspace());
+        RegisterWorkspace("Audio", BuildAudioWorkspace());
+        RegisterWorkspace("MultiView", BuildMultiViewWorkspace());
+        RegisterWorkspace("Media", BuildMediaWorkspace());
+        RegisterWorkspace("Macros", BuildMacrosWorkspace());
+        RegisterWorkspace("Streaming", BuildStreamingWorkspace());
+        ShowWorkspace("Switcher");
+''')
+
+          rep(
+              '''            b.Tag = name;
+            b.Click += TopNav_Click;
+            nav.Controls.Add(b);
+''',
+              '''            b.Tag = name;
+            b.Click += TopNav_Click;
+            _navButtons[name] = b;
+            nav.Controls.Add(b);
+''')
+
+          anchor = '    private Control BuildStatusStrip()\n'
+          if anchor not in text:
+              raise SystemExit('BuildStatusStrip anchor not found')
+          workspace_methods = r'''    private void RegisterWorkspace(string name, Control page)
+    {
+        page.Dock = DockStyle.Fill;
+        page.Visible = false;
+        _workspacePages[name] = page;
+        _workspaceHost.Controls.Add(page);
+    }
+
+    private void ShowWorkspace(string name)
+    {
+        if (!_workspacePages.TryGetValue(name, out var selected)) return;
+
+        foreach (var pair in _workspacePages)
+            pair.Value.Visible = string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase);
+
+        selected.BringToFront();
+
+        foreach (var pair in _navButtons)
+            pair.Value.BackColor = string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)
+                ? Theme.Blue
+                : Color.Transparent;
+
+        SetLog($"{name} workspace");
+    }
+
+    private Control BuildFeatureWorkspace(string title, string subtitle, Control content)
+    {
+        var page = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Theme.Background,
+            Padding = new Padding(20, 18, 20, 20)
+        };
+
+        var heading = new Label
+        {
+            Text = title,
+            ForeColor = Theme.Text,
+            Font = new Font("Segoe UI Semibold", 18f),
+            AutoSize = true,
+            Location = new Point(24, 18)
+        };
+
+        var sub = new Label
+        {
+            Text = subtitle,
+            ForeColor = Theme.Muted,
+            Font = new Font("Segoe UI", 10f),
+            AutoSize = true,
+            Location = new Point(26, 52)
+        };
+
+        var host = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Theme.Background,
+            Padding = new Padding(0, 76, 0, 0)
+        };
+        content.Dock = DockStyle.Fill;
+        host.Controls.Add(content);
+
+        page.Controls.Add(host);
+        page.Controls.Add(sub);
+        page.Controls.Add(heading);
+        heading.BringToFront();
+        sub.BringToFront();
+        return page;
+    }
+
+    private Control BuildAudioWorkspace()
+    {
+        return BuildFeatureWorkspace(
+            "Audio",
+            "Full audio mixer view. Faders, mute and AFV use the same live device controls.",
+            BuildAudioMixer(_audioPageStrips));
+    }
+
+    private Control BuildMultiViewWorkspace()
+    {
+        return BuildFeatureWorkspace(
+            "MultiView",
+            "MultiSource and layout controls for the connected GoStream model.",
+            BuildPresetCard());
+    }
+
+    private Control BuildMacrosWorkspace()
+    {
+        return BuildFeatureWorkspace(
+            "Macros",
+            "Production macro controls in a dedicated workspace.",
+            BuildMacrosPanel());
+    }
+
+    private Control BuildMediaWorkspace()
+    {
+        var card = CreateCard("MEDIA");
+        var info = new Label
+        {
+            Text = "Media controls and device media status will appear here for the connected GoStream model.",
+            ForeColor = Theme.Text,
+            Font = new Font("Segoe UI", 11f),
+            AutoSize = true,
+            Location = new Point(22, 58)
+        };
+        var still = MakeFlatButton("STILL / MEDIA", Theme.Surface2, 170, 52);
+        still.Location = new Point(22, 104);
+        still.Click += (_, _) => SetLog("Media workspace selected. Device media mapping will follow detected capabilities.");
+        card.Controls.Add(info);
+        card.Controls.Add(still);
+        return BuildFeatureWorkspace("Media", "Media and still-source workspace.", card);
+    }
+
+    private Control BuildStreamingWorkspace()
+    {
+        var card = CreateCard("STREAMING & RECORDING");
+
+        var status = new Label
+        {
+            Name = "StreamingPageStatus",
+            Text = "Waiting for device status",
+            ForeColor = Theme.Text,
+            Font = new Font("Segoe UI", 12f),
+            AutoSize = true,
+            Location = new Point(24, 62)
+        };
+
+        var record = MakeFlatButton("●  RECORD / STOP", Color.FromArgb(82, 22, 29), 210, 58);
+        record.Location = new Point(24, 118);
+        record.Click += async (_, _) =>
+        {
+            if (_controller.RecordStatus == 0) await _controller.StartRecordAsync(false);
+            else await _controller.StopRecordAsync();
+        };
+
+        var stream = MakeFlatButton("●  STREAM ON / OFF", Color.FromArgb(18, 75, 37), 210, 58);
+        stream.Location = new Point(250, 118);
+        stream.Click += async (_, _) => await _controller.SetStreamEnabledAsync(!_controller.StreamEnabled);
+
+        card.Controls.Add(status);
+        card.Controls.Add(record);
+        card.Controls.Add(stream);
+        return BuildFeatureWorkspace("Streaming", "Live stream and recording controls.", card);
+    }
+
+'''
+          text = text.replace(anchor, workspace_methods + anchor, 1)
+
+          rep('        flow.AutoScroll = true;\n        flow.BackColor = Theme.Background;',
+              '        flow.AutoScroll = false;\n        flow.BackColor = Theme.Background;', 1)
+
+          rep('            Width = 112,\n            Height = 50,',
+              '            Width = 100,\n            Height = 50,', 1)
+
+          rep('            var pgm = MakeFlatButton($"CAM {i}", Theme.Surface2, 94, 50);',
+              '            var pgm = MakeFlatButton($"CAM {i}", Theme.Surface2, 66, 50);\n            pgm.Margin = new Padding(2, 0, 2, 0);', 1)
+
+          rep('            var pvw = MakeFlatButton($"CAM {i}", Theme.Surface2, 94, 50);',
+              '            var pvw = MakeFlatButton($"CAM {i}", Theme.Surface2, 66, 50);\n            pvw.Margin = new Padding(2, 0, 2, 0);', 1)
+
+          rep('    private Control BuildAudioMixer()\n',
+              '    private Control BuildAudioMixer(List<AudioChannelStrip>? targetStrips = null)\n', 1)
+
+          # The second AutoScroll=true belongs to the audio mixer.
+          rep('            AutoScroll = true,\n            BackColor = Theme.Surface,',
+              '            AutoScroll = false,\n            BackColor = Theme.Surface,', 1)
+
+          rep('            _audioStrips.Add(strip);',
+              '            (targetStrips ?? _audioStrips).Add(strip);', 1)
+
+          rep(
+              '''        var audioIds = _controller.AudioSources;
+        for (var i = 0; i < _audioStrips.Count; i++)
+            _audioStrips[i].SourceId = i < audioIds.Length ? audioIds[i] : 0;
+        ApplyMeters();
+''',
+              '''        var audioIds = _controller.AudioSources;
+        ApplyAudioSourceIds(_audioStrips, audioIds);
+        ApplyAudioSourceIds(_audioPageStrips, audioIds);
+        ApplyMeters();
+''')
+
+          apply_meters_anchor = '    private void ApplyMeters()\n'
+          if apply_meters_anchor not in text:
+              raise SystemExit('ApplyMeters anchor missing')
+          helper = r'''    private static void ApplyAudioSourceIds(List<AudioChannelStrip> strips, IReadOnlyList<int> audioIds)
+    {
+        for (var i = 0; i < strips.Count; i++)
+            strips[i].SourceId = i < audioIds.Count ? audioIds[i] : 0;
+    }
+
+'''
+          text = text.replace(apply_meters_anchor, helper + apply_meters_anchor, 1)
+
+          rep(
+              '''            var strip = _audioStrips.FirstOrDefault(s => s.SourceId == sourceId);
+            if (strip is not null) strip.SetLevel(NormalizeMeter(peak));
+''',
+              '''            foreach (var strips in new[] { _audioStrips, _audioPageStrips })
+            {
+                var strip = strips.FirstOrDefault(s => s.SourceId == sourceId);
+                if (strip is not null) strip.SetLevel(NormalizeMeter(peak));
+            }
+''')
+
+          rep(
+              '''        else if (name != "Switcher")
+        {
+            SetLog($"{name} workspace is scaffolded; its controls will be expanded without changing the approved Switcher layout.");
+        }
+''',
+              '''        else
+        {
+            ShowWorkspace(name);
+        }
+''')
+
+          rep(
+              '''        var rightRecord = FindDeep(this, "RightRecordStatus") as Label;
+        if (rightRecord is not null)
+            rightRecord.Text = _controller.RecordStatus == 0 ? "●  Recording\n    Ready" : "●  Recording\n    ACTIVE";
+
+        ApplyProfileToButtons();
+''',
+              '''        var rightRecord = FindDeep(this, "RightRecordStatus") as Label;
+        if (rightRecord is not null)
+            rightRecord.Text = _controller.RecordStatus == 0 ? "●  Recording\n    Ready" : "●  Recording\n    ACTIVE";
+
+        var streamingPageStatus = FindDeep(this, "StreamingPageStatus") as Label;
+        if (streamingPageStatus is not null)
+            streamingPageStatus.Text =
+                $"Streaming: {(_controller.StreamEnabled ? "LIVE" : "OFF")}    Recording: {(_controller.RecordStatus == 0 ? "OFF" : "ACTIVE")}";
+
+        ApplyProfileToButtons();
+''')
+
+          main.write_text(text)
+
+          audio = Path('gostream-studio-0.1.1/src/GoStreamStudio/Controls/AudioChannelStrip.cs')
+          a = audio.read_text()
+
+          replacements = [
+              ('        Width = 66;', '        Width = 48;'),
+              ('        Margin = new Padding(3);', '        Margin = new Padding(1);'),
+              ('            Font = new Font("Segoe UI Semibold", 8.2f),', '            Font = new Font("Segoe UI Semibold", 7.2f),'),
+              ('            Font = new Font("Segoe UI", 7.8f),', '            Font = new Font("Segoe UI", 7.0f),'),
+              ('        _meter = new LevelMeter { Width = 12, Height = 176, Location = new Point(42, 57) };',
+               '        _meter = new LevelMeter { Width = 8, Height = 176, Location = new Point(35, 57) };'),
+              ('            Width = 38,', '            Width = 30,'),
+              ('            Location = new Point(5, 53),', '            Location = new Point(1, 53),'),
+              ('        _mute.Location = new Point(6, 242);', '        _mute.Location = new Point(2, 242);'),
+              ('        _afv.Location = new Point(6, 276);', '        _afv.Location = new Point(2, 276);'),
+              ('        Width = 54,', '        Width = 44,'),
+              ('        Font = new Font("Segoe UI Semibold", 8f),', '        Font = new Font("Segoe UI Semibold", 7.5f),'),
+          ]
+          for old, new in replacements:
+              if old not in a:
+                  raise SystemExit(f'Expected AudioChannelStrip text not found: {old!r}')
+              a = a.replace(old, new, 1)
+          audio.write_text(a)
+
+          # Build-time assertions for the reported regressions.
+          final = main.read_text()
+          if 'workspace is scaffolded' in final:
+              raise SystemExit('Dead top-navigation scaffold handler still present')
+          if 'flow.AutoScroll = true;' in final:
+              raise SystemExit('Source-bus scrollbar still enabled')
+          if 'AutoScroll = true,' in final:
+              raise SystemExit('Audio-mixer scrollbar still enabled')
+          if 'ShowWorkspace(name);' not in final:
+              raise SystemExit('Navigation switching was not installed')
+          print('v0.1.2 navigation and no-scrollbar patch applied successfully')
+          PY
 
       - name: Apply WinForms callback compatibility patch
         shell: python
@@ -116,11 +433,11 @@ jobs:
           Unicode True
           !include "MUI2.nsh"
           Name "GoStream Studio"
-          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.1.exe"
+          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.2.exe"
           InstallDir "$PROGRAMFILES64\GoStream Studio"
           InstallDirRegKey HKLM "Software\GoStream Studio" "InstallDir"
           RequestExecutionLevel admin
-          BrandingText "GoStream Studio v0.1.1"
+          BrandingText "GoStream Studio v0.1.2"
           !define MUI_ABORTWARNING
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
@@ -134,7 +451,7 @@ jobs:
             File /r "../publish/*.*"
             WriteRegStr HKLM "Software\GoStream Studio" "InstallDir" "$INSTDIR"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.1"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.2"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
             WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -158,7 +475,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.1.exe
+          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
           test -f "$installer"
           size=$(stat -c%s "$installer")
           test "$size" -gt 1000000
@@ -169,9 +486,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: GoStream-Studio-v0.1.1-Windows-Installer
+          name: GoStream-Studio-v0.1.2-Windows-Installer
           path: |
-            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.1.exe
+            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
             gostream-studio-0.1.1/artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 30
