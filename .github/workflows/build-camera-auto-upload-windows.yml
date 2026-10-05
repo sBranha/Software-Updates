@@ -43,6 +43,7 @@ jobs:
       - name: Build curated official camera photo library
         shell: pwsh
         run: |
+          $env:PYTHONUTF8='1'
           python camera-auto-upload-windows/build_camera_assets.py
           $required = @(
             'camera-auto-upload-windows\CameraAssets\Nikon_Z8.png',
