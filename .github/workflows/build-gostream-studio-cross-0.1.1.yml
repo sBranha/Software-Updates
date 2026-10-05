@@ -1,9 +1,9 @@
-name: Build GoStream Studio v0.1.1 Windows Installer
+name: Inspect GoStream Studio v0.1.2 UI
 
 on:
   push:
     branches:
-      - gostream-studio-0.1.1
+      - gostream-studio-0.1.2
     paths:
       - '.github/workflows/build-gostream-studio-cross-0.1.1.yml'
       - '.build/gostream-studio-0.1.0/**'
@@ -36,6 +36,19 @@ jobs:
           script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
           exec(compile(script, '/tmp/patch011.py', 'exec'))
           PY
+
+      - name: Inspect current navigation and scrolling code
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=gostream-studio-0.1.1/src/GoStreamStudio/MainForm.cs
+          echo '--- NAV/TAB MATCHES ---'
+          grep -n -E 'Switcher|Audio|MultiView|Media|Macros|Streaming|Settings|tab|Tab|nav|Nav' "$f" | head -n 220 || true
+          echo '--- SCROLL/FLOW MATCHES ---'
+          grep -n -E 'AutoScroll|HorizontalScroll|VerticalScroll|FlowLayoutPanel|WrapContents|PROGRAM / LIVE|PREVIEW' "$f" | head -n 220 || true
+          echo '--- FIRST 420 LINES ---'
+          sed -n '1,420p' "$f"
+          exit 1
 
       - name: Apply WinForms callback compatibility patch
         shell: python
