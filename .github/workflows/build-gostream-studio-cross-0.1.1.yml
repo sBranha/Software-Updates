@@ -1,1 +1,152 @@
-name: placeholder
+name: Build GoStream Studio v0.1.1 Windows Installer
+
+on:
+  push:
+    branches:
+      - gostream-studio-0.1.1
+    paths:
+      - '.build/gostream-studio-0.1.1/source.zip'
+      - '.github/workflows/build-gostream-studio-cross-0.1.1.yml'
+  workflow_dispatch:
+
+jobs:
+  build-windows-cross:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Expand v0.1.1 source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .build/gostream-studio-0.1.1/source.zip
+          unzip -q -o .build/gostream-studio-0.1.1/source.zip
+          test -f gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj
+
+      - name: Apply WinForms callback compatibility patch
+        shell: python
+        run: |
+          from pathlib import Path
+          files = [
+              Path('gostream-studio-0.1.1/src/GoStreamStudio/MainForm.cs'),
+              Path('gostream-studio-0.1.1/src/GoStreamStudio/Controls/VideoMonitor.cs'),
+          ]
+          replacements = {
+              'BeginInvoke(UpdateUiFromState);': 'BeginInvoke(new Action(UpdateUiFromState));',
+              'BeginInvoke(() => SetLog(text));': 'BeginInvoke(new Action(() => SetLog(text)));',
+              'BeginInvoke(() => SourceText = value);': 'BeginInvoke(new Action(() => SourceText = value));',
+              'BeginInvoke(() => CaptureStatus = value);': 'BeginInvoke(new Action(() => CaptureStatus = value));',
+              'BeginInvoke(() => SetFrame(bitmap));': 'BeginInvoke(new Action(() => SetFrame(bitmap)));',
+          }
+          for p in files:
+              text = p.read_text()
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              p.write_text(text)
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Decode application icon
+        shell: bash
+        run: |
+          base64 -d gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico.b64 > gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico
+
+      - name: Restore Windows target
+        shell: bash
+        run: dotnet restore gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj -r win-x64 -p:EnableWindowsTargeting=true
+
+      - name: Publish self-contained Windows x64 app
+        shell: bash
+        run: dotnet publish gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj -c Release -r win-x64 --self-contained true --no-restore -p:EnableWindowsTargeting=true -o gostream-studio-0.1.1/publish
+
+      - name: Verify application EXE
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe=gostream-studio-0.1.1/publish/GoStreamStudio.exe
+          test -f "$exe"
+          size=$(stat -c%s "$exe")
+          test "$size" -gt 100000
+          file "$exe"
+          echo "GoStreamStudio.exe size: $size"
+
+      - name: Install NSIS
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis
+
+      - name: Create Windows installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gostream-studio-0.1.1/artifacts
+          cat > gostream-studio-0.1.1/installer/GoStreamStudio.nsi <<'EOF'
+          Unicode True
+          !include "MUI2.nsh"
+          Name "GoStream Studio"
+          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.1.exe"
+          InstallDir "$PROGRAMFILES64\GoStream Studio"
+          InstallDirRegKey HKLM "Software\GoStream Studio" "InstallDir"
+          RequestExecutionLevel admin
+          BrandingText "GoStream Studio v0.1.1"
+          !define MUI_ABORTWARNING
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !insertmacro MUI_PAGE_FINISH
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+          !insertmacro MUI_LANGUAGE "English"
+
+          Section "GoStream Studio" SEC01
+            SetOutPath "$INSTDIR"
+            File /r "../publish/*.*"
+            WriteRegStr HKLM "Software\GoStream Studio" "InstallDir" "$INSTDIR"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.1"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
+            WriteUninstaller "$INSTDIR\Uninstall.exe"
+            CreateDirectory "$SMPROGRAMS\GoStream Studio"
+            CreateShortcut "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
+            CreateShortcut "$DESKTOP\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
+          SectionEnd
+
+          Section "Uninstall"
+            Delete "$DESKTOP\GoStream Studio.lnk"
+            Delete "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk"
+            RMDir "$SMPROGRAMS\GoStream Studio"
+            RMDir /r "$INSTDIR"
+            DeleteRegKey HKLM "Software\GoStream Studio"
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio"
+          SectionEnd
+          EOF
+          cd gostream-studio-0.1.1/installer
+          makensis GoStreamStudio.nsi
+
+      - name: Verify installer and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.1.exe
+          test -f "$installer"
+          size=$(stat -c%s "$installer")
+          test "$size" -gt 1000000
+          file "$installer"
+          sha256sum "$installer" | tee gostream-studio-0.1.1/artifacts/SHA256.txt
+          echo "Installer size: $size"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoStream-Studio-v0.1.1-Windows-Installer
+          path: |
+            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.1.exe
+            gostream-studio-0.1.1/artifacts/SHA256.txt
+          if-no-files-found: error
+          retention-days: 30
