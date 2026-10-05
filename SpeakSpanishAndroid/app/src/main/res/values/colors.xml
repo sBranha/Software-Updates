@@ -1,0 +1,8 @@
+<resources>
+    <color name="brand_primary">#143D59</color>
+    <color name="brand_accent">#F4B41A</color>
+    <color name="screen_bg">#F7F9FB</color>
+    <color name="text_primary">#17202A</color>
+    <color name="text_secondary">#5D6D7E</color>
+    <color name="white">#FFFFFF</color>
+</resources>

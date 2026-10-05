@@ -1,0 +1,44 @@
+name: Build Speak Spanish APK
+
+on:
+  push:
+    branches:
+      - speak-spanish-apk-build
+    paths:
+      - 'SpeakSpanishAndroid/**'
+      - '.github/workflows/speak-spanish-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build debug APK
+        working-directory: SpeakSpanishAndroid
+        run: gradle --no-daemon assembleDebug
+
+      - name: Rename APK
+        run: cp SpeakSpanishAndroid/app/build/outputs/apk/debug/app-debug.apk Speak-Spanish-v1.0.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Speak-Spanish-v1.0.0-APK
+          path: Speak-Spanish-v1.0.0.apk
+          if-no-files-found: error
