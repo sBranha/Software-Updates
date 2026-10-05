@@ -46,8 +46,10 @@ jobs:
           grep -n -E 'Switcher|Audio|MultiView|Media|Macros|Streaming|Settings|tab|Tab|nav|Nav' "$f" | head -n 220 || true
           echo '--- SCROLL/FLOW MATCHES ---'
           grep -n -E 'AutoScroll|HorizontalScroll|VerticalScroll|FlowLayoutPanel|WrapContents|PROGRAM / LIVE|PREVIEW' "$f" | head -n 220 || true
-          echo '--- FIRST 420 LINES ---'
-          sed -n '1,420p' "$f"
+          echo '--- MAINFORM LINES 420-780 ---'
+          sed -n '420,780p' "$f"
+          echo '--- AUDIO CHANNEL STRIP ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Controls/AudioChannelStrip.cs
           exit 1
 
       - name: Apply WinForms callback compatibility patch
