@@ -1,0 +1,106 @@
+name: Build GoStream Studio v0.1.0 Windows Installer
+
+on:
+  push:
+    branches:
+      - gostream-studio-0.1.0
+    paths:
+      - '.build/gostream-studio-0.1.0/**'
+      - '.github/workflows/build-gostream-studio-0.1.0.yml'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct source package
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem '.build/gostream-studio-0.1.0/part*' | Sort-Object Name
+          if ($parts.Count -ne 8) { throw "Expected 8 source chunks, found $($parts.Count)." }
+          $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
+          [IO.File]::WriteAllBytes('gostream-source.zip', [Convert]::FromBase64String($b64))
+          Expand-Archive -Path 'gostream-source.zip' -DestinationPath '.' -Force
+          if (!(Test-Path 'gostream-studio-0.1.0/src/GoStreamStudio/GoStreamStudio.csproj')) { throw 'Source project was not reconstructed.' }
+
+      - name: Apply WinForms callback compatibility patch
+        shell: pwsh
+        run: |
+          $files = @(
+            'gostream-studio-0.1.0/src/GoStreamStudio/MainForm.cs',
+            'gostream-studio-0.1.0/src/GoStreamStudio/Controls/VideoMonitor.cs'
+          )
+          foreach ($path in $files) {
+            $text = Get-Content $path -Raw
+            $text = $text.Replace('BeginInvoke(UpdateUiFromState);', 'BeginInvoke(new Action(UpdateUiFromState));')
+            $text = $text.Replace('BeginInvoke(() => SetLog(text));', 'BeginInvoke(new Action(() => SetLog(text)));')
+            $text = $text.Replace('BeginInvoke(() => SourceText = value);', 'BeginInvoke(new Action(() => SourceText = value));')
+            $text = $text.Replace('BeginInvoke(() => CaptureStatus = value);', 'BeginInvoke(new Action(() => CaptureStatus = value));')
+            $text = $text.Replace('BeginInvoke(() => SetFrame(bitmap));', 'BeginInvoke(new Action(() => SetFrame(bitmap)));')
+            Set-Content -Path $path -Value $text -NoNewline
+          }
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Decode application icon
+        shell: pwsh
+        run: |
+          $b64 = Get-Content 'gostream-studio-0.1.0/src/GoStreamStudio/Assets/GoStreamStudio.ico.b64' -Raw
+          [IO.File]::WriteAllBytes('gostream-studio-0.1.0/src/GoStreamStudio/Assets/GoStreamStudio.ico', [Convert]::FromBase64String($b64))
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore 'gostream-studio-0.1.0/src/GoStreamStudio/GoStreamStudio.csproj' -r win-x64
+
+      - name: Publish self-contained Windows x64 app
+        shell: pwsh
+        run: dotnet publish 'gostream-studio-0.1.0/src/GoStreamStudio/GoStreamStudio.csproj' -c Release -r win-x64 --self-contained true --no-restore -o 'gostream-studio-0.1.0/publish'
+
+      - name: Verify application EXE
+        shell: pwsh
+        run: |
+          $exe = 'gostream-studio-0.1.0/publish/GoStreamStudio.exe'
+          if (!(Test-Path $exe)) { throw 'GoStreamStudio.exe was not produced.' }
+          $item = Get-Item $exe
+          if ($item.Length -lt 100000) { throw "Application EXE is unexpectedly small: $($item.Length) bytes" }
+          Write-Host "Application EXE: $($item.FullName) ($($item.Length) bytes)"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { throw 'Inno Setup compiler not found.' }
+          & $iscc 'gostream-studio-0.1.0/installer/GoStreamStudio.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with code $LASTEXITCODE" }
+
+      - name: Verify installer and SHA256
+        shell: pwsh
+        run: |
+          $installer = 'gostream-studio-0.1.0/artifacts/GoStream-Studio-Setup-v0.1.0.exe'
+          if (!(Test-Path $installer)) { throw 'Installer EXE was not produced.' }
+          $item = Get-Item $installer
+          if ($item.Length -lt 1000000) { throw "Installer is unexpectedly small: $($item.Length) bytes" }
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash
+          "$hash  GoStream-Studio-Setup-v0.1.0.exe" | Set-Content 'gostream-studio-0.1.0/artifacts/SHA256.txt'
+          Write-Host "Installer: $($item.FullName) ($($item.Length) bytes)"
+          Write-Host "SHA256: $hash"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoStream-Studio-v0.1.0-Windows-Installer
+          path: |
+            gostream-studio-0.1.0/artifacts/GoStream-Studio-Setup-v0.1.0.exe
+            gostream-studio-0.1.0/artifacts/SHA256.txt
+          if-no-files-found: error
+          retention-days: 30
