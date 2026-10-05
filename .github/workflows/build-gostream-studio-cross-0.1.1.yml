@@ -150,3 +150,5 @@ jobs:
             gostream-studio-0.1.1/artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 30
+
+# v0.1.1 build trigger
