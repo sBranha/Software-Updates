@@ -1,0 +1,187 @@
+name: Inspect GoStream Studio v0.1.3 MultiSource
+
+on:
+  push:
+    branches:
+      - gostream-studio-0.1.3
+    paths:
+      - '.github/workflows/build-gostream-studio-cross-0.1.3.yml'
+      - '.build/gostream-studio-0.1.0/**'
+  workflow_dispatch:
+
+jobs:
+  build-windows-cross:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct v0.1.0 baseline source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .build/gostream-studio-0.1.0 -maxdepth 1 -name 'part*' | wc -l)" -eq 8
+          cat $(find .build/gostream-studio-0.1.0 -maxdepth 1 -name 'part*' | sort) | base64 -d > gostream-source.zip
+          unzip -q -o gostream-source.zip
+          test -f gostream-studio-0.1.0/src/GoStreamStudio/GoStreamStudio.csproj
+          mv gostream-studio-0.1.0 gostream-studio-0.1.1
+
+      - name: Apply v0.1.1 Program and Preview bus changes
+        shell: bash
+        env:
+          PATCH_B64: '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'
+        run: |
+          python - <<'PY'
+          import os, base64, zlib
+          script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
+          exec(compile(script, '/tmp/patch011.py', 'exec'))
+          PY
+
+      - name: Apply v0.1.2 navigation and no-scrollbar fixes
+        shell: bash
+        env:
+          PATCH_B64: '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'
+        run: |
+          python - <<'PY'
+          import os, base64, zlib
+          script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
+          exec(compile(script, '/tmp/patch012.py', 'exec'))
+          PY
+
+      - name: Inspect MultiSource controller support
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- GOSTREAM CONTROLLER MULTISOURCE MATCHES ---'
+          grep -Rni -E 'multiSource|MultiSource|Set.*Source|Send.*Async|Command|Json|Window' gostream-studio-0.1.1/src/GoStreamStudio/Core gostream-studio-0.1.1/src/GoStreamStudio/Services gostream-studio-0.1.1/src/GoStreamStudio/Models | head -n 500 || true
+          echo '--- GOSTREAM CONTROLLER FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamController.cs
+          echo '--- GOSTREAM CLIENT FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamClient.cs
+          echo '--- DEVICE PROFILE FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Models/DeviceProfile.cs
+          exit 1
+
+      - name: Apply WinForms callback compatibility patch
+        shell: python
+        run: |
+          from pathlib import Path
+          files = [
+              Path('gostream-studio-0.1.1/src/GoStreamStudio/MainForm.cs'),
+              Path('gostream-studio-0.1.1/src/GoStreamStudio/Controls/VideoMonitor.cs'),
+          ]
+          replacements = {
+              'BeginInvoke(UpdateUiFromState);': 'BeginInvoke(new Action(UpdateUiFromState));',
+              'BeginInvoke(() => SetLog(text));': 'BeginInvoke(new Action(() => SetLog(text)));',
+              'BeginInvoke(() => SourceText = value);': 'BeginInvoke(new Action(() => SourceText = value));',
+              'BeginInvoke(() => CaptureStatus = value);': 'BeginInvoke(new Action(() => CaptureStatus = value));',
+              'BeginInvoke(() => SetFrame(bitmap));': 'BeginInvoke(new Action(() => SetFrame(bitmap)));',
+          }
+          for p in files:
+              text = p.read_text()
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              p.write_text(text)
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Decode application icon
+        shell: bash
+        run: base64 -d gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico.b64 > gostream-studio-0.1.1/src/GoStreamStudio/Assets/GoStreamStudio.ico
+
+      - name: Restore Windows target
+        shell: bash
+        run: dotnet restore gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj -r win-x64 -p:EnableWindowsTargeting=true
+
+      - name: Publish self-contained Windows x64 app
+        shell: bash
+        run: dotnet publish gostream-studio-0.1.1/src/GoStreamStudio/GoStreamStudio.csproj -c Release -r win-x64 --self-contained true --no-restore -p:EnableWindowsTargeting=true -o gostream-studio-0.1.1/publish
+
+      - name: Verify Windows application EXE
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe=gostream-studio-0.1.1/publish/GoStreamStudio.exe
+          test -f "$exe"
+          size=$(stat -c%s "$exe")
+          test "$size" -gt 100000
+          file "$exe"
+          echo "GoStreamStudio.exe size: $size"
+
+      - name: Install NSIS
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis
+
+      - name: Create Windows installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gostream-studio-0.1.1/artifacts gostream-studio-0.1.1/installer
+          cat > gostream-studio-0.1.1/installer/GoStreamStudio.nsi <<'EOFNSIS'
+          Unicode True
+          !include "MUI2.nsh"
+          Name "GoStream Studio"
+          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.2.exe"
+          InstallDir "$PROGRAMFILES64\GoStream Studio"
+          InstallDirRegKey HKLM "Software\GoStream Studio" "InstallDir"
+          RequestExecutionLevel admin
+          BrandingText "GoStream Studio v0.1.2"
+          !define MUI_ABORTWARNING
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !insertmacro MUI_PAGE_FINISH
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+          !insertmacro MUI_LANGUAGE "English"
+          Section "GoStream Studio" SEC01
+            SetOutPath "$INSTDIR"
+            File /r "../publish/*.*"
+            WriteRegStr HKLM "Software\GoStream Studio" "InstallDir" "$INSTDIR"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.2"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
+            WriteUninstaller "$INSTDIR\Uninstall.exe"
+            CreateDirectory "$SMPROGRAMS\GoStream Studio"
+            CreateShortcut "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
+            CreateShortcut "$DESKTOP\GoStream Studio.lnk" "$INSTDIR\GoStreamStudio.exe"
+          SectionEnd
+          Section "Uninstall"
+            Delete "$DESKTOP\GoStream Studio.lnk"
+            Delete "$SMPROGRAMS\GoStream Studio\GoStream Studio.lnk"
+            RMDir "$SMPROGRAMS\GoStream Studio"
+            RMDir /r "$INSTDIR"
+            DeleteRegKey HKLM "Software\GoStream Studio"
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio"
+          SectionEnd
+          EOFNSIS
+          cd gostream-studio-0.1.1/installer
+          makensis GoStreamStudio.nsi
+
+      - name: Verify installer and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
+          test -f "$installer"
+          size=$(stat -c%s "$installer")
+          test "$size" -gt 1000000
+          file "$installer"
+          sha256sum "$installer" | tee gostream-studio-0.1.1/artifacts/SHA256.txt
+          echo "Installer size: $size"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoStream-Studio-v0.1.2-Windows-Installer
+          path: |
+            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
+            gostream-studio-0.1.1/artifacts/SHA256.txt
+          if-no-files-found: error
+          retention-days: 30
