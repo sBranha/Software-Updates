@@ -1,4 +1,4 @@
-name: Inspect GoStream Studio v0.1.3 MultiSource
+name: Build GoStream Studio v0.1.3 Windows Installer
 
 on:
   push:
@@ -48,19 +48,16 @@ jobs:
           exec(compile(script, '/tmp/patch012.py', 'exec'))
           PY
 
-      - name: Inspect MultiSource controller support
+      - name: Apply v0.1.3 four-window MultiSource editor
         shell: bash
+        env:
+          PATCH_B64: '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'
         run: |
-          set -euo pipefail
-          echo '--- GOSTREAM CONTROLLER MULTISOURCE MATCHES ---'
-          grep -Rni -E 'multiSource|MultiSource|Set.*Source|Send.*Async|Command|Json|Window' gostream-studio-0.1.1/src/GoStreamStudio/Core gostream-studio-0.1.1/src/GoStreamStudio/Services gostream-studio-0.1.1/src/GoStreamStudio/Models | head -n 500 || true
-          echo '--- GOSTREAM CONTROLLER FULL ---'
-          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamController.cs
-          echo '--- GOSTREAM CLIENT FULL ---'
-          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamClient.cs
-          echo '--- DEVICE PROFILE FULL ---'
-          cat gostream-studio-0.1.1/src/GoStreamStudio/Models/DeviceProfile.cs
-          exit 1
+          python - <<'PY'
+          import os, base64, zlib
+          script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
+          exec(compile(script, '/tmp/patch013.py', 'exec'))
+          PY
 
       - name: Apply WinForms callback compatibility patch
         shell: python
@@ -126,11 +123,11 @@ jobs:
           Unicode True
           !include "MUI2.nsh"
           Name "GoStream Studio"
-          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.2.exe"
+          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.3.exe"
           InstallDir "$PROGRAMFILES64\GoStream Studio"
           InstallDirRegKey HKLM "Software\GoStream Studio" "InstallDir"
           RequestExecutionLevel admin
-          BrandingText "GoStream Studio v0.1.2"
+          BrandingText "GoStream Studio v0.1.3"
           !define MUI_ABORTWARNING
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
@@ -144,7 +141,7 @@ jobs:
             File /r "../publish/*.*"
             WriteRegStr HKLM "Software\GoStream Studio" "InstallDir" "$INSTDIR"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.2"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.3"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
             WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -168,7 +165,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
+          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.3.exe
           test -f "$installer"
           size=$(stat -c%s "$installer")
           test "$size" -gt 1000000
@@ -179,9 +176,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: GoStream-Studio-v0.1.2-Windows-Installer
+          name: GoStream-Studio-v0.1.3-Windows-Installer
           path: |
-            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.2.exe
+            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.3.exe
             gostream-studio-0.1.1/artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 30
