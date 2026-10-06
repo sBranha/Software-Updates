@@ -1,9 +1,9 @@
-name: Build GoStream Studio v0.1.2 Windows Installer
+name: Inspect GoStream Studio v0.1.3 MultiSource
 
 on:
   push:
     branches:
-      - gostream-studio-0.1.2
+      - gostream-studio-0.1.3
     paths:
       - '.github/workflows/build-gostream-studio-cross-0.1.2.yml'
       - '.build/gostream-studio-0.1.0/**'
@@ -47,6 +47,20 @@ jobs:
           script = zlib.decompress(base64.b64decode(os.environ['PATCH_B64'])).decode()
           exec(compile(script, '/tmp/patch012.py', 'exec'))
           PY
+
+      - name: Inspect MultiSource controller support
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- GOSTREAM CONTROLLER MULTISOURCE MATCHES ---'
+          grep -Rni -E 'multiSource|MultiSource|Set.*Source|Send.*Async|Command|Json|Window' gostream-studio-0.1.1/src/GoStreamStudio/Core gostream-studio-0.1.1/src/GoStreamStudio/Services gostream-studio-0.1.1/src/GoStreamStudio/Models | head -n 500 || true
+          echo '--- GOSTREAM CONTROLLER FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamController.cs
+          echo '--- GOSTREAM CLIENT FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Core/GoStreamClient.cs
+          echo '--- DEVICE PROFILE FULL ---'
+          cat gostream-studio-0.1.1/src/GoStreamStudio/Models/DeviceProfile.cs
+          exit 1
 
       - name: Apply WinForms callback compatibility patch
         shell: python
