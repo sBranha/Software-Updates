@@ -35,13 +35,12 @@ rep(
 '''
 )
 
-rep(
-'''        ApplyProfileToButtons();
-    }
-
-    private void ApplyMeters()
-''',
-'''        ApplyProfileToButtons();
+needle = '        ApplyProfileToButtons();'
+pos = text.rfind(needle)
+if pos < 0:
+    raise SystemExit('Final ApplyProfileToButtons call not found')
+pos += len(needle)
+text = text[:pos] + '''
 
         if (_multiSourceEditor is not null)
         {
@@ -50,12 +49,7 @@ rep(
                 : DeviceProfile.FromMode(_settings.ProfileMode);
             var windowCount = profile.Mode == DeviceProfileMode.GoStream4 ? 2 : 4;
             _multiSourceEditor.SetSources(_controller.CameraSourceIds(), windowCount);
-        }
-    }
-
-    private void ApplyMeters()
-'''
-)
+        }''' + text[pos:]
 
 main.write_text(text)
 
