@@ -1,13 +1,14 @@
-name: Build GoStream Studio v0.1.3 Windows Installer
+name: Build GoStream Studio v0.1.4 Windows Installer
 
 on:
   push:
     branches:
-      - gostream-studio-0.1.3
+      - gostream-studio-0.1.4
     paths:
       - '.github/workflows/build-gostream-studio-cross-0.1.2.yml'
       - '.build/gostream-studio-0.1.0/**'
       - '.build/gostream-studio-0.1.3/**'
+      - '.build/gostream-studio-0.1.4/**'
   workflow_dispatch:
 
 jobs:
@@ -54,6 +55,12 @@ jobs:
         run: |
           set -euo pipefail
           python .build/gostream-studio-0.1.3/patch.py
+
+      - name: Apply v0.1.4 full workspace windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .build/gostream-studio-0.1.4/patch.py
 
       - name: Apply WinForms callback compatibility patch
         shell: python
@@ -119,11 +126,11 @@ jobs:
           Unicode True
           !include "MUI2.nsh"
           Name "GoStream Studio"
-          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.3.exe"
+          OutFile "../artifacts/GoStream-Studio-Setup-v0.1.4.exe"
           InstallDir "$PROGRAMFILES64\GoStream Studio"
           InstallDirRegKey HKLM "Software\GoStream Studio" "InstallDir"
           RequestExecutionLevel admin
-          BrandingText "GoStream Studio v0.1.3"
+          BrandingText "GoStream Studio v0.1.4"
           !define MUI_ABORTWARNING
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
@@ -137,7 +144,7 @@ jobs:
             File /r "../publish/*.*"
             WriteRegStr HKLM "Software\GoStream Studio" "InstallDir" "$INSTDIR"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayName" "GoStream Studio"
-            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.3"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "DisplayVersion" "0.1.4"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "Publisher" "GoStream Studio"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GoStream Studio" "UninstallString" '\"$INSTDIR\Uninstall.exe\"'
             WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -161,7 +168,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.3.exe
+          installer=gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.4.exe
           test -f "$installer"
           size=$(stat -c%s "$installer")
           test "$size" -gt 1000000
@@ -172,9 +179,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: GoStream-Studio-v0.1.3-Windows-Installer
+          name: GoStream-Studio-v0.1.4-Windows-Installer
           path: |
-            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.3.exe
+            gostream-studio-0.1.1/artifacts/GoStream-Studio-Setup-v0.1.4.exe
             gostream-studio-0.1.1/artifacts/SHA256.txt
           if-no-files-found: error
           retention-days: 30
