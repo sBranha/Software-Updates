@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -16,7 +16,6 @@ jobs:
           java-version: '17'
       - name: Install Android SDK packages
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -28,3 +27,9 @@ jobs:
           name: NewsWave-Live-v0.1.0-APK
           path: newswave-android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+      - name: Publish direct download as prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.1.0.apk
+          gh release create newswave-live-v0.1.0 NewsWave-Live-v0.1.0.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.1.0 Android Test APK" --notes "Android test build of NewsWave Live. Download the APK asset and install on Android. This is an unsigned-for-store debug test build, not yet device tested." --prerelease
