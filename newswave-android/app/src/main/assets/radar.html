@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>NewsWave Radar</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#09101e;--pane:#131f32;--pane2:#1b2a42;--fg:#edf7ff;--muted:#92adc5;--edge:#283b54;--cyan:#46d1e4;--amber:#ffc978}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}button:focus-visible,input:focus-visible{outline:2px solid var(--cyan)}
+.header{padding:18px 16px 12px;background:linear-gradient(135deg,#10243b,#09101e);border-bottom:1px solid var(--edge)}
+.overline{font-weight:800;color:var(--cyan);font-size:10px;letter-spacing:2px}.brand{font-size:23px;font-weight:850;letter-spacing:-.5px;margin:6px 0 5px}.sub{font-size:12px;color:var(--muted);line-height:1.4}
+.toolbar{display:flex;gap:8px;overflow:auto;padding:12px 12px 9px;scrollbar-width:none}.toolbar::-webkit-scrollbar{display:none}
+.pill{white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--pane);border:1px solid var(--edge);border-radius:999px;padding:10px 14px;color:var(--fg);font-weight:750}
+.pill.selected{background:var(--cyan);color:#052031;border-color:var(--cyan)}.pill.outline{color:var(--cyan)}
+.searchwrap{display:flex;gap:8px;padding:0 12px 10px}.searchwrap input{flex:1;min-width:0;background:#101d30;color:var(--fg);border:1px solid var(--edge);padding:11px 13px;border-radius:12px}
+.tinybtn{min-width:42px;border:1px solid var(--edge);color:var(--fg);border-radius:12px;padding:8px 11px;background:var(--pane)}
+.results{display:none;max-height:220px;overflow:auto;margin:0 12px 10px;border:1px solid var(--edge);border-radius:13px;background:#111e31}.results.show{display:block}
+.result{padding:10px 12px;border-bottom:1px solid var(--edge);display:flex;gap:10px;align-items:center}.result:last-child{border:0}.result strong{color:var(--cyan);min-width:50px}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 14px 11px}.meta .title{font-size:16px;font-weight:800}.meta .note{font-size:11px;color:var(--muted);margin-top:4px}.badge{background:#183b43;color:#83f2e4;border-radius:10px;padding:6px 9px;font-size:10px;font-weight:750;white-space:nowrap}
+.mapShell{position:relative;margin:0 11px;border:1px solid #31516b;border-radius:18px;overflow:hidden;background:#111c2c}
+.mapGrid{height:min(58vh,530px);min-height:350px;display:grid;grid-template-columns:1fr}.mapGrid.compare{grid-template-columns:1fr 1fr}.map{height:100%;width:100%;background:#111a28}.mapGrid.compare .map:nth-child(2){border-left:2px solid #2b5269;display:block}.map:nth-child(2){display:none}
+.mapLabels{position:absolute;top:10px;left:11px;right:11px;display:flex;justify-content:space-between;pointer-events:none;z-index:450}.mapLabel{background:#0e1b2ee6;border:1px solid #40617a;border-radius:8px;padding:5px 9px;font-size:10px;font-weight:800;letter-spacing:.6px}
+.leaflet-container{font-family:inherit!important;background:#101c2d!important}.leaflet-control-attribution{font-size:9px!important}.leaflet-control-zoom a{background:#15283d!important;color:#e8faff!important;border-color:#31516b!important}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#15253a!important;color:#edf7ff!important}
+.mapHint{position:absolute;z-index:460;bottom:25px;left:50%;transform:translateX(-50%);border-radius:9px;padding:7px 12px;white-space:nowrap;background:#0a1427dd;color:#dbf5fc;font-size:10px;pointer-events:none}
+.section{padding:14px 12px 5px}.sectitle{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:1.4px;margin:0 0 10px}
+.products{display:flex;flex-wrap:wrap;gap:7px}.prod{background:#17263b;border:1px solid #32475b;border-radius:11px;color:var(--fg);padding:10px 12px;font-weight:750;font-size:12px}.prod.active{background:#123f4e;color:#86eaf3;border-color:#24a7bc}
+.tools{display:flex;gap:8px;flex-wrap:wrap}.action{flex:1;min-width:100px;border:1px solid var(--edge);background:var(--pane);border-radius:12px;color:var(--fg);font-weight:750;padding:12px 11px}.action.selected{border-color:var(--cyan);color:var(--cyan)}
+.box{background:#121f32;border:1px solid var(--edge);margin:10px 12px;border-radius:15px;padding:12px}.legend{display:flex;justify-content:space-between;color:var(--muted);font-size:10px;gap:6px;margin-top:8px}
+.scale{height:9px;border-radius:8px;background:linear-gradient(90deg,#56b6ed,#64e4d2,#51a73c,#e9db32,#ec8035,#d93440,#ac51c6)}
+.velocityScale{background:linear-gradient(90deg,#46ab4a,#106b31,#042b27,#c9c9c9,#8a1535,#e8334d)}
+.small{font-size:11px;line-height:1.5;color:var(--muted)}
+#previewBox{display:none}#preview{width:100%;max-height:390px;object-fit:contain;background:#080e1a;border-radius:10px;border:1px solid var(--edge)}.previewhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px}
+.foot{padding:18px 14px 36px;font-size:11px;line-height:1.5;color:#98b1c9}.error{color:var(--amber)}a{color:#8ae9f7;text-decoration:none}.loading{color:#84e0ef}
+@media(min-width:700px){.header,.toolbar,.searchwrap,.meta,.section,.foot{max-width:1000px;margin-inline:auto}.mapShell{max-width:985px;margin-inline:auto}.box{max-width:985px;margin-inline:auto}.mapGrid{height:65vh}}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="overline">NEWSWAVE LIVE · FREE WEATHER TOOLS</div>
+  <div class="brand">◉ National Radar Network</div>
+  <div class="sub">Select a U.S. Doppler radar. Explore its official NOAA products without paid tiers.</div>
+</header>
+<nav class="toolbar">
+  <button class="pill selected" id="nationalButton">◈ Nationwide</button>
+  <button class="pill" id="localButton">◎ KHTX Huntsville</button>
+  <button class="pill" id="favoritesButton">☆ Saved stations</button>
+</nav>
+<div class="searchwrap"><input aria-label="Find radar station" id="search" placeholder="Find radar by city or code (KHTX)"><button class="tinybtn" id="searchClear">✕</button></div>
+<div id="results" class="results"></div>
+<div class="meta">
+ <div><div class="title" id="stationTitle">United States · National Mosaic</div><div class="note" id="stationNote">Tap a radar marker to view its station products</div></div>
+ <div class="badge" id="count">NOAA • Loading</div>
+</div>
+<div class="mapShell">
+  <div class="mapGrid" id="mapGrid"><div class="map" id="radarMap"></div><div class="map" id="compareMap"></div></div>
+  <div class="mapLabels"><div class="mapLabel" id="labelLeft">NATIONAL REFLECTIVITY</div><div class="mapLabel" id="labelRight" style="display:none">RADIAL VELOCITY</div></div>
+  <div class="mapHint" id="hint">Tap a radar station • Pinch to zoom</div>
+</div>
+<section class="section"><div class="sectitle">RADAR DATA PRODUCT</div><div class="products" id="products"></div></section>
+<section class="section"><div class="sectitle">VIEW CONTROLS</div><div class="tools">
+<button class="action" id="compareButton">◫ Compare R / V</button><button class="action" id="previewButton">▶ Scan loop</button><button class="action" id="alertsButton">⚠ NWS Alerts</button>
+<button class="action" id="saveButton">☆ Save station</button><button class="action" id="refreshButton">↻ Refresh</button></div></section>
+<div class="box"><div class="small" id="description">National base reflectivity is a quality-controlled radar mosaic supplied by NOAA. Choose a blue station marker to switch to an individual Doppler radar.</div><div id="scale" class="scale" style="margin-top:11px"></div><div class="legend"><span id="legendA">Light echoes</span><span id="legendB">Strong echoes</span></div><div class="small" id="status" style="margin-top:10px">Map requires an Internet connection.</div></div>
+<div class="box" id="previewBox">
+  <div class="previewhead"><div><strong id="previewTitle">NOAA radar loop</strong><div class="small">Animated frames from radar.weather.gov</div></div><button id="closePreview" class="tinybtn">✕</button></div>
+  <img id="preview" alt="Official NOAA radar animation" />
+  <div class="small" style="margin-top:8px">This backup scan view works when tiled radar products are unavailable. Radar may be delayed or temporarily offline.</div>
+</div>
+<div class="foot">Data: <a href="https://radar.weather.gov/">NOAA / National Weather Service</a> · Station inventory: NOAA Coastal Services · Base map: © OpenStreetMap contributors. Unofficial independent viewer, not endorsed by NOAA. Radial velocity is motion toward/away from a radar, not ground-level wind speed. Do not use this app as your only source for life-safety warnings. <span id="stationFoot"></span></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="stations.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const products=[
+  {id:'SR_BREF',label:'Reflectivity',desc:'Returned radar energy helps show precipitation and storm structure.'},
+  {id:'SR_BVEL',label:'Base Velocity',desc:'Radial wind motion toward or away from the selected Doppler radar.'},
+  {id:'BDHC',label:'Hydrometeor',desc:'Dual-polarization classification of radar echoes, such as rain, snow or hail.'},
+  {id:'BOHA',label:'1-hour rain',desc:'Radar-estimated precipitation accumulation over one hour.'},
+  {id:'BDSA',label:'Storm total',desc:'Radar-estimated storm-total precipitation accumulation.'}
+];
+const byId=new Map(), sites=(window.RADAR_STATIONS||[]).filter(s=>s&&/^[KPT][A-Z0-9]{3}$/.test(s.id)&&isFinite(s.lat)&&isFinite(s.lon));
+sites.forEach(s=>byId.set(s.id,s)); 
+let selected=null, current='SR_BREF', map=null, secondary=null, radarLayer=null, splitLayer=null, markers=null, mosaic=null, alerts=null, comparing=false, showAlerts=false, pending=null, preview=false, warningCount=0;
+let saves=[];try{saves=JSON.parse(localStorage.getItem('radarFavorites')||'[]')}catch(e){}
+const mosaicUrl='https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity/MapServer/export';
+function status(t,err){$('status').textContent=t;$('status').className='small '+(err?'error':'');}
+function hideSearch(){$('results').className='results';$('results').innerHTML='';}
+function refreshSearch(showOnlySaved) {
+ const q=$('search').value.toLowerCase().trim();
+ const matches=sites.filter(s=>(!showOnlySaved||saves.includes(s.id))&&(s.id.toLowerCase().includes(q)||s.name.toLowerCase().includes(q))).slice(0,70);
+ if(!q&&!showOnlySaved){hideSearch();return;}
+ $('results').innerHTML='';
+ matches.forEach(s=>{const d=document.createElement('div');d.className='result';d.innerHTML='<strong>'+s.id+'</strong><span></span>';d.lastElementChild.textContent=s.name;d.onclick=()=>choose(s);$('results').appendChild(d)});
+ if(!matches.length){const d=document.createElement('div');d.className='result';d.textContent='No matching radar stations.';$('results').appendChild(d)}
+ $('results').className='results show';
+}
+function savePrefs(){try{localStorage.setItem('radarFavorites',JSON.stringify(saves))}catch(e){}}
+function renderProducts(){
+ $('products').innerHTML='';
+ products.forEach(p=>{const b=document.createElement('button');b.className='prod'+(p.id===current?' active':'');b.textContent=p.label;b.disabled=!selected;b.style.opacity=selected?'1':'.45';b.onclick=()=>{current=p.id;preview=false;$('previewBox').style.display='none';renderProducts();updateRadar()};$('products').appendChild(b)});
+ $('description').textContent=selected?products.find(p=>p.id===current).desc:'National base reflectivity mosaic is supplied by NOAA. Select a radar marker to switch to station-level products.';
+ const velocity=current==='SR_BVEL';$('scale').className=velocity?'scale velocityScale':'scale';
+ $('legendA').textContent=velocity?'Toward radar':'Light echoes';$('legendB').textContent=velocity?'Away from radar':'Strong echoes';
+}
+function rebuildMarkers(){
+ if(!map)return;if(markers)map.removeLayer(markers);
+ markers=L.layerGroup();
+ sites.forEach(s=>{
+ const active=selected&&selected.id===s.id;
+ const mark=L.circleMarker([s.lat,s.lon],{radius:active?8:5,color:active?'#fff':'#a7eaf7',weight:active?2:1,fillColor:active?'#ffcc75':'#29c4e8',fillOpacity:.93});
+ mark.bindTooltip(s.id+' · '+s.name,{direction:'top'});
+ mark.on('click',()=>choose(s));markers.addLayer(mark);
+ });
+ markers.addTo(map); $('count').textContent=sites.length+' radar stations';
+}
+function national(){
+ selected=null;comparing=false; $('mapGrid').classList.remove('compare');$('labelRight').style.display='none';$('compareButton').classList.remove('selected');
+ if(secondary){secondary.remove();secondary=null} $('stationTitle').textContent='United States · National Mosaic';
+ $('stationNote').textContent='Tap a blue radar marker to select its station';
+ $('labelLeft').textContent='NATIONAL REFLECTIVITY';$('stationFoot').textContent='';
+ $('nationalButton').classList.add('selected');$('localButton').classList.remove('selected');$('favoritesButton').classList.remove('selected');
+ $('saveButton').disabled=true;$('saveButton').style.opacity='.4';$('saveButton').textContent='☆ Save station';
+ $('previewBox').style.display='none';preview=false;hideSearch();$('search').value='';
+ if(radarLayer){map.removeLayer(radarLayer);radarLayer=null}
+ map.setView([38.5,-97.0],4);rebuildMarkers();renderProducts();drawMosaic();
+ status('NOAA national reflectivity. Tap a station for more products.');
+}
+function drawMosaic(){
+ if(!map||selected||comparing)return;
+ if(mosaic){map.removeLayer(mosaic);mosaic=null}
+ const b=map.getBounds();const ne=b.getNorthEast(),sw=b.getSouthWest();
+ const size=map.getSize();let w=Math.max(200,Math.min(1800,Math.round(size.x*window.devicePixelRatio)));let h=Math.max(200,Math.min(1800,Math.round(size.y*window.devicePixelRatio)));
+ let url=mosaicUrl+'?bbox='+[sw.lng,sw.lat,ne.lng,ne.lat].join(',')+'&bboxSR=4326&imageSR=4326&size='+w+','+h+'&format=png32&transparent=true&layers=show%3A0&f=image&cache='+Math.floor(Date.now()/180000);
+ mosaic=L.imageOverlay(url,b,{opacity:.76,interactive:false}).addTo(map);
+ mosaic.on('error',()=>status('The national radar image could not load. Try Refresh.',true));
+ if(markers)markers.bringToFront();
+}
+function wmsFor(s,product,target) {
+ const name=s.id.toLowerCase();
+ const layer=L.tileLayer.wms('https://opengeo.ncep.noaa.gov/geoserver/'+name+'/ows',{
+   layers:name+':'+product,format:'image/png',transparent:true,version:'1.1.1',
+   opacity:.88,tileSize:256,attribution:'NOAA/NWS NEXRAD'
+ });
+ let errors=0;
+ layer.on('tileerror',()=>{errors++;if(errors===3&&selected&&selected.id===s.id){status('Some radar tiles are unavailable. Try the Scan loop or NWS official radar link.',true);}});
+ layer.addTo(target);return layer;
+}
+function choose(s){
+ selected=s;hideSearch();$('search').value='';current='SR_BREF';
+ $('stationTitle').textContent=s.id+' · '+s.name;
+ $('stationNote').textContent='NOAA WSR-88D radar products · tap a layer below';
+ $('labelLeft').textContent='BASE REFLECTIVITY';
+ $('nationalButton').classList.remove('selected');$('localButton').classList.toggle('selected',s.id==='KHTX');$('favoritesButton').classList.remove('selected');
+ $('saveButton').disabled=false;$('saveButton').style.opacity='1';
+ $('saveButton').textContent=saves.includes(s.id)?'★ Saved':'☆ Save station';
+ $('stationFoot').innerHTML=' · <a href="https://radar.weather.gov/station/'+encodeURIComponent(s.id)+'/standard">Official '+s.id+' radar page</a>';
+ if(mosaic){map.removeLayer(mosaic);mosaic=null} 
+ map.setView([s.lat,s.lon],7);preview=false;$('previewBox').style.display='none';rebuildMarkers();renderProducts();updateRadar();
+}
+function updateRadar(){
+ if(!selected)return;
+ if(radarLayer){map.removeLayer(radarLayer);radarLayer=null}
+ radarLayer=wmsFor(selected,current,map);
+ $('labelLeft').textContent=products.find(p=>p.id===current).label.toUpperCase();
+ if(comparing)renderCompareLayer();
+ status('Showing '+selected.id+' '+products.find(p=>p.id===current).label+' from NOAA. Latest available scan; timestamps and availability vary.');
+ if(preview)drawPreview();
+}
+function renderCompareLayer(){
+ if(!comparing||!selected||!secondary)return;
+ if(splitLayer){secondary.removeLayer(splitLayer);splitLayer=null}
+ splitLayer=wmsFor(selected,'SR_BVEL',secondary);
+}
+function compare(){
+ if(!selected){status('Choose a radar station before comparing reflectivity and velocity.',true);return}
+ comparing=!comparing;$('mapGrid').classList.toggle('compare',comparing);
+ $('compareButton').classList.toggle('selected',comparing);$('labelRight').style.display=comparing?'block':'none';
+ if(comparing){
+   secondary=L.map('compareMap',{attributionControl:false,zoomControl:false,preferCanvas:true,zoomSnap:.25}).setView(map.getCenter(),map.getZoom());
+   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OSM'}).addTo(secondary);
+   renderCompareLayer();
+   map.on('moveend',syncSecond);
+   setTimeout(()=>{map.invalidateSize();secondary.invalidateSize();secondary.setView(map.getCenter(),map.getZoom())},150);
+ }else{
+   map.off('moveend',syncSecond);if(secondary){secondary.remove();secondary=null}splitLayer=null;
+   setTimeout(()=>map.invalidateSize(),120);
+ }
+}
+function syncSecond(){if(secondary)secondary.setView(map.getCenter(),map.getZoom(),{animate:false})}
+function drawPreview(){
+ if(!selected)return;
+ let path=current==='SR_BVEL'?'base_velocity/':'';
+ let product=current==='SR_BVEL'?'Base velocity':'Base reflectivity';
+ if(current!=='SR_BVEL'&&current!=='SR_BREF'){path='';product='Base reflectivity (backup preview)';}
+ $('previewTitle').textContent=selected.id+' · '+product+' · NOAA loop';
+ $('preview').src='https://radar.weather.gov/ridge/standard/'+path+selected.id+'_loop.gif?cache='+Math.floor(Date.now()/180000);
+ $('previewBox').style.display='block';
+}
+function updateAlerts(){
+ if(!map)return;
+ if(alerts){map.removeLayer(alerts);alerts=null}
+ if(!showAlerts){status('Alert polygons hidden.');return;}
+ status('Loading active NWS warnings...');
+ fetch('https://api.weather.gov/alerts/active?status=actual',{headers:{'Accept':'application/geo+json'}})
+ .then(r=>{if(!r.ok)throw Error('NWS returned '+r.status);return r.json()})
+ .then(data=>{
+   if(!showAlerts)return;
+   const allowed=/^(Tornado Warning|Severe Thunderstorm Warning|Flash Flood Warning)$/;
+   const subset={type:'FeatureCollection',features:(data.features||[]).filter(f=>f.geometry&&allowed.test((f.properties||{}).event||''))};
+   alerts=L.geoJSON(subset,{style:f=>({color:f.properties.event==='Tornado Warning'?'#f3365d':'#fbb44f',weight:2,fillOpacity:.12}),
+    onEachFeature:(f,l)=>{const p=f.properties||{};const div=document.createElement('div');div.innerHTML='<b></b><div></div>';div.firstChild.textContent=p.event||'NWS Warning';div.lastChild.textContent=(p.headline||'See NWS for official details').slice(0,220);l.bindPopup(div)}}).addTo(map);
+   status('NWS active tornado, severe thunderstorm, and flash flood warning polygons. Always confirm via official alerts.');
+ }).catch(e=>status('NWS warnings layer unavailable right now: '+e.message,true));
+}
+function init() {
+ if(typeof L==='undefined'){status('Map library could not load. Connect to the Internet and reopen Radar.',true);$('count').textContent='Map offline';return}
+ map=L.map('radarMap',{preferCanvas:true,zoomControl:true,zoomSnap:.25,minZoom:3,maxZoom:12}).setView([38.5,-97],4);
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap contributors'}).addTo(map);
+ map.on('moveend',()=>{if(!selected){clearTimeout(pending);pending=setTimeout(drawMosaic,250)}});
+ map.on('zoomend',()=>{if(markers)rebuildMarkers()});
+ $('nationalButton').onclick=national;
+ $('localButton').onclick=()=>choose(byId.get('KHTX')||sites[0]);
+ $('favoritesButton').onclick=()=>{ $('favoritesButton').classList.add('selected');refreshSearch(true);};
+ $('search').addEventListener('input',()=>refreshSearch(false));
+ $('searchClear').onclick=()=>{$('search').value='';hideSearch()};
+ $('compareButton').onclick=compare;
+ $('previewButton').onclick=()=>{if(!selected){status('Select a radar station first.',true);return}preview=!preview;if(preview){drawPreview();$('previewBox').scrollIntoView({behavior:'smooth',block:'center'})}else $('previewBox').style.display='none'};
+ $('closePreview').onclick=()=>{preview=false;$('previewBox').style.display='none'};
+ $('alertsButton').onclick=()=>{showAlerts=!showAlerts;$('alertsButton').classList.toggle('selected',showAlerts);updateAlerts()};
+ $('saveButton').onclick=()=>{if(!selected)return;const i=saves.indexOf(selected.id);if(i>=0)saves.splice(i,1);else saves.push(selected.id);savePrefs();$('saveButton').textContent=saves.includes(selected.id)?'★ Saved':'☆ Save station'};
+ $('refreshButton').onclick=()=>{if(selected){updateRadar();if(preview)drawPreview()}else drawMosaic();if(showAlerts)updateAlerts()};
+ renderProducts();national();
+}
+window.addEventListener('load',init);
+})();
+</script>
+</body></html>
