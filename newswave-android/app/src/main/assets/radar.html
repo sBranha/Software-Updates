@@ -141,7 +141,7 @@ function drawMosaic(){
 function wmsFor(s,product,target) {
  const name=s.id.toLowerCase();
  const layer=L.tileLayer.wms('https://opengeo.ncep.noaa.gov/geoserver/'+name+'/ows',{
-   layers:name+':'+product,format:'image/png',transparent:true,version:'1.1.1',
+   layers:name+'_'+product.toLowerCase(),format:'image/png',transparent:true,version:'1.1.1',
    opacity:.88,tileSize:256,attribution:'NOAA/NWS NEXRAD'
  });
  let errors=0;
