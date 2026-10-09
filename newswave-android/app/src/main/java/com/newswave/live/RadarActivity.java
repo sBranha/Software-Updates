@@ -47,7 +47,7 @@ public class RadarActivity extends Activity {
     if (radar != null && radar.canGoBack()) radar.goBack(); else super.onBackPressed();
   }
   @Override protected void onDestroy() {
-    if (radar!=null) { ((FrameLayout)radar.getParent()); radar.destroy(); radar=null; }
+    if (radar!=null) { radar.destroy(); radar=null; }
     super.onDestroy();
   }
 }
