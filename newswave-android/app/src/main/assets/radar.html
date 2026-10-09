@@ -136,7 +136,7 @@ function drawMosaic(){
  let url=mosaicUrl+'?bbox='+[sw.lng,sw.lat,ne.lng,ne.lat].join(',')+'&bboxSR=4326&imageSR=4326&size='+w+','+h+'&format=png32&transparent=true&layers=show%3A0&f=image&cache='+Math.floor(Date.now()/180000);
  mosaic=L.imageOverlay(url,b,{opacity:.76,interactive:false}).addTo(map);
  mosaic.on('error',()=>status('The national radar image could not load. Try Refresh.',true));
- if(markers)markers.bringToFront();
+ if(markers)markers.eachLayer(function(layer){if(layer.bringToFront)layer.bringToFront();});
 }
 function wmsFor(s,product,target) {
  const name=s.id.toLowerCase();
