@@ -60,7 +60,7 @@ public class MainActivity extends Activity {
   private Channel current;
   private String tab="All";
   private String query="";
-  private final String[] tabs={"All","National","Weather","Local","Favorites"};
+  private final String[] tabs={"All","Radar","National","Weather","Local","Favorites"};
 
   @Override public void onCreate(Bundle b){
     super.onCreate(b);
@@ -93,13 +93,13 @@ public class MainActivity extends Activity {
     root=column();root.setBackgroundColor(BG);setContentView(root);
     LinearLayout header=column();pad(header,20,20);
     TextView brand=text("◉  NEWSWAVE LIVE",22,FG,true);header.addView(brand);
-    TextView subtitle=text("Your news. Your weather. One place.",13,MUTED,false);
+    TextView subtitle=text("News channels, local coverage & free NOAA radar.",13,MUTED,false);
     LinearLayout.LayoutParams sl=lp(-1,-2);sl.topMargin=dp(7);header.addView(subtitle,sl);
     root.addView(header);
     TextView notice=text("OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
     search=new EditText(this);
-    search.setSingleLine(true);search.setHint("Search stations…");search.setHintTextColor(MUTED);
+    search.setSingleLine(true);search.setHint("Search news channels…");search.setHintTextColor(MUTED);
     search.setTextColor(FG);search.setTextSize(16);search.setBackground(box(PANEL,13));pad(search,14,10);
     LinearLayout.LayoutParams sp=lp(-1,52);sp.setMargins(dp(16),dp(12),dp(16),dp(8));
     root.addView(search,sp);search.setText(query);
@@ -122,7 +122,7 @@ public class MainActivity extends Activity {
       TextView v=text(name,13,selected?BG:FG,true);v.setGravity(Gravity.CENTER);
       v.setBackground(box(selected?ACCENT:PANEL,15));pad(v,13,11);
       LinearLayout.LayoutParams p=lp(-2,-2);p.rightMargin=dp(8);tabBar.addView(v,p);
-      v.setOnClickListener(x->{tab=name;makeTabs();render();});
+      v.setOnClickListener(x->{if(name.equals("Radar")){startActivity(new Intent(MainActivity.this,RadarActivity.class));return;}tab=name;makeTabs();render();});
     }
   }
   private void render(){
