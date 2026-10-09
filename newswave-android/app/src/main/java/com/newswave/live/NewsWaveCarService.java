@@ -59,7 +59,7 @@ public final class NewsWaveCarService extends CarAppService {
     private static final String LOG="NewsWaveAuto";
 
     @NonNull @Override public HostValidator createHostValidator() {
-        if (BuildConfig.DEBUG) return HostValidator.ALLOW_ALL_HOSTS_VALIDATOR;
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) return HostValidator.ALLOW_ALL_HOSTS_VALIDATOR;
         return new HostValidator.Builder(this)
                 .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample).build();
     }
