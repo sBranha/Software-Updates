@@ -45,16 +45,16 @@ jobs:
         run: gradle -p newswave-android :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWave-Live-v0.2.0-APK
+          name: NewsWave-Live-v0.3.0-APK
           path: newswave-android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
       - name: Publish direct download as prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.2.0.apk
-          if gh release view newswave-live-v0.2.0 >/dev/null 2>&1; then
-            gh release upload newswave-live-v0.2.0 NewsWave-Live-v0.2.0.apk --clobber
+          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.3.0.apk
+          if gh release view newswave-live-v0.3.0 >/dev/null 2>&1; then
+            gh release upload newswave-live-v0.3.0 NewsWave-Live-v0.3.0.apk --clobber
           else
-          gh release create newswave-live-v0.2.0 NewsWave-Live-v0.2.0.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.2.0 Android Radar Test APK" --notes "NewsWave Live v0.2.0 with new Radar tab, NOAA national map, Doppler stations, station-level reflectivity and velocity, precipitation products, station search, favorite stations, basic alerts, compare and scan-loop views. Debug test APK not yet tested on device. Since debug signing can change between builds, uninstall the previous NewsWave app before installing if Android reports conflicting signatures." --prerelease
+          gh release create newswave-live-v0.3.0 NewsWave-Live-v0.3.0.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.3.0 Android Auto Weather Test APK" --notes "NewsWave Live v0.3.0 with new Radar tab, NOAA national map, Doppler stations, station-level reflectivity and velocity, precipitation products, station search, favorite stations, basic alerts, compare and scan-loop views. Debug test APK not yet tested on device. Since debug signing can change between builds, uninstall the previous NewsWave app before installing if Android reports conflicting signatures." --prerelease
           fi
