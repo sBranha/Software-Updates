@@ -20,6 +20,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Bundle Leaflet map engine locally
+        run: |
+          curl --fail --location --silent --show-error --retry 2 --max-time 35 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' --output newswave-android/app/src/main/assets/leaflet.js
+          curl --fail --location --silent --show-error --retry 2 --max-time 35 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' --output newswave-android/app/src/main/assets/leaflet.css
       - name: Bundle full national NOAA radar station catalog
         run: python newswave-android/build_radar_stations.py
       - name: Inspect NOAA radar WMS products
@@ -31,7 +35,9 @@ jobs:
               url='https://opengeo.ncep.noaa.gov/geoserver/khtx/ows?request=GetCapabilities&service=WMS&version=1.3.0'
               with urlopen(url,timeout=20) as r: root=ET.fromstring(r.read())
               names=[e.text for e in root.iter() if e.tag.split('}')[-1]=='Name' and e.text and any(p in e.text for p in ('BREF','BVEL','BDHC','BOHA','BDSA'))]
+              print('NOAA WMS XML root:',root.tag,'first bytes:',ET.tostring(root,encoding='unicode')[:700])
               print('NOAA WMS KHTX radar layer names:',names[:30])
+              print('All WMS Names:',[e.text for e in root.iter() if e.tag.split('}')[-1]=='Name' and e.text][:90])
           except Exception as e:
               print('NOAA WMS capability probe unavailable:',repr(e))
           PY
@@ -47,4 +53,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.2.0.apk
+          if gh release view newswave-live-v0.2.0 >/dev/null 2>&1; then
+            gh release upload newswave-live-v0.2.0 NewsWave-Live-v0.2.0.apk --clobber
+          else
           gh release create newswave-live-v0.2.0 NewsWave-Live-v0.2.0.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.2.0 Android Radar Test APK" --notes "NewsWave Live v0.2.0 with new Radar tab, NOAA national map, Doppler stations, station-level reflectivity and velocity, precipitation products, station search, favorite stations, basic alerts, compare and scan-loop views. Debug test APK not yet tested on device. Since debug signing can change between builds, uninstall the previous NewsWave app before installing if Android reports conflicting signatures." --prerelease
+          fi
