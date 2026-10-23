@@ -1,7 +1,7 @@
-name: NewsWire 0.4.7 version label fix (compile and package)
+name: NewsWire 0.4.8 version label fix (compile and package)
 on:
   push:
-    branches: [newswire-version-fix-v0.4.7]
+    branches: [newswire-auto-weather-v0.4.8]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q "applicationId 'com.newswire.live'" newswave-android/app/build.gradle
-          grep -q 'versionCode 11' newswave-android/app/build.gradle
-          grep -q "versionName '0.4.7'" newswave-android/app/build.gradle
+          grep -q 'versionCode 12' newswave-android/app/build.gradle
+          grep -q "versionName '0.4.8'" newswave-android/app/build.gradle
           grep -q 'targetSdk 36' newswave-android/app/build.gradle
           grep -q 'setContentTemplate(list)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           ! grep -q 'PaneTemplate panel=' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
@@ -41,17 +41,26 @@ jobs:
           grep -Fq 'getPackageManager().getPackageInfo(getPackageName(),0)' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -Fq '"NewsWire v"+installedVersion()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           ! grep -Fq '"NewsWire v0.4.5' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
+      - name: Verify car map controls and warning renderer
+        run: |
+          set -euo pipefail
+          grep -q 'setMapController(mapControls)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
+          grep -q 'void zoomIn()' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
+          grep -q 'void recenter()' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
+          grep -q 'WeatherWarningOverlay.draw' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
+          grep -q 'api.weather.gov/alerts/active' newswave-android/app/src/main/java/com/newswave/live/WeatherWarningOverlay.java
+          grep -q 'versionCode 12' newswave-android/app/build.gradle
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
         run: |
-          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.4.7-UNSIGNED.aab
-          unzip -t NewsWire-v0.4.7-UNSIGNED.aab >/dev/null
-          sha256sum NewsWire-v0.4.7-UNSIGNED.aab > SHA256SUMS.txt
+          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.4.8-UNSIGNED.aab
+          unzip -t NewsWire-v0.4.8-UNSIGNED.aab >/dev/null
+          sha256sum NewsWire-v0.4.8-UNSIGNED.aab > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.4.7-unsigned-intermediate
+          name: NewsWire-v0.4.8-unsigned-intermediate
           path: |
-            NewsWire-v0.4.7-UNSIGNED.aab
+            NewsWire-v0.4.8-UNSIGNED.aab
             SHA256SUMS.txt
           retention-days: 15
