@@ -24,7 +24,11 @@ final class LocalNewspapers {
   }
   static final class Headline {
     final String title, source, url;
-    Headline(String t,String s,String u){title=t;source=s;url=u;}
+    final long publishedMillis;
+    Headline(String t,String s,String u){this(t,s,u,0);}
+    Headline(String t,String s,String u,long published){
+      title=t;source=s;url=u;publishedMillis=published;
+    }
   }
   // Verified official publication sites. These are region examples, not an exhaustive US directory.
   private static final Paper[] PUBLISHERS = {
@@ -98,21 +102,31 @@ final class LocalNewspapers {
         XmlPullParser xml=Xml.newPullParser();
         xml.setInput(stream,"UTF-8");
         boolean inItem=false;
-        String title="",link="",source="";
+        String title="",link="",source="",published="";
         int event=xml.getEventType();
         while(event!=XmlPullParser.END_DOCUMENT && data.size()<maxItems){
           if(event==XmlPullParser.START_TAG){
             String name=xml.getName();
-            if("item".equals(name)){inItem=true;title="";link="";source="";}
-            else if(inItem&&("title".equals(name)||"link".equals(name)||"source".equals(name))){
+            if("item".equals(name)){inItem=true;title="";link="";source="";published="";}
+            else if(inItem&&("title".equals(name)||"link".equals(name)||"source".equals(name)||"pubDate".equals(name))){
               String value=xml.nextText();
               if("title".equals(name))title=value;
               else if("link".equals(name))link=value;
+              else if("pubDate".equals(name))published=value;
               else source=value;
             }
           }else if(event==XmlPullParser.END_TAG&&"item".equals(xml.getName())){
-            if(!title.isEmpty()&&link.startsWith("https://"))
-              data.add(new Headline(title,source.isEmpty()?"News provider":source,link));
+            if(!title.isEmpty()&&link.startsWith("https://")){
+              long timestamp=0;
+              try{
+                java.text.SimpleDateFormat parser=new java.text.SimpleDateFormat(
+                  "EEE, dd MMM yyyy HH:mm:ss Z",Locale.US);
+                parser.setLenient(false);
+                java.util.Date date=parser.parse(published);
+                if(date!=null)timestamp=date.getTime();
+              }catch(Exception ignored){}
+              data.add(new Headline(title,source.isEmpty()?"News provider":source,link,timestamp));
+            }
             inItem=false;
           }
           event=xml.next();
