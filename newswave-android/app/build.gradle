@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
  namespace 'com.newswave.live'
  compileSdk 36
- defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 13; versionName '0.4.9' }
+ defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 14; versionName '0.5.0' }
  buildTypes { release { minifyEnabled false } }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
@@ -10,4 +10,6 @@ android {
 dependencies {
   implementation 'androidx.car.app:app:1.7.0'
   implementation 'androidx.car.app:app-projected:1.7.0'
+  implementation 'com.google.android.play:app-update:2.1.0'
+  implementation 'androidx.work:work-runtime:2.10.2'
 }
