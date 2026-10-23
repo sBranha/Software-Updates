@@ -375,6 +375,7 @@ public class MainActivity extends Activity {
     final double lat=!Double.isNaN(dashboardLatitude)?dashboardLatitude:postalLat;
     final double lon=!Double.isNaN(dashboardLongitude)?dashboardLongitude:postalLon;
     if(Double.isNaN(lat)||Double.isNaN(lon)){renderMyArea();return;}
+    final boolean isGps=!Double.isNaN(dashboardLatitude);
     final String key=String.format(Locale.US,"%.3f:%.3f:%s:%s",lat,lon,city,state);
     if(!force && (areaLoading ||
         key.equals(loadedAreaKey)&&myAreaSnapshot!=null
@@ -383,9 +384,27 @@ public class MainActivity extends Activity {
     }
     loadedAreaKey=key;areaLoading=true;
     renderMyArea();
-    final String localCity=city,localState=state;
+    final String savedCity=city,savedState=state;
     new Thread(()->{
-      MyAreaData.Snapshot result=MyAreaData.load(lat,lon,localCity,localState);
+      String currentCity=savedCity,currentState=savedState;
+      if(isGps){
+        // Reverse-geocode only with location permission; don't keep using
+        // the ZIP's city after the person has travelled somewhere else.
+        currentCity="";currentState="";
+        try{
+          Geocoder geocoder=new Geocoder(this,Locale.US);
+          List<Address> places=geocoder.getFromLocation(lat,lon,1);
+          if(places!=null&&!places.isEmpty()){
+            Address address=places.get(0);
+            currentCity=address.getLocality();
+            if(currentCity==null||currentCity.isEmpty())currentCity=address.getSubAdminArea();
+            currentState=address.getAdminArea();
+          }
+        }catch(Exception error){android.util.Log.w("NewsWireArea","City unavailable",error);}
+      }
+      if(currentCity==null)currentCity="";
+      if(currentState==null)currentState="";
+      MyAreaData.Snapshot result=MyAreaData.load(lat,lon,currentCity,currentState);
       runOnUiThread(()->{
         if(!key.equals(loadedAreaKey))return;
         areaLoading=false;myAreaSnapshot=result;
