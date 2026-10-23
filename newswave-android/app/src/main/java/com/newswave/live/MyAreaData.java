@@ -68,8 +68,8 @@ final class MyAreaData {
         // Read only active, actual official NWS weather alerts for this location.
         try {
             JSONObject active=fetch("https://api.weather.gov/alerts/active?point="+point);
-            alertsOk=true;
             JSONArray features=active.optJSONArray("features");
+            alertsOk=features!=null;
             if(features!=null)for(int n=0;n<Math.min(12,features.length());n++){
                 JSONObject props=features.getJSONObject(n).optJSONObject("properties");
                 if(props==null)continue;
