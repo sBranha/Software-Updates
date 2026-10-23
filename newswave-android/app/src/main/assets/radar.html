@@ -18,6 +18,7 @@
 .results{display:none;max-height:220px;overflow:auto;margin:0 12px 10px;border:1px solid var(--edge);border-radius:13px;background:#111e31}.results.show{display:block}
 .result{padding:10px 12px;border-bottom:1px solid var(--edge);display:flex;gap:10px;align-items:center}.result:last-child{border:0}.result strong{color:var(--cyan);min-width:50px}
 .meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 14px 11px}.meta .title{font-size:16px;font-weight:800}.meta .note{font-size:11px;color:var(--muted);margin-top:4px}.badge{background:#183b43;color:#83f2e4;border-radius:10px;padding:6px 9px;font-size:10px;font-weight:750;white-space:nowrap}
+.mapstylebar{display:flex;gap:7px;margin:0 12px 10px;flex-wrap:wrap}.stylebtn{border:1px solid #32475b;background:#17263b;color:#e6f7ff;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700}.stylebtn.active{background:#123f4e;border-color:#24a7bc;color:#89eff3}
 .mapShell{position:relative;margin:0 11px;border:1px solid #31516b;border-radius:18px;overflow:hidden;background:#111c2c}
 .mapGrid{height:min(58vh,530px);min-height:350px;display:grid;grid-template-columns:1fr}.mapGrid.compare{grid-template-columns:1fr 1fr}.map{height:100%;width:100%;background:#111a28}.mapGrid.compare .map:nth-child(2){border-left:2px solid #2b5269;display:block}.map:nth-child(2){display:none}
 .mapLabels{position:absolute;top:10px;left:84px;right:11px;display:flex;justify-content:space-between;pointer-events:none;z-index:450}.mapLabel{background:#0e1b2ee6;border:1px solid #40617a;border-radius:8px;padding:5px 9px;font-size:10px;font-weight:800;letter-spacing:.6px}
@@ -52,6 +53,7 @@
  <div><div class="title" id="stationTitle">United States · National Mosaic</div><div class="note" id="stationNote">Tap a radar marker to view its station products</div></div>
  <div class="badge" id="count">NOAA • Loading</div>
 </div>
+<div class="mapstylebar" aria-label="Radar map type"><button id="styleSatellite" class="stylebtn active">Satellite</button><button id="styleTerrain" class="stylebtn">Terrain</button><button id="styleRoad" class="stylebtn">Road Map</button></div>
 <div class="mapShell">
   <div class="mapGrid" id="mapGrid"><div class="map" id="radarMap"></div><div class="map" id="compareMap"></div></div>
   <div class="mapLabels"><div class="mapLabel" id="labelLeft">NATIONAL REFLECTIVITY</div><div class="mapLabel" id="labelRight" style="display:none">RADIAL VELOCITY</div></div>
@@ -84,9 +86,35 @@ const products=[
 const byId=new Map(), sites=(window.RADAR_STATIONS||[]).filter(s=>s&&/^[KPT][A-Z0-9]{3}$/.test(s.id)&&isFinite(s.lat)&&isFinite(s.lon));
 sites.forEach(s=>byId.set(s.id,s)); 
 let selected=null, current='SR_BREF', map=null, secondary=null, radarLayer=null, splitLayer=null, markers=null, mosaic=null, alerts=null, comparing=false, showAlerts=true, pending=null, preview=false, warningCount=0;
-let gps=null, gpsPin=null, follow=true;
+let gps=null, gpsPin=null, follow=true, baseLayer=null, compareBaseLayer=null;
+let mapStyle='satellite';try{mapStyle=localStorage.getItem('newswireRadarMapStyle')||'satellite'}catch(e){};
+if(!['satellite','terrain','road'].includes(mapStyle))mapStyle='satellite';
 let saves=[];try{saves=JSON.parse(localStorage.getItem('radarFavorites')||'[]')}catch(e){}
 const mosaicUrl='https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity/MapServer/export';
+const mapLayers={
+ satellite:{url:'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attribution:'Imagery © Esri & partners'},
+ terrain:{url:'https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',attribution:'Terrain © Esri & partners'},
+ road:{url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attribution:'© OpenStreetMap contributors'}
+};
+function createBaseLayer(){const source=mapLayers[mapStyle];return L.tileLayer(source.url,{maxZoom:18,attribution:source.attribution})}
+function applyMapStyle(style){
+ if(!mapLayers[style])return;
+ mapStyle=style;
+ try{localStorage.setItem('newswireRadarMapStyle',style)}catch(e){}
+ for(const [id,name] of [['styleSatellite','satellite'],['styleTerrain','terrain'],['styleRoad','road']]){
+   $(id).classList.toggle('active',name===style);
+ }
+ if(map){
+   if(baseLayer)map.removeLayer(baseLayer);
+   baseLayer=createBaseLayer();baseLayer.addTo(map);
+   baseLayer.bringToBack();
+ }
+ if(secondary){
+   if(compareBaseLayer)secondary.removeLayer(compareBaseLayer);
+   compareBaseLayer=createBaseLayer();compareBaseLayer.addTo(secondary);
+   compareBaseLayer.bringToBack();
+ }
+}
 function status(t,err){$('status').textContent=t;$('status').className='small '+(err?'error':'');}
 function hideSearch(){$('results').className='results';$('results').innerHTML='';}
 function refreshSearch(showOnlySaved) {
@@ -181,12 +209,12 @@ function compare(){
  $('compareButton').classList.toggle('selected',comparing);$('labelRight').style.display=comparing?'block':'none';
  if(comparing){
    secondary=L.map('compareMap',{attributionControl:false,zoomControl:false,preferCanvas:true,zoomSnap:.25}).setView(map.getCenter(),map.getZoom());
-   L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Imagery © Esri & partners'}).addTo(secondary);
+   compareBaseLayer=createBaseLayer();compareBaseLayer.addTo(secondary);
    renderCompareLayer();
    map.on('moveend',syncSecond);
    setTimeout(()=>{map.invalidateSize();secondary.invalidateSize();secondary.setView(map.getCenter(),map.getZoom())},150);
  }else{
-   map.off('moveend',syncSecond);if(secondary){secondary.remove();secondary=null}splitLayer=null;
+   map.off('moveend',syncSecond);if(secondary){secondary.remove();secondary=null}compareBaseLayer=null;splitLayer=null;
    setTimeout(()=>map.invalidateSize(),120);
  }
 }
@@ -230,7 +258,9 @@ window.updateNewsWirePosition=function(lat,lon){
 function init() {
  if(typeof L==='undefined'){status('Map library could not load. Connect to the Internet and reopen Radar.',true);$('count').textContent='Map offline';return}
  map=L.map('radarMap',{preferCanvas:true,zoomControl:true,zoomSnap:.25,minZoom:3,maxZoom:12}).setView([38.5,-97],4);
- L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Imagery © Esri & partners'}).addTo(map);
+ baseLayer=createBaseLayer();baseLayer.addTo(map);
+ for(const [id,style] of [['styleSatellite','satellite'],['styleTerrain','terrain'],['styleRoad','road']])$(id).onclick=()=>applyMapStyle(style);
+ applyMapStyle(mapStyle);
  map.on('moveend',()=>{if(!selected){clearTimeout(pending);pending=setTimeout(drawMosaic,250)}});
  map.on('zoomend',()=>{if(markers)rebuildMarkers()});
  $('followButton').onclick=()=>{
