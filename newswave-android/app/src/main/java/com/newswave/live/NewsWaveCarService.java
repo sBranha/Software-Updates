@@ -240,7 +240,7 @@ public final class NewsWaveCarService extends CarAppService {
                 .build();
             MapController mapControls=new MapController.Builder()
                 .setMapActionStrip(controls)
-                .setPanModeListener(isPanning->{ if(isPanning)renderer.disableFollow(); })
+                .setPanModeListener(isPanning->{ if(isPanning)setFollow(false); })
                 .build();
             ActionStrip settings=new ActionStrip.Builder()
                 .addAction(new Action.Builder().setTitle("Options")
@@ -332,8 +332,15 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.4.5 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.4.8 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
+        private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
+        private volatile WeatherWarningOverlay.Snapshot warnings=null;
+        private long lastWarningRequest=0;
+        private boolean warningsOn=true;
+        private boolean followGps=true;
+        private double manualLat=Double.NaN,manualLon=Double.NaN;
+        private int zoom=7; // Zoom is independent of GPS-follow status.
         private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(80,.75f,true){
             @Override protected boolean removeEldestEntry(Map.Entry<String,Bitmap> eldest){return size()>80;}
         };
@@ -344,20 +351,87 @@ public final class NewsWaveCarService extends CarAppService {
         private Bitmap finished;
         private Double userLat=null,userLon=null;
         void setPosition(double latitude,double longitude){
-          synchronized(lock){userLat=latitude;userLon=longitude;}
-          refresh();
+            synchronized(lock){userLat=latitude;userLon=longitude;}
+            refresh();
         }
-        void clearPosition(){synchronized(lock){userLat=null;userLon=null;}refresh();}
+        void disableFollow(){synchronized(lock){followGps=false;}}
+        void recenter(){
+            synchronized(lock){
+                followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
+            }
+            refresh();
+        }
+        void zoomIn(){setZoom(1);}
+        void zoomOut(){setZoom(-1);}
+        private void setZoom(int delta){
+            synchronized(lock){zoom=Math.max(3,Math.min(10,zoom+delta));}
+            refresh();
+        }
+        @Override public void onScale(float x,float y,float factor){
+            if(factor>1.12f)setZoom(1);
+            else if(factor<0.89f)setZoom(-1);
+        }
+        @Override public void onScroll(float dx,float dy){
+            synchronized(lock){
+                int z=zoom;
+                double centerLat=followGps&&userLat!=null?userLat:
+                    Double.isNaN(manualLat)?station.lat:manualLat;
+                double centerLon=followGps&&userLon!=null?userLon:
+                    Double.isNaN(manualLon)?station.lon:manualLon;
+                double px=mx(centerLon,z)+dx;
+                double py=my(centerLat,z)+dy;
+                px=Math.max(0,Math.min(256*(1<<z),px));
+                py=Math.max(0,Math.min(256*(1<<z),py));
+                manualLat=lat(py,z);manualLon=lon(px,z);
+                followGps=false;
+            }
+            refresh();
+        }
+        void setWarningVisibility(boolean visible){
+            synchronized(lock){warningsOn=visible;}
+            if(visible)forceWarningsRefresh();else refresh();
+        }
+        void forceWarningsRefresh(){
+            synchronized(lock){lastWarningRequest=0;}
+            fetchWarningsIfDue();
+        }
+        private void fetchWarningsIfDue(){
+            synchronized(lock){
+                if(!warningsOn||System.currentTimeMillis()-lastWarningRequest<WeatherWarningOverlay.REFRESH_MS)
+                    return;
+                lastWarningRequest=System.currentTimeMillis();
+            }
+            warningExecutor.execute(()->{
+                warnings=WeatherWarningOverlay.fetch(warnings);
+                refresh();
+            });
+        }
         private final Object lock=new Object();
-
         void change(Station s,String p,boolean national){
-            synchronized(lock){station=s;product=p;usa=national;revision++;}
+            synchronized(lock){
+                station=s;product=p;usa=national;
+                if(national && zoom>5)zoom=4;
+                if(!national && zoom<5)zoom=7;
+                revision++;
+            }
             refresh();
         }
         void refresh(){
-            final Station s; final String p;final boolean national;final int rev,w,h;
-            synchronized(lock){s=station;p=product;national=usa;rev=++revision;w=width;h=height;}
-            executor.execute(()->render(s,p,national,rev,Math.max(480,w),Math.max(320,h)));
+            fetchWarningsIfDue();
+            final Station s;final String p;final boolean national;final int rev,w,h,z;
+            final boolean auto,drawWarnings;
+            final double mLat,mLon;
+            synchronized(lock){
+                s=station;p=product;national=usa;rev=++revision;
+                w=width;h=height;z=zoom;
+                auto=followGps;drawWarnings=warningsOn;
+                mLat=manualLat;mLon=manualLon;
+            }
+            executor.execute(()->{
+                synchronized(lock){if(rev!=revision)return;}
+                render(s,p,national,rev,Math.max(480,w),Math.max(320,h),
+                       z,auto,mLat,mLon,drawWarnings);
+            });
         }
         @Override public void onSurfaceAvailable(@NonNull SurfaceContainer c){
             synchronized(lock){surface=c.getSurface();width=c.getWidth();height=c.getHeight();}
@@ -399,11 +473,13 @@ public final class NewsWaveCarService extends CarAppService {
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
         }
-        private void render(Station s,String p,boolean national,int rev,int w,int h){
+        private void render(Station s,String p,boolean national,int rev,int w,int h,
+                            int z,boolean auto,double manualLatitude,double manualLongitude,
+                            boolean drawWarnings){
             try{
-                int z=national?3:7;
                 Double gLat,gLon; synchronized(lock){gLat=userLat;gLon=userLon;}
-                double centerLat=gLat!=null?gLat:(national?39.0:s.lat),centerLon=gLon!=null?gLon:(national?-98.0:s.lon);
+                double centerLat=auto&&gLat!=null?gLat:!Double.isNaN(manualLatitude)?manualLatitude:(national?39.0:s.lat);
+                double centerLon=auto&&gLon!=null?gLon:!Double.isNaN(manualLongitude)?manualLongitude:(national?-98.0:s.lon);
                 double x0=mx(centerLon,z)-w/2.,y0=my(centerLat,z)-h/2.;
                 Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
                 Canvas canvas=new Canvas(out);
@@ -412,6 +488,7 @@ public final class NewsWaveCarService extends CarAppService {
                 int tx0=(int)Math.floor(x0/256),tx1=(int)Math.ceil((x0+w)/256);
                 int ty0=(int)Math.floor(y0/256),ty1=(int)Math.ceil((y0+h)/256);
                 for(int ty=ty0;ty<=ty1;ty++){
+                    synchronized(lock){if(rev!=revision){out.recycle();return;}}
                     for(int tx=tx0;tx<=tx1;tx++){
                         Bitmap t=tile(tx,ty,z);
                         if(t!=null)canvas.drawBitmap(t, (float)(tx*256-x0),(float)(ty*256-y0),brush);
@@ -434,12 +511,16 @@ public final class NewsWaveCarService extends CarAppService {
                 }
                 Bitmap radar=download(url);
                 if(radar!=null)canvas.drawBitmap(radar,null,new Rect(0,0,w,h),brush);
+                int warningsVisible=drawWarnings?
+                    WeatherWarningOverlay.draw(canvas,warnings,z,x0,y0,w,h):-2;
                 if(gLat!=null){
                     Paint halo=new Paint(Paint.ANTI_ALIAS_FLAG);halo.setColor(0x99ffffff);
-                    canvas.drawCircle(w/2f,h/2f,15,halo);
-                    halo.setColor(0xff2389ff);canvas.drawCircle(w/2f,h/2f,10,halo);
+                    float pinX=(float)(mx(gLon,z)-x0);
+                    float pinY=(float)(my(gLat,z)-y0);
+                    canvas.drawCircle(pinX,pinY,15,halo);
+                    halo.setColor(0xff2389ff);canvas.drawCircle(pinX,pinY,10,halo);
                     halo.setColor(Color.WHITE);halo.setStyle(Paint.Style.STROKE);halo.setStrokeWidth(3);
-                    canvas.drawCircle(w/2f,h/2f,10,halo);
+                    canvas.drawCircle(pinX,pinY,10,halo);
                 }
                 if(!national&&gLat==null){
                     // Station center marker, white outlined radar reference point.
@@ -450,15 +531,20 @@ public final class NewsWaveCarService extends CarAppService {
                     canvas.drawLine(w/2f,h/2f-15,w/2f,h/2f+15,pin);
                 }
                 // Basic product ID and attribution stay readable independent of map zoom.
-                brush.setColor(0xe20b1727);canvas.drawRoundRect(12,12,Math.min(w-12,600),70,14,14,brush);
+                brush.setColor(0xe20b1727);canvas.drawRoundRect(12,12,Math.min(w-12,640),88,14,14,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(20f);brush.setFakeBoldText(true);
                 String label=national?"US RADAR · Reflectivity":s.id+" · "+(p.equals("SR_BVEL")?"Radial velocity":p.equals("BDHC")?"Precipitation type":p.equals("BOHA")?"Hourly rainfall":"Reflectivity");
-                canvas.drawText(label,26,40,brush);
+                canvas.drawText(label+"   Z"+z+(auto?"  GPS":"  MAP"),26,40,brush);
                 brush.setFakeBoldText(false);brush.setTextSize(13);
-                canvas.drawText(radar==null?"Radar overlay unavailable — map only":"NOAA latest available scan · static driving view",26,60,brush);
+                canvas.drawText(radar==null?"Radar unavailable — map only":"NOAA latest radar scan · static driving view",26,60,brush);
+                String warningText=warningsVisible==-2?"Warnings hidden":
+                    warningsVisible==-1?"NWS warnings loading/unavailable":
+                    warningsVisible==0?"No mapped NWS warning polygons in view":
+                    warningsVisible+" active NWS warning area(s) visible";
+                canvas.drawText(warningText,26,78,brush);
                 brush.setColor(0xea09111b);canvas.drawRoundRect(8,h-31,Math.min(w-8,440),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
-                canvas.drawText("Map © OpenStreetMap contributors  ·  Radar NOAA/NWS",14,h-13,brush);
+                canvas.drawText("Map © OpenStreetMap · NOAA/NWS · Alerts may be delayed",14,h-13,brush);
                 synchronized(lock){if(rev!=revision){out.recycle();return;}finished=out;}
                 display();
             }catch(Throwable e){Log.e(LOG,"Radar rendering failed",e);}
