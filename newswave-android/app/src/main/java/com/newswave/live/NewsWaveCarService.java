@@ -469,7 +469,11 @@ public final class NewsWaveCarService extends CarAppService {
             String key=z+"/"+x+"/"+y;
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
-            Bitmap b=download("https://tile.openstreetmap.org/"+key+".png");
+            // Satellite imagery is the preferred basemap for all NewsWire radar views.
+            // If Esri tiles cannot be loaded, retain an offline-safe map fallback.
+            Bitmap b=download("https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
+                +z+"/"+y+"/"+x);
+            if(b==null)b=download("https://tile.openstreetmap.org/"+key+".png");
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
         }
@@ -544,7 +548,7 @@ public final class NewsWaveCarService extends CarAppService {
                 canvas.drawText(warningText,26,78,brush);
                 brush.setColor(0xea09111b);canvas.drawRoundRect(8,h-31,Math.min(w-8,440),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
-                canvas.drawText("Map © OpenStreetMap · NOAA/NWS · Alerts may be delayed",14,h-13,brush);
+                canvas.drawText("Imagery © Esri / OSM fallback · Radar & alerts NOAA/NWS",14,h-13,brush);
                 synchronized(lock){if(rev!=revision){out.recycle();return;}finished=out;}
                 display();
             }catch(Throwable e){Log.e(LOG,"Radar rendering failed",e);}
