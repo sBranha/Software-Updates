@@ -69,7 +69,7 @@ public class RadarActivity extends Activity {
     homeButton.setTextSize(16);
     homeButton.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
     homeButton.setGravity(Gravity.CENTER);
-    homeButton.setContentDescription("Return to the Newswire News, Weather, Sports menu");
+    homeButton.setContentDescription("Return to the NewsWire News, Weather, Sports menu");
     GradientDrawable background=new GradientDrawable();
     background.setColor(Color.rgb(25,38,61));
     background.setCornerRadius(dp(14));
@@ -102,7 +102,7 @@ public class RadarActivity extends Activity {
     return (int)(number*getResources().getDisplayMetrics().density+0.5f);
   }
   private void returnHome(){
-    // Clear the radar activity and reopen the actual Newswire dashboard,
+    // Clear the radar activity and reopen the actual NewsWire dashboard,
     // rather than the Weather section that launched the radar.
     Intent home=new Intent(this,MainActivity.class);
     home.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
