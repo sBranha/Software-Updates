@@ -22,6 +22,11 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.appupdate.AppUpdateOptions;
+import com.google.android.play.core.install.model.AppUpdateType;
+import com.google.android.play.core.install.model.UpdateAvailability;
 import android.net.Uri;
 import android.view.Gravity;
 import android.view.View;
@@ -70,6 +75,14 @@ public class MainActivity extends Activity {
     Channel(String a,String b,String c,String d,String e,boolean f){id=a;name=b;category=c;note=d;url=e;signIn=f;}
   }
   private SharedPreferences prefs;
+  private static final int NEWS_NOTIFICATION_REQUEST=145;
+  private AppUpdateManager playUpdates;
+  private boolean updateAvailable=false;
+  private boolean checkingUpdate=false;
+  private long lastUpdatePoll=0;
+  private boolean localNewsNotificationEnabled(){
+    return getSharedPreferences("newswire-news-alerts",MODE_PRIVATE).getBoolean("enabled",false);
+  }
   private LinearLayout root, list, tabBar;
   private EditText search;
   private WebView web;
@@ -111,6 +124,52 @@ public class MainActivity extends Activity {
     postalLat=Double.longBitsToDouble(loc.getLong("lat",Double.doubleToLongBits(Double.NaN)));
     postalLon=Double.longBitsToDouble(loc.getLong("lon",Double.doubleToLongBits(Double.NaN)));
     dashboard();
+    NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
+    playUpdates=AppUpdateManagerFactory.create(this);
+    checkForUpdates(false);
+  }
+  private void checkForUpdates(boolean interactive){
+    if(playUpdates==null)playUpdates=AppUpdateManagerFactory.create(this);
+    if(checkingUpdate)return;
+    long now=System.currentTimeMillis();
+    if(!interactive && now-lastUpdatePoll<5*60*1000L)return;
+    checkingUpdate=true;lastUpdatePoll=now;
+    playUpdates.getAppUpdateInfo().addOnSuccessListener(info->{
+      checkingUpdate=false;
+      boolean available=info.updateAvailability()==UpdateAvailability.UPDATE_AVAILABLE;
+      if(available && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)){
+        updateAvailable=true;
+        if(interactive){
+          playUpdates.startUpdateFlow(info,this,
+            AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build());
+        }else if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){
+          android.widget.Toast.makeText(this,"NewsWire update available in Google Play",1).show();
+        }else dashboard();
+      }else{
+        updateAvailable=false;
+        if(interactive)android.widget.Toast.makeText(this,
+          "You're on the latest Google Play version of NewsWire.",1).show();
+      }
+    }).addOnFailureListener(error->{
+      checkingUpdate=false;
+      if(interactive)android.widget.Toast.makeText(this,
+        "Update check unavailable. Verify your Google Play connection.",1).show();
+    });
+  }
+  private void toggleNewsNotifications(){
+    if(!localNewsNotificationEnabled() && Build.VERSION.SDK_INT>=33
+       &&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+      requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NEWS_NOTIFICATION_REQUEST);
+      return;
+    }
+    boolean enabled=!localNewsNotificationEnabled();
+    getSharedPreferences("newswire-news-alerts",MODE_PRIVATE)
+      .edit().putBoolean("enabled",enabled).apply();
+    NewsMonitorWorker.schedule(this,enabled);
+    dashboard();
+    android.widget.Toast.makeText(this,enabled?
+      "Local headline alerts are on. Updates are checked hourly.":
+      "Local headline notifications are off.",1).show();
   }
   // Always show the version of the package actually installed on the device.
   // Never hardcode a release string in this UI again.
@@ -121,6 +180,16 @@ public class MainActivity extends Activity {
     }catch(Exception ignored){return "unknown";}
   }
   private int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
+  private GradientDrawable atmosphere(){
+    return new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+      new int[]{0xff0c2540,0xff081320,0xff0c101f});
+  }
+  private GradientDrawable radiantCard(int left,int right,int edge){
+    GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+      new int[]{left,right});
+    g.setCornerRadius(dp(22));g.setStroke(dp(1),edge);
+    return g;
+  }
   private GradientDrawable box(int color,int radius){
     GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));
     d.setStroke(dp(1),EDGE);return d;
@@ -561,6 +630,14 @@ public class MainActivity extends Activity {
   }
   @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
     super.onRequestPermissionsResult(requestCode,permissions,results);
+    if(requestCode==NEWS_NOTIFICATION_REQUEST){
+      if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){
+        getSharedPreferences("newswire-news-alerts",MODE_PRIVATE)
+          .edit().putBoolean("enabled",true).apply();
+        NewsMonitorWorker.schedule(this,true);
+        dashboard();
+      }else android.widget.Toast.makeText(this,"Notifications are off until permitted.",1).show();
+    }
     if(requestCode==NEWS_LOCATION_REQUEST){
       boolean granted=false;
       for(int result:results)if(result==PackageManager.PERMISSION_GRANTED)granted=true;
