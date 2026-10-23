@@ -76,6 +76,29 @@ public class MainActivity extends Activity {
     Channel(String a,String b,String c,String d,String e,boolean f){id=a;name=b;category=c;note=d;url=e;signIn=f;}
   }
   private SharedPreferences prefs;
+  private static final int MORNING_NOTIFICATION_PERMISSION=149;
+  private void openPersonalized(){
+    startActivity(new Intent(this,PersonalizedNewsActivity.class));
+  }
+  private void openMorning(){
+    startActivity(new Intent(this,MorningBriefingActivity.class));
+  }
+  private void toggleMorningBriefing(){
+    if(!MorningBriefingWorker.enabled(this)
+        &&Build.VERSION.SDK_INT>=33
+        &&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+            !=PackageManager.PERMISSION_GRANTED){
+      requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+          MORNING_NOTIFICATION_PERMISSION);
+      return;
+    }
+    boolean enabled=!MorningBriefingWorker.enabled(this);
+    MorningBriefingWorker.configure(this,enabled);
+    dashboard();
+    android.widget.Toast.makeText(this,enabled?
+      "Good Morning notifications on. Android chooses an approximate morning delivery time.":
+      "Good Morning notifications turned off.",1).show();
+  }
   // The live My Area dashboard is driven by a foreground GPS fix when allowed.
   // Saved ZIP coordinates are the reliable fallback.
   private LinearLayout myAreaCard;
@@ -180,6 +203,8 @@ public class MainActivity extends Activity {
       getIntent().removeExtra("open_news");
     }
     NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
+    if(MorningBriefingWorker.enabled(this))
+      MorningBriefingWorker.configure(this,true);
     playUpdates=AppUpdateManagerFactory.create(this);
     checkForUpdates(false);
   }
@@ -331,6 +356,10 @@ public class MainActivity extends Activity {
       0xff135879,this::openDrive);
     categoryTile(content,"TRAFFIC & ROAD CLOSURES","Official DOT incidents and travel maps","⇢",
       0xff684124,this::openTraffic);
+    categoryTile(content,"MY NEWS","Follow towns, favorite publishers, save stories","★",
+      0xff235286,this::openPersonalized);
+    categoryTile(content,"GOOD MORNING","Your weather and local news briefing","☀",
+      0xff8a542e,this::openMorning);
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
     pad(driveCard,16,16);
@@ -347,6 +376,11 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams slp=lp(-1,-2);slp.topMargin=dp(9);driveCard.addView(safety,slp);
     LinearLayout.LayoutParams drlp=lp(-1,-2);drlp.topMargin=dp(10);drlp.bottomMargin=dp(12);
     content.addView(driveCard,drlp);
+    TextView morningAction=button(MorningBriefingWorker.enabled(this)?
+        "☀  GOOD MORNING NOTIFICATIONS ON · TAP TO TURN OFF":
+        "☀  ENABLE MORNING BRIEFING NOTIFICATIONS",this::toggleMorningBriefing);
+    LinearLayout.LayoutParams morningParams=lp(-1,-2);
+    morningParams.bottomMargin=dp(13);content.addView(morningAction,morningParams);
     TextView utilities=text("MAKE NEWSWIRE YOURS",12,0xff62dbe6,true);
     LinearLayout.LayoutParams utilityLp=lp(-1,-2);utilityLp.topMargin=dp(13);
     utilityLp.bottomMargin=dp(9);content.addView(utilities,utilityLp);
@@ -964,6 +998,13 @@ public class MainActivity extends Activity {
         requestDriveAlerts();
       else android.widget.Toast.makeText(this,
         "Drive Alerts require permission to show tornado-warning notifications.",1).show();
+    }
+    if(requestCode==MORNING_NOTIFICATION_PERMISSION){
+      if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){
+        MorningBriefingWorker.configure(this,true);
+        dashboard();
+      }else android.widget.Toast.makeText(this,
+        "Good Morning notifications remain disabled.",1).show();
     }
     if(requestCode==DASHBOARD_LOCATION_REQUEST){
       boolean ok=false;
