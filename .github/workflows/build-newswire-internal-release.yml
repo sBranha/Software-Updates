@@ -1,0 +1,82 @@
+name: NewsWire Google Play release-signed bundle
+on:
+  push:
+    branches: [newswire-play-test-v0.4.5]
+    paths:
+      - '.github/workflows/build-newswire-internal-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android 36 SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Bundle radar map resources and stations
+        run: |
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' --output newswave-android/app/src/main/assets/leaflet.js
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' --output newswave-android/app/src/main/assets/leaflet.css
+          python newswave-android/build_radar_stations.py
+      - name: Verify package settings are correct for Google Play
+        run: |
+          grep -q "applicationId 'com.newswire.live'" newswave-android/app/build.gradle
+          grep -q 'targetSdk 36' newswave-android/app/build.gradle
+          grep -q 'versionCode 9' newswave-android/app/build.gradle
+          grep -q 'android:label="NewsWire"' newswave-android/app/src/main/AndroidManifest.xml
+      - name: Build a non-debuggable release AAB
+        run: gradle -p newswave-android :app:bundleRelease --no-daemon
+      - name: Generate persistent upload key, sign and verify AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          UPLOAD_PASS="$(openssl rand -hex 32)"
+          keytool -genkeypair -noprompt -storetype PKCS12 -keyalg RSA -keysize 3072 -validity 10000             -alias newswire-upload -keystore NewsWire-upload-key.p12             -storepass "$UPLOAD_PASS" -keypass "$UPLOAD_PASS"             -dname 'CN=NewsWire Upload Key, O=NewsWire, C=US'
+          {
+            printf '%s\n' 'NEWSWIRE GOOGLE PLAY UPLOAD KEY - SAVE THESE FILES SECURELY'
+            printf '%s\n' 'Keystore file: NewsWire-upload-key.p12'
+            printf '%s\n' 'Keystore type: PKCS12'
+            printf '%s\n' 'Alias: newswire-upload'
+            printf 'Store password: %s\n' "$UPLOAD_PASS"
+            printf 'Key password: %s\n' "$UPLOAD_PASS"
+            printf '%s\n' 'Package: com.newswire.live'
+            printf '%s\n' 'This is the UPLOAD key for future Google Play bundles (not the Play app signing key).'
+          } > NewsWire-upload-key-credentials.txt
+          UNSIGNED=newswave-android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$UNSIGNED"
+          jarsigner -keystore NewsWire-upload-key.p12 -storetype PKCS12             -storepass "$UPLOAD_PASS" -keypass "$UPLOAD_PASS"             -digestalg SHA-256 -sigalg SHA256withRSA             -signedjar NewsWire-Google-Play-Internal-v0.4.5.aab "$UNSIGNED" newswire-upload
+          jarsigner -verify NewsWire-Google-Play-Internal-v0.4.5.aab
+          unzip -t NewsWire-Google-Play-Internal-v0.4.5.aab >/dev/null
+          keytool -list -keystore NewsWire-upload-key.p12 -storepass "$UPLOAD_PASS" -alias newswire-upload >/dev/null
+          tar -czf NewsWire-upload-key-backup.tar.gz NewsWire-upload-key.p12 NewsWire-upload-key-credentials.txt
+          openssl cms -encrypt -binary -aes256             -in NewsWire-upload-key-backup.tar.gz             -outform DER -out NewsWire-Upload-Key-Backup-ENCRYPTED.p7m             newswave-android/signing/newswire-recovery-public.pem
+          test -s NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+          sha256sum NewsWire-Google-Play-Internal-v0.4.5.aab NewsWire-Upload-Key-Backup-ENCRYPTED.p7m > NewsWire-SHA256SUMS.txt
+          rm -f NewsWire-upload-key.p12 NewsWire-upload-key-credentials.txt NewsWire-upload-key-backup.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-Google-Play-v0.4.5-SIGNED
+          path: |
+            NewsWire-Google-Play-Internal-v0.4.5.aab
+            NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+            NewsWire-SHA256SUMS.txt
+          retention-days: 30
+      - name: Publish public AAB and encrypted recovery backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view newswire-play-internal-v0.4.5 >/dev/null 2>&1; then
+            echo "Refusing to overwrite the previous signed AAB: a new key would break updates."
+            exit 1
+          fi
+          gh release create newswire-play-internal-v0.4.5             NewsWire-Google-Play-Internal-v0.4.5.aab             NewsWire-Upload-Key-Backup-ENCRYPTED.p7m             NewsWire-SHA256SUMS.txt             --target "$GITHUB_SHA"             --title "NewsWire v0.4.5 - release-signed Google Play internal test"             --notes "Release-mode, non-debuggable AAB signed with a permanent upload key for package com.newswire.live, versionCode 9. Upload AAB in Google Play Console -> Internal testing -> Create release. The backup is encrypted with a separate private recovery key given to the app owner; never distribute that private key. This is a test build and does not indicate live device or Google Play review verification."             --prerelease
