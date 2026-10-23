@@ -218,7 +218,7 @@ public class MainActivity extends Activity {
     LinearLayout hero=column();hero.setBackground(radiantCard(0xff152f4c,0xff0d192b,0xff2e6174));
     pad(hero,19,20);
     TextView eyebrow=text("NEWSWIRE   /   LIVE",11,0xff62dbe6,true);hero.addView(eyebrow);
-    TextView brand=text("YOUR WORLD.\\nIN THE KNOW.",27,FG,true);
+    TextView brand=text("YOUR WORLD.\nIN THE KNOW.",27,FG,true);
     LinearLayout.LayoutParams bp0=lp(-1,-2);bp0.topMargin=dp(8);hero.addView(brand,bp0);
     TextView sub=text("Local news   •   Storm radar   •   Your teams",13,0xffbfd4e6,false);
     LinearLayout.LayoutParams su=lp(-1,-2);su.topMargin=dp(9);hero.addView(sub,su);
