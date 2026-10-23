@@ -327,6 +327,10 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Your local headlines, live","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Satellite radar & NWS warnings","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Friday night scores • nearby teams","★",0xffa15620,this::openFootballBoard);
+    categoryTile(content,"NEWSWIRE DRIVE","Spoken weather • live GPS • storm alerts","↗",
+      0xff135879,this::openDrive);
+    categoryTile(content,"TRAFFIC & ROAD CLOSURES","Official DOT incidents and travel maps","⇢",
+      0xff684124,this::openTraffic);
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
     pad(driveCard,16,16);
@@ -517,6 +521,29 @@ public class MainActivity extends Activity {
     tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->click.run());
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(13);parent.addView(tile,p);
   }
+  private String activeState(){
+    if(myAreaSnapshot!=null&&!Double.isNaN(dashboardLatitude)){
+      String label=myAreaSnapshot.area;
+      int at=label.lastIndexOf(',');
+      if(at>=0&&at<label.length()-1)return label.substring(at+1).trim();
+    }
+    return state;
+  }
+  private void openDrive(){
+    Intent intent=new Intent(this,NewsWireDriveActivity.class);
+    intent.putExtra("city",city);
+    intent.putExtra("state",activeState());
+    if(!Double.isNaN(dashboardLatitude)&&!Double.isNaN(dashboardLongitude)){
+      intent.putExtra("latitude",dashboardLatitude);
+      intent.putExtra("longitude",dashboardLongitude);
+    }
+    startActivity(intent);
+  }
+  private void openTraffic(){
+    Intent intent=new Intent(this,TrafficActivity.class);
+    intent.putExtra("state",activeState());
+    startActivity(intent);
+  }
   private void openFootballBoard(){
     Intent football=new Intent(this,FootballBoardActivity.class);
     String areaCity=city,areaState=state;
@@ -657,6 +684,9 @@ public class MainActivity extends Activity {
     list.removeAllViews();
     int count=0;
     if(tab.equals("Weather")){
+      TextView driveLink=button("↗  NEWSWIRE DRIVE • SPOKEN WEATHER",this::openDrive);
+      LinearLayout.LayoutParams driveLp=lp(-1,-2);driveLp.bottomMargin=dp(11);
+      list.addView(driveLink,driveLp);
       TextView radar=button("◎  LIVE RADAR  •  GPS FOLLOW",()->startActivity(new Intent(MainActivity.this,RadarActivity.class)));
       LinearLayout.LayoutParams rp=lp(-1,-2);rp.bottomMargin=dp(13);list.addView(radar,rp);
       if(!Double.isNaN(postalLat)){
