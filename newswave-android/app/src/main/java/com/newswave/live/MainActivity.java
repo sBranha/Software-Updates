@@ -1,6 +1,7 @@
 package com.newswave.live;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
@@ -174,6 +175,10 @@ public class MainActivity extends Activity {
     postalLat=Double.longBitsToDouble(loc.getLong("lat",Double.doubleToLongBits(Double.NaN)));
     postalLon=Double.longBitsToDouble(loc.getLong("lon",Double.doubleToLongBits(Double.NaN)));
     dashboard();
+    if(getIntent()!=null && getIntent().getBooleanExtra("open_news",false)){
+      openSection("News");
+      getIntent().removeExtra("open_news");
+    }
     NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
     playUpdates=AppUpdateManagerFactory.create(this);
     checkForUpdates(false);
@@ -205,6 +210,29 @@ public class MainActivity extends Activity {
       if(interactive)android.widget.Toast.makeText(this,
         "Update check unavailable. Verify your Google Play connection.",1).show();
     });
+  }
+  private void showSmartNewsSettings(){
+    final String[] labels={
+      "Important headlines (only when the publisher headline indicates urgency)",
+      "School closures and delays",
+      "General local headlines"
+    };
+    final String[] topic={"breaking","schools","local"};
+    SharedPreferences prefs=getSharedPreferences("newswire-news-alerts",MODE_PRIVATE);
+    boolean[] values=new boolean[3];
+    for(int i=0;i<3;i++)values[i]=prefs.getBoolean("topic_"+topic[i],true);
+    new AlertDialog.Builder(this)
+      .setTitle("Smart News Alerts")
+      .setMultiChoiceItems(labels,values,(dialog,index,checked)->values[index]=checked)
+      .setPositiveButton("Save preferences",(dialog,which)->{
+        SharedPreferences.Editor editor=prefs.edit();
+        for(int i=0;i<3;i++)editor.putBoolean("topic_"+topic[i],values[i]);
+        editor.apply();
+        NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
+        android.widget.Toast.makeText(this,
+          "News alert preferences saved. Checks are periodic, not immediate.",1).show();
+      })
+      .setNegativeButton("Cancel",null).show();
   }
   private void toggleNewsNotifications(){
     if(!localNewsNotificationEnabled() && Build.VERSION.SDK_INT>=33
@@ -298,7 +326,7 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams cp=lp(-1,-2);cp.bottomMargin=dp(20);content.addView(locale,cp);
     categoryTile(content,"NEWS","Your local headlines, live","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Satellite radar & NWS warnings","☁",0xff097e98,()->openSection("Weather"));
-    categoryTile(content,"SPORTS","Follow local high-school teams","★",0xffa15620,()->openSection("Sports"));
+    categoryTile(content,"SPORTS","Friday night scores • nearby teams","★",0xffa15620,this::openFootballBoard);
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
     pad(driveCard,16,16);
@@ -323,6 +351,10 @@ public class MainActivity extends Activity {
       this::toggleNewsNotifications);
     LinearLayout.LayoutParams alertLp=lp(-1,-2);alertLp.bottomMargin=dp(10);
     content.addView(alertToggle,alertLp);
+    TextView alertSettings=button("⚙  SMART ALERT TOPICS · BREAKING / SCHOOLS / LOCAL",
+      this::showSmartNewsSettings);
+    LinearLayout.LayoutParams settingsLp=lp(-1,-2);
+    settingsLp.bottomMargin=dp(10);content.addView(alertSettings,settingsLp);
     TextView updates=button(updateAvailable?
       "↑  NEWSWIRE UPDATE READY IN GOOGLE PLAY":
       "↑  CHECK FOR APP UPDATES",()->checkForUpdates(true));
@@ -485,7 +517,26 @@ public class MainActivity extends Activity {
     tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->click.run());
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(13);parent.addView(tile,p);
   }
-  private void openSection(String name){tab=name;query="";home();}
+  private void openFootballBoard(){
+    Intent football=new Intent(this,FootballBoardActivity.class);
+    String areaCity=city,areaState=state;
+    if(myAreaSnapshot!=null&&!Double.isNaN(dashboardLatitude)){
+      String label=myAreaSnapshot.area;
+      int comma=label.indexOf(',');
+      if(comma>0){
+        areaCity=label.substring(0,comma).trim();
+        areaState=label.substring(comma+1).trim();
+      }
+    }
+    football.putExtra("city",areaCity);
+    football.putExtra("state",areaState);
+    football.putExtra("zip",zip);
+    startActivity(football);
+  }
+  private void openSection(String name){
+    if("Sports".equals(name)){openFootballBoard();return;}
+    tab=name;query="";home();
+  }
   private void resolveZip(String postal){resolveZip(postal,false);}
   private void resolveZip(String postal,boolean showSportsAfterSave){
     if(!postal.matches("[0-9]{5}")){android.widget.Toast.makeText(this,"Enter a 5-digit ZIP code",0).show();return;}
@@ -616,6 +667,9 @@ public class MainActivity extends Activity {
     }
     if(tab.equals("News"))count+=renderLocalNews();
     if(tab.equals("Sports")){
+      TextView live=button("🏈  FRIDAY NIGHT FOOTBALL LIVE",this::openFootballBoard);
+      LinearLayout.LayoutParams flp=lp(-1,-2);flp.bottomMargin=dp(13);
+      list.addView(live,flp);
       if(state.matches("[A-Z]{2}")&&!city.isEmpty()&&!zip.isEmpty()){
         try{
           String local=URLEncoder.encode(city+" "+state+" high school football scores","UTF-8");
