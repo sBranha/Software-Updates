@@ -61,14 +61,15 @@ public final class NewsWireDriveActivity extends Activity {
         if(Double.isNaN(longitude))
             longitude=Double.longBitsToDouble(saved.getLong("lon",
                 Double.doubleToLongBits(Double.NaN)));
-        speaker=new TextToSpeech(this,code->{
+        speaker=new TextToSpeech(this,code->runOnUiThread(()->{
+            if(closed||speaker==null)return;
             speakerReady=code==TextToSpeech.SUCCESS;
             if(speakerReady){
                 speaker.setLanguage(Locale.US);
                 speaker.setSpeechRate(.94f);
                 if(pendingRead){pendingRead=false;speak();}
-            }
-        });
+            }else status.setText("Text-to-speech isn't available on this phone.");
+        }));
         render();
         usePhoneLocation(false);
     }
