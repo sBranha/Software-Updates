@@ -136,7 +136,7 @@ public final class NewsWaveCarService extends CarAppService {
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
             startFollowing();
-            getLifecycle().addObserver((source,event)->{
+            getLifecycle().addObserver((androidx.lifecycle.LifecycleEventObserver)(source,event)->{
               if(event==Lifecycle.Event.ON_DESTROY&&locationManager!=null&&locationListener!=null){
                 locationManager.removeUpdates(locationListener);
               }
