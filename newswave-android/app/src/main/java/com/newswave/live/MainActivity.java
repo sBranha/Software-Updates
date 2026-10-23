@@ -531,7 +531,13 @@ public class MainActivity extends Activity {
   }
   private void openDrive(){
     Intent intent=new Intent(this,NewsWireDriveActivity.class);
-    intent.putExtra("city",city);
+    String currentCity=city;
+    if(myAreaSnapshot!=null&&!Double.isNaN(dashboardLatitude)){
+      String currentArea=myAreaSnapshot.area;
+      int comma=currentArea.indexOf(',');
+      if(comma>0)currentCity=currentArea.substring(0,comma).trim();
+    }
+    intent.putExtra("city",currentCity);
     intent.putExtra("state",activeState());
     if(!Double.isNaN(dashboardLatitude)&&!Double.isNaN(dashboardLongitude)){
       intent.putExtra("latitude",dashboardLatitude);
