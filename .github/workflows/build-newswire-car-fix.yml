@@ -1,7 +1,7 @@
-name: NewsWire 0.5.0 Android Auto weather map and warning build
+name: NewsWire 0.5.1 Android Auto weather map and warning build
 on:
   push:
-    branches: [newswire-map-interactions-v0.5.0]
+    branches: [newswire-storm-myarea-v0.5.1]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q "applicationId 'com.newswire.live'" newswave-android/app/build.gradle
-          grep -q 'versionCode 14' newswave-android/app/build.gradle
-          grep -q "versionName '0.5.0'" newswave-android/app/build.gradle
+          grep -q 'versionCode 15' newswave-android/app/build.gradle
+          grep -q "versionName '0.5.1'" newswave-android/app/build.gradle
           grep -q 'targetSdk 36' newswave-android/app/build.gradle
           grep -q 'setContentTemplate(pane)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           ! grep -q 'PaneTemplate panel=' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
@@ -49,7 +49,7 @@ jobs:
           grep -q 'void recenter()' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -q 'WeatherWarningOverlay.draw' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -q 'api.weather.gov/alerts/active' newswave-android/app/src/main/java/com/newswave/live/WeatherWarningOverlay.java
-          grep -q 'versionCode 14' newswave-android/app/build.gradle
+          grep -q 'versionCode 15' newswave-android/app/build.gradle
       - name: Verify minimal weather map and map style selectors
         run: |
           set -euo pipefail
@@ -84,17 +84,28 @@ jobs:
           grep -q 'android.permission.POST_NOTIFICATIONS' newswave-android/app/src/main/AndroidManifest.xml
           grep -q 'com.google.android.play:app-update' newswave-android/app/build.gradle
           grep -q 'androidx.work:work-runtime' newswave-android/app/build.gradle
+      - name: First pair feature regression checks
+        run: |
+          set -euo pipefail
+          grep -q 'class MyAreaData' newswave-android/app/src/main/java/com/newswave/live/MyAreaData.java
+          grep -q 'alerts/active?point=' newswave-android/app/src/main/java/com/newswave/live/MyAreaData.java
+          grep -q 'observationStations' newswave-android/app/src/main/java/com/newswave/live/MyAreaData.java
+          grep -q 'startDashboardGps()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
+          grep -q 'renderMyArea()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
+          grep -q 'trackStorms' newswave-android/app/src/main/assets/radar.html
+          grep -q 'nearWarnings' newswave-android/app/src/main/assets/radar.html
+          grep -q 'versionCode 15' newswave-android/app/build.gradle
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
         run: |
-          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.5.0-UNSIGNED.aab
-          unzip -t NewsWire-v0.5.0-UNSIGNED.aab >/dev/null
-          sha256sum NewsWire-v0.5.0-UNSIGNED.aab > SHA256SUMS.txt
+          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.5.1-UNSIGNED.aab
+          unzip -t NewsWire-v0.5.1-UNSIGNED.aab >/dev/null
+          sha256sum NewsWire-v0.5.1-UNSIGNED.aab > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.5.0-unsigned-intermediate
+          name: NewsWire-v0.5.1-unsigned-intermediate
           path: |
-            NewsWire-v0.5.0-UNSIGNED.aab
+            NewsWire-v0.5.1-UNSIGNED.aab
             SHA256SUMS.txt
           retention-days: 15
