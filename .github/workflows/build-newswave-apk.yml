@@ -45,16 +45,16 @@ jobs:
         run: gradle -p newswave-android :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWave-Live-v0.4.3-APK
+          name: NewsWave-Live-v0.4.4-APK
           path: newswave-android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
       - name: Publish direct download as prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.4.3.apk
-          if gh release view newswave-live-v0.4.3 >/dev/null 2>&1; then
-            gh release upload newswave-live-v0.4.3 NewsWave-Live-v0.4.3.apk --clobber
+          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWave-Live-v0.4.4.apk
+          if gh release view newswave-live-v0.4.4 >/dev/null 2>&1; then
+            gh release upload newswave-live-v0.4.4 NewsWave-Live-v0.4.4.apk --clobber
           else
-          gh release create newswave-live-v0.4.3 NewsWave-Live-v0.4.3.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.4.3 Android Auto Weather Test APK" --notes "Newswire v0.4.3: publisher-controlled News/Weather/Sports dashboard, ZIP-based local news and state football scores, phone and Android Auto radar GPS follow, WeatherWise location permission fix, Sports ZIP search, and a persistent radar NEWSWIRE HOME button that returns directly to the dashboard. Debug test APK not yet tested on device. Since debug signing can change between builds, uninstall the previous NewsWave app before installing if Android reports conflicting signatures." --prerelease
+          gh release create newswave-live-v0.4.4 NewsWave-Live-v0.4.4.apk --target "$GITHUB_SHA" --title "NewsWave Live v0.4.4 Android Auto Weather Test APK" --notes "Newswire v0.4.4: publisher-controlled News/Weather/Sports dashboard, ZIP-based local news and state football scores, phone and Android Auto radar GPS follow, WeatherWise location permission fix, Sports ZIP search, persistent radar Home button, automatic GPS-based local news, nearby newspapers and live headline links while traveling. Debug test APK not yet tested on device. Since debug signing can change between builds, uninstall the previous NewsWave app before installing if Android reports conflicting signatures." --prerelease
           fi

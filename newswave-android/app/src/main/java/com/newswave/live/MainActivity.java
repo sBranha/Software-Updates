@@ -1,6 +1,17 @@
 package com.newswave.live;
 
 import android.app.Activity;
+import android.content.Context;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Looper;
+import android.location.Geocoder;
+import android.location.Address;
+import java.util.List;
+import java.util.ArrayList;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import android.os.Bundle;
 import android.Manifest;
 import android.os.Build;
@@ -63,6 +74,7 @@ public class MainActivity extends Activity {
   private EditText search;
   private WebView web;
   private static final int WEB_LOCATION_REQUEST = 143;
+  private static final int NEWS_LOCATION_REQUEST = 144;
   private GeolocationPermissions.Callback pendingLocationCallback;
   private String pendingLocationOrigin;
   private FrameLayout fullscreen;
@@ -73,6 +85,19 @@ public class MainActivity extends Activity {
   private String zip="",city="",state="";
   private double postalLat=Double.NaN,postalLon=Double.NaN;
   private String query="";
+  // Foreground-only location-following for the News tab; saved ZIP remains unchanged.
+  private LocationManager newsLocationManager;
+  private LocationListener newsLocationListener;
+  private boolean newsPermissionRequested=false;
+  private boolean newsGpsActive=false;
+  private boolean newsGeocoding=false;
+  private String newsGpsCity="",newsGpsRegion="";
+  private double newsGpsLatitude=Double.NaN,newsGpsLongitude=Double.NaN;
+  private Location lastNewsLookup;
+  private int newsGeoGeneration=0;
+  private String newsFeedKey="",newsFeedError="";
+  private boolean newsFeedLoading=false;
+  private List<LocalNewspapers.Headline> newsHeadlines=new ArrayList<>();
   private final String[] tabs={"All","Radar","National","Weather","Local","Favorites"};
 
   @Override public void onCreate(Bundle b){
@@ -107,7 +132,7 @@ public class MainActivity extends Activity {
 
   // Categories are intentionally publisher-controlled. Public users cannot add or edit menu buttons.
   private void dashboard(){
-    current=null;query="";if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
+    current=null;query="";stopNewsGps();if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
     ScrollView sc=new ScrollView(this);LinearLayout content=column();pad(content,18,20);
     sc.addView(content);root.addView(sc);
@@ -132,7 +157,7 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
-    TextView foot=text("Newswire v0.4.3  •  More sections arrive through official app updates.",12,MUTED,false);
+    TextView foot=text("Newswire v0.4.4  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
@@ -193,10 +218,10 @@ public class MainActivity extends Activity {
     TextView back=button("‹  MENU",()->dashboard());header.addView(back);
     TextView brand=text("NEWSWIRE  /  "+tab.toUpperCase(Locale.US),24,FG,true);
     LinearLayout.LayoutParams bh=lp(-1,-2);bh.topMargin=dp(13);header.addView(brand,bh);
-    TextView subtitle=text(zip.isEmpty()?(tab.equals("Sports")?"Search by ZIP below for local football scores":"Set a ZIP on the home screen for local results"):city+", "+state+"  •  "+zip,13,MUTED,false);
+    TextView subtitle=text(tab.equals("News")?"Local papers follow your location • saved ZIP is backup":zip.isEmpty()?(tab.equals("Sports")?"Search by ZIP below for local football scores":"Set a ZIP on the home screen for local results"):city+", "+state+"  •  "+zip,13,MUTED,false);
     LinearLayout.LayoutParams sl=lp(-1,-2);sl.topMargin=dp(7);header.addView(subtitle,sl);
     root.addView(header);
-    TextView notice=text("OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
+    TextView notice=text(tab.equals("News")?"LOCAL HEADLINES  •  NEWSPAPERS  •  NETWORK NEWS":"OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
     if(tab.equals("Sports")){
       LinearLayout sportZip=column();pad(sportZip,16,12);
@@ -251,6 +276,7 @@ public class MainActivity extends Activity {
     ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
     list=column();pad(list,16,7);scroll.addView(list);
     root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render();
+    if(tab.equals("News"))startNewsGps(false);
   }
   private void makeTabs(){
     tabBar.removeAllViews();
@@ -275,14 +301,7 @@ public class MainActivity extends Activity {
         count++;
       }
     }
-    if(tab.equals("News")&&!zip.isEmpty()){
-      try{
-        String searchTerm=URLEncoder.encode(city+" "+state+" local news","UTF-8");
-        card(localLink("zipnews","Local news near "+city,"News","Regional news for your saved ZIP",
-             "https://news.google.com/search?q="+searchTerm+"&hl=en-US&gl=US&ceid=US%3Aen"));
-        count++;
-      }catch(Exception ignored){}
-    }
+    if(tab.equals("News"))count+=renderLocalNews();
     if(tab.equals("Sports")){
       if(state.matches("[A-Z]{2}")&&!city.isEmpty()&&!zip.isEmpty()){
         try{
@@ -305,7 +324,8 @@ public class MainActivity extends Activity {
       if(tab.equals("Sports"))continue;
       if(tab.equals("Weather")&&!ch.category.equals("Weather"))continue;
       if(tab.equals("News")&&!ch.category.equals("National")&&!ch.category.equals("Local"))continue;
-      if(ch.category.equals("Local")&&!state.equals("AL"))continue;
+      String areaState=tab.equals("News")&&newsGpsActive?newsGpsRegion:state;
+      if(ch.category.equals("Local")&&!("AL".equalsIgnoreCase(areaState)||"Alabama".equalsIgnoreCase(areaState)))continue;
       String needle=query.toLowerCase(Locale.US);
       if(!ch.name.toLowerCase(Locale.US).contains(needle)&&!ch.note.toLowerCase(Locale.US).contains(needle))continue;
       count++; card(ch);
@@ -316,6 +336,186 @@ public class MainActivity extends Activity {
     }
     TextView footer=text(tab.equals("Sports")?"Score links are supplied by external providers; school coverage and update times vary.":"Independent channel guide. Video belongs to each broadcaster. Some channels need a paid login or must open in your browser.",12,MUTED,false);
     pad(footer,8,22);list.addView(footer);
+  }
+
+  private boolean newsMatch(String title,String extra){
+    String filter=query.trim().toLowerCase(Locale.US);
+    return filter.isEmpty()||title.toLowerCase(Locale.US).contains(filter)
+        ||extra.toLowerCase(Locale.US).contains(filter);
+  }
+  private void section(LinearLayout target,String name){
+    TextView header=text(name,12,ACCENT,true);
+    LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(15);p.bottomMargin=dp(12);
+    target.addView(header,p);
+  }
+  private int renderLocalNews(){
+    String activeCity=newsGpsActive?newsGpsCity:city;
+    String activeRegion=newsGpsActive?newsGpsRegion:state;
+    double lat=newsGpsActive?newsGpsLatitude:postalLat;
+    double lon=newsGpsActive?newsGpsLongitude:postalLon;
+    String areaLabel=activeCity.isEmpty()?"No local area set":activeCity+", "+activeRegion;
+    TextView where=text((newsGpsActive?"● FOLLOWING PHONE  •  ":"⌖ SAVED ZIP / BACKUP  •  ")+areaLabel,14,
+        newsGpsActive?ACCENT:MUTED,true);
+    pad(where,7,9);list.addView(where);
+    TextView locationHelp=text("Your news changes as you travel. Location is used only while News is open. A nearby-city lookup may use the device's geocoding service.",12,MUTED,false);
+    pad(locationHelp,7,5);list.addView(locationHelp);
+    TextView retry=button(newsGpsActive?"◎ REFRESH CURRENT LOCATION":"◎ USE CURRENT LOCATION",()->startNewsGps(true));
+    LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(8);
+    rp.bottomMargin=dp(4);list.addView(retry,rp);
+    int count=0;
+    if(activeCity.isEmpty()){
+      TextView hint=text("Allow location to find news near you, or save a ZIP on the main menu.",14,MUTED,false);
+      pad(hint,8,12);list.addView(hint);
+      return 0;
+    }
+    section(list,"NEWSPAPERS NEAR "+activeCity.toUpperCase(Locale.US));
+    // Verified paper shortcuts are shown by distance; the discovery link works for any city.
+    for(LocalNewspapers.Paper paper:LocalNewspapers.nearby(lat,lon)){
+      if(!newsMatch(paper.name,paper.town))continue;
+      card(localLink("paper"+paper.url.hashCode(),paper.name,"Newspaper",
+          paper.town+" • Official newspaper website",paper.url));
+      count++;
+    }
+    String location=activeCity+" "+activeRegion;
+    if(newsMatch("Find newspapers",location)){
+      card(localLink("findpapers"+location,"Find more local newspapers in "+activeCity,"Local",
+          "Discover additional publishers serving this area (external search)",
+          LocalNewspapers.paperDiscovery(activeCity,activeRegion)));
+      count++;
+    }
+    section(list,"CURRENT LOCAL HEADLINES");
+    if(!newsFeedKey.equals(location)){
+      newsFeedKey=location;newsFeedLoading=true;newsFeedError="";
+      newsHeadlines=new ArrayList<>();
+      final String requestedKey=location, cityName=activeCity, region=activeRegion;
+      new Thread(()->{
+        try{
+          List<LocalNewspapers.Headline> latest=LocalNewspapers.headlines(cityName,region);
+          runOnUiThread(()->{
+            if(!requestedKey.equals(newsFeedKey))return;
+            newsHeadlines=latest;newsFeedLoading=false;newsFeedError="";
+            if(tab.equals("News")&&current==null)render();
+          });
+        }catch(Exception ex){
+          runOnUiThread(()->{
+            if(!requestedKey.equals(newsFeedKey))return;
+            newsFeedLoading=false;newsFeedError="Feed unavailable; use local news search below.";
+            if(tab.equals("News")&&current==null)render();
+          });
+        }
+      }).start();
+    }
+    if(newsFeedLoading){
+      TextView loading=text("Updating news for "+activeCity+"…",13,MUTED,false);
+      pad(loading,8,10);list.addView(loading);
+    }else if(!newsFeedError.isEmpty()){
+      TextView unavailable=text(newsFeedError,13,MUTED,false);
+      pad(unavailable,8,10);list.addView(unavailable);
+    }else if(newsHeadlines.isEmpty()){
+      TextView empty=text("No recent headlines returned for this area. Try the full news search.",13,MUTED,false);
+      pad(empty,8,10);list.addView(empty);
+    }else{
+      for(LocalNewspapers.Headline h:newsHeadlines){
+        if(!newsMatch(h.title,h.source))continue;
+        card(localLink("story"+h.url.hashCode(),h.title,"Headline",
+            h.source+" • Opens source coverage",h.url));
+        count++;
+      }
+    }
+    if(newsMatch("All local news",location)){
+      card(localLink("allnews"+location,"More local news in "+activeCity,"Local",
+          "Browse additional regional coverage and sources",
+          LocalNewspapers.localNewsSearch(activeCity,activeRegion)));
+      count++;
+    }
+    return count;
+  }
+  private void stopNewsGps(){
+    if(newsLocationManager!=null&&newsLocationListener!=null){
+      try{newsLocationManager.removeUpdates(newsLocationListener);}catch(Exception ignored){}
+    }
+    newsLocationListener=null;
+  }
+  private void startNewsGps(boolean userRequested){
+    if(!"News".equals(tab)||current!=null)return;
+    if(!hasLocationAccess()){
+      if(Build.VERSION.SDK_INT>=23&&(!newsPermissionRequested||userRequested)){
+        newsPermissionRequested=true;
+        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION},NEWS_LOCATION_REQUEST);
+      }
+      return;
+    }
+    if(newsLocationListener!=null&&!userRequested)return;
+    stopNewsGps();
+    try{
+      newsLocationManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
+      newsLocationListener=location->resolveNewsLocation(location);
+      Location best=null;
+      for(String provider:newsLocationManager.getProviders(true)){
+        Location last=newsLocationManager.getLastKnownLocation(provider);
+        if(last!=null&&(best==null||last.getTime()>best.getTime()))best=last;
+        newsLocationManager.requestLocationUpdates(provider,20000,300,newsLocationListener,Looper.getMainLooper());
+      }
+      if(best!=null&&System.currentTimeMillis()-best.getTime()<10*60*1000)resolveNewsLocation(best);
+    }catch(SecurityException ex){stopNewsGps();}
+      catch(Exception ex){stopNewsGps();}
+  }
+  private void resolveNewsLocation(Location point){
+    if(point==null||newsGeocoding)return;
+    if(lastNewsLookup!=null&&point.distanceTo(lastNewsLookup)<2500
+        && System.currentTimeMillis()-lastNewsLookup.getTime()<120000)return;
+    lastNewsLookup=new Location(point);
+    lastNewsLookup.setTime(System.currentTimeMillis());
+    newsGeocoding=true;
+    int generation=++newsGeoGeneration;
+    final double lat=point.getLatitude(),lon=point.getLongitude();
+    new Thread(()->{
+      String foundCity="",foundRegion="";
+      try{
+        Geocoder g=new Geocoder(this,Locale.US);
+        List<Address> result=g.getFromLocation(lat,lon,1);
+        if(result!=null&&!result.isEmpty()){
+          Address item=result.get(0);
+          foundCity=item.getLocality();
+          if(foundCity==null||foundCity.trim().isEmpty())foundCity=item.getSubAdminArea();
+          foundRegion=item.getAdminArea();
+        }
+      }catch(Exception ignored){}
+      // Fallback client-side reverse geocoding only after permission is granted.
+      // Coordinates are sent directly from the phone to the provider, not via Newswire servers.
+      if(foundCity==null||foundCity.trim().isEmpty()){
+        HttpURLConnection conn=null;
+        try{
+          String url=String.format(Locale.US,
+             "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=%.5f&longitude=%.5f&localityLanguage=en",lat,lon);
+          conn=(HttpURLConnection)new URL(url).openConnection();
+          conn.setConnectTimeout(7000);conn.setReadTimeout(7000);
+          if(conn.getResponseCode()==200){
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+            try(InputStream in=conn.getInputStream()){
+              byte[] b=new byte[2048];int n;while((n=in.read(b))!=-1)bytes.write(b,0,n);
+            }
+            JSONObject data=new JSONObject(bytes.toString("UTF-8"));
+            foundCity=data.optString("city",data.optString("locality",""));
+            if(foundCity.isEmpty())foundCity=data.optString("locality","");
+            foundRegion=data.optString("principalSubdivision","");
+          }
+        }catch(Exception ignored){}
+        finally{if(conn!=null)conn.disconnect();}
+      }
+      final String newCity=foundCity==null?"":foundCity.trim(),newRegion=foundRegion==null?"":foundRegion.trim();
+      runOnUiThread(()->{
+        if(generation!=newsGeoGeneration)return;
+        newsGeocoding=false;
+        if(!newCity.isEmpty()){
+          boolean changed=!newCity.equalsIgnoreCase(newsGpsCity)||!newRegion.equalsIgnoreCase(newsGpsRegion);
+          newsGpsCity=newCity;newsGpsRegion=newRegion;newsGpsLatitude=lat;newsGpsLongitude=lon;
+          newsGpsActive=true;
+          if(changed&&tab.equals("News")&&current==null)render();
+        }
+      });
+    }).start();
   }
   private boolean fav(Channel c){return prefs.getBoolean(c.id,false);}
   private void card(Channel ch){
@@ -329,7 +529,7 @@ public class MainActivity extends Activity {
     c.addView(heading);
     TextView description=text(ch.note,13,MUTED,false);
     LinearLayout.LayoutParams nd=lp(-1,-2);nd.topMargin=dp(3);c.addView(description,nd);
-    TextView badge=text(ch.signIn?"SIGN-IN / SUBSCRIPTION":"OFFICIAL WATCH PAGE",11,ch.signIn?Color.rgb(253,199,102):ACCENT,true);
+    TextView badge=text(ch.signIn?"SIGN-IN / SUBSCRIPTION":ch.category.equals("Newspaper")?"OFFICIAL NEWSPAPER WEBSITE":ch.category.equals("Headline")?"CURRENT HEADLINE":"OFFICIAL LINK",11,ch.signIn?Color.rgb(253,199,102):ACCENT,true);
     LinearLayout.LayoutParams bd=lp(-1,-2);bd.topMargin=dp(12);c.addView(badge,bd);
     c.setOnClickListener(v->watch(ch));
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(12);list.addView(c,p);
@@ -350,6 +550,12 @@ public class MainActivity extends Activity {
   }
   @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
     super.onRequestPermissionsResult(requestCode,permissions,results);
+    if(requestCode==NEWS_LOCATION_REQUEST){
+      boolean granted=false;
+      for(int result:results)if(result==PackageManager.PERMISSION_GRANTED)granted=true;
+      if(granted)startNewsGps(false);
+      else if(tab.equals("News")&&current==null)render();
+    }
     if(requestCode==WEB_LOCATION_REQUEST){
       boolean granted=false;
       for(int result:results) if(result==PackageManager.PERMISSION_GRANTED) granted=true;
@@ -440,5 +646,7 @@ public class MainActivity extends Activity {
     if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
-  @Override protected void onDestroy(){respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
+  @Override protected void onResume(){super.onResume();if(tab.equals("News")&&current==null)startNewsGps(false);}
+  @Override protected void onStop(){stopNewsGps();super.onStop();}
+  @Override protected void onDestroy(){stopNewsGps();respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
 }
