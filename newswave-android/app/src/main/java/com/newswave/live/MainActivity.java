@@ -339,9 +339,10 @@ public class MainActivity extends Activity {
       LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(4);myAreaCard.addView(temperature,tp);
       TextView desc=text(data.condition+"  •  Wind "+data.wind,13,0xffc7dce9,false);
       myAreaCard.addView(desc);
-      TextView warning=text(data.warnings.isEmpty()?"✓  No active NWS alerts reported at this point":
+      TextView warning=text(!data.warningsAvailable?"NWS alerts temporarily unavailable — check official warnings":
+        data.warnings.isEmpty()?"✓  NWS reports no active alerts at this location":
         "⚠  "+data.warnings.size()+" ACTIVE NWS ALERT"+(data.warnings.size()==1?"":"S")+" • "+data.warnings.get(0),
-        12,data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
+        12,!data.warningsAvailable?0xffffc373:data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
       LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(12);
       myAreaCard.addView(warning,wp);
       if(!data.headlines.isEmpty()){
