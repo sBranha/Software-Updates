@@ -134,11 +134,15 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
         private boolean warningsEnabled=true;
+        private String mapStyle="satellite";
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
+            mapStyle=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
+                .getString("map_style","satellite");
+            renderer.setMapStyle(mapStyle);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
             renderer.setWarningVisibility(true);
@@ -220,15 +224,13 @@ public final class NewsWaveCarService extends CarAppService {
             invalidate();
         }
         @NonNull @Override public Template onGetTemplate() {
+            // Weather-category MapWithContentTemplate requires a content pane:
+            // one tiny row is the minimum Google-approved host overlay.
+            // No header and no radar controls/details here; those live in Options.
             Pane status=new Pane.Builder()
-                .addRow(new Row.Builder()
-                    .setTitle("Radar "+chosen.id+"  ·  "+productName())
-                    .addText(warningsEnabled?"NWS warnings on · Use map controls":"NWS warnings off · Use map controls")
-                    .build())
+                .addRow(new Row.Builder().setTitle("Map").build())
                 .build();
-            PaneTemplate pane=new PaneTemplate.Builder(status)
-                .setHeader(new Header.Builder().setTitle("NewsWire Radar")
-                    .setStartHeaderAction(Action.APP_ICON).build()).build();
+            PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
                 .addAction(new Action.Builder(Action.PAN).setIcon(mapIcon("↔")).build())
                 .addAction(new Action.Builder().setIcon(mapIcon("◎"))
@@ -263,6 +265,11 @@ public final class NewsWaveCarService extends CarAppService {
         RadarOptionsScreen(CarContext context,RadarScreen radar){super(context);this.radar=radar;}
         @NonNull @Override public Template onGetTemplate(){
             ItemList.Builder list=new ItemList.Builder();
+            list.addItem(new Row.Builder()
+                .setTitle("Map type: "+RadarRenderer.styleName(radar.mapStyle))
+                .addText("Satellite, terrain, or road map")
+                .setOnClickListener(()->getScreenManager().push(
+                    new MapStyleScreen(getCarContext(),radar))).build());
             list.addItem(new Row.Builder().setTitle("Radar station: "+radar.chosen.id)
                 .addText(radar.chosen.name)
                 .setOnClickListener(()->getScreenManager().push(new StationScreen(
@@ -299,6 +306,33 @@ public final class NewsWaveCarService extends CarAppService {
                     .setStartHeaderAction(Action.BACK).build()).build();
         }
     }
+    /** Choose a background map; saved for every subsequent car session. */
+    private static final class MapStyleScreen extends Screen {
+        private final RadarScreen radar;
+        MapStyleScreen(CarContext context,RadarScreen radar){super(context);this.radar=radar;}
+        @NonNull @Override public Template onGetTemplate(){
+            ItemList.Builder list=new ItemList.Builder();
+            for(String style:new String[]{"satellite","terrain","road"}){
+                String display=RadarRenderer.styleName(style);
+                list.addItem(new Row.Builder()
+                    .setTitle((style.equals(radar.mapStyle)?"✓ ":"")+display)
+                    .addText(style.equals("satellite")?"Aerial satellite imagery":
+                        style.equals("terrain")?"Topographic terrain and contour detail":
+                        "Roads, cities and road labels")
+                    .setOnClickListener(()->{
+                        radar.mapStyle=style;
+                        radar.getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
+                            .edit().putString("map_style",style).apply();
+                        radar.renderer.setMapStyle(style);
+                        radar.invalidate();
+                        getScreenManager().pop();
+                    }).build());
+            }
+            return new ListTemplate.Builder().setSingleList(list.build())
+                .setHeader(new Header.Builder().setTitle("Map type")
+                    .setStartHeaderAction(Action.BACK).build()).build();
+        }
+    }
     private static final class StationScreen extends Screen {
         private final RadarScreen parent;
         private final List<Station> ordered;
@@ -332,7 +366,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.4.8 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.4.9 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
         private volatile WeatherWarningOverlay.Snapshot warnings=null;
@@ -341,6 +375,17 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private int zoom=7; // Zoom is independent of GPS-follow status.
+        private String mapStyle="satellite";
+        static String styleName(String style){
+            if("road".equals(style))return "Road Map";
+            if("terrain".equals(style))return "Terrain";
+            return "Satellite";
+        }
+        void setMapStyle(String style){
+            if(!"road".equals(style)&&!"terrain".equals(style))style="satellite";
+            synchronized(lock){mapStyle=style;}
+            refresh();
+        }
         private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(80,.75f,true){
             @Override protected boolean removeEldestEntry(Map.Entry<String,Bitmap> eldest){return size()>80;}
         };
@@ -420,17 +465,19 @@ public final class NewsWaveCarService extends CarAppService {
             fetchWarningsIfDue();
             final Station s;final String p;final boolean national;final int rev,w,h,z;
             final boolean auto,drawWarnings;
+            final String selectedStyle;
             final double mLat,mLon;
             synchronized(lock){
                 s=station;p=product;national=usa;rev=++revision;
                 w=width;h=height;z=zoom;
                 auto=followGps;drawWarnings=warningsOn;
                 mLat=manualLat;mLon=manualLon;
+                selectedStyle=mapStyle;
             }
             executor.execute(()->{
                 synchronized(lock){if(rev!=revision)return;}
                 render(s,p,national,rev,Math.max(480,w),Math.max(320,h),
-                       z,auto,mLat,mLon,drawWarnings);
+                       z,auto,mLat,mLon,drawWarnings,selectedStyle);
             });
         }
         @Override public void onSurfaceAvailable(@NonNull SurfaceContainer c){
@@ -465,21 +512,26 @@ public final class NewsWaveCarService extends CarAppService {
             }catch(Exception e){Log.w(LOG,"Weather tile unavailable: "+e.getMessage());return null;}
             finally{if(connection!=null)connection.disconnect();}
         }
-        private Bitmap tile(int x,int y,int z){
-            String key=z+"/"+x+"/"+y;
+        private Bitmap tile(int x,int y,int z,String style){
+            String key=style+"/"+z+"/"+x+"/"+y;
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
-            // Satellite imagery is the preferred basemap for all NewsWire radar views.
-            // If Esri tiles cannot be loaded, retain an offline-safe map fallback.
-            Bitmap b=download("https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
-                +z+"/"+y+"/"+x);
-            if(b==null)b=download("https://tile.openstreetmap.org/"+key+".png");
+            String server;
+            if("road".equals(style))server="https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png";
+            else {
+                String service="terrain".equals(style)?"World_Topo_Map":"World_Imagery";
+                server="https://services.arcgisonline.com/ArcGIS/rest/services/"+service
+                    +"/MapServer/tile/"+z+"/"+y+"/"+x;
+            }
+            Bitmap b=download(server);
+            if(b==null && !"road".equals(style))
+                b=download("https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png");
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
         }
         private void render(Station s,String p,boolean national,int rev,int w,int h,
                             int z,boolean auto,double manualLatitude,double manualLongitude,
-                            boolean drawWarnings){
+                            boolean drawWarnings,String style){
             try{
                 Double gLat,gLon; synchronized(lock){gLat=userLat;gLon=userLon;}
                 double centerLat=auto&&gLat!=null?gLat:!Double.isNaN(manualLatitude)?manualLatitude:(national?39.0:s.lat);
@@ -494,7 +546,7 @@ public final class NewsWaveCarService extends CarAppService {
                 for(int ty=ty0;ty<=ty1;ty++){
                     synchronized(lock){if(rev!=revision){out.recycle();return;}}
                     for(int tx=tx0;tx<=tx1;tx++){
-                        Bitmap t=tile(tx,ty,z);
+                        Bitmap t=tile(tx,ty,z,style);
                         if(t!=null)canvas.drawBitmap(t, (float)(tx*256-x0),(float)(ty*256-y0),brush);
                     }
                 }
@@ -534,21 +586,20 @@ public final class NewsWaveCarService extends CarAppService {
                     canvas.drawLine(w/2f-15,h/2f,w/2f+15,h/2f,pin);
                     canvas.drawLine(w/2f,h/2f-15,w/2f,h/2f+15,pin);
                 }
-                // Basic product ID and attribution stay readable independent of map zoom.
-                brush.setColor(0xe20b1727);canvas.drawRoundRect(12,12,Math.min(w-12,640),88,14,14,brush);
-                brush.setColor(Color.WHITE);brush.setTextSize(20f);brush.setFakeBoldText(true);
-                String label=national?"US RADAR · Reflectivity":s.id+" · "+(p.equals("SR_BVEL")?"Radial velocity":p.equals("BDHC")?"Precipitation type":p.equals("BOHA")?"Hourly rainfall":"Reflectivity");
-                canvas.drawText(label+"   Z"+z+(auto?"  GPS":"  MAP"),26,40,brush);
-                brush.setFakeBoldText(false);brush.setTextSize(13);
-                canvas.drawText(radar==null?"Radar unavailable — map only":"NOAA latest radar scan · static driving view",26,60,brush);
-                String warningText=warningsVisible==-2?"Warnings hidden":
-                    warningsVisible==-1?"NWS warnings loading/unavailable":
-                    warningsVisible==0?"No mapped NWS warning polygons in view":
-                    warningsVisible+" active NWS warning area(s) visible";
-                canvas.drawText(warningText,26,78,brush);
-                brush.setColor(0xea09111b);canvas.drawRoundRect(8,h-31,Math.min(w-8,440),h-5,5,5,brush);
+                // The primary radar view is map-first. Station and layer details
+                // are available under Options instead of obscuring the map.
+                if(warningsVisible>0){
+                    Paint warningBanner=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    warningBanner.setColor(0xd01a2435);
+                    canvas.drawRoundRect(12,10,Math.min(w-12,360),42,8,8,warningBanner);
+                    warningBanner.setColor(Color.WHITE);
+                    warningBanner.setTextSize(16);
+                    canvas.drawText(warningsVisible+" NWS warning areas",22,32,warningBanner);
+                }
+                brush.setColor(0xca09111b);
+                canvas.drawRoundRect(8,h-30,Math.min(w-8,490),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
-                canvas.drawText("Imagery © Esri / OSM fallback · Radar & alerts NOAA/NWS",14,h-13,brush);
+                canvas.drawText("Imagery Esri / OSM · Radar and warnings NOAA/NWS",14,h-13,brush);
                 synchronized(lock){if(rev!=revision){out.recycle();return;}finished=out;}
                 display();
             }catch(Throwable e){Log.e(LOG,"Radar rendering failed",e);}
