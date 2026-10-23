@@ -1,4 +1,4 @@
-name: NewsWire 0.4.8 version label fix (compile and package)
+name: NewsWire 0.4.8 Android Auto weather map and warning build
 on:
   push:
     branches: [newswire-auto-weather-v0.4.8]
@@ -33,7 +33,7 @@ jobs:
           grep -q 'versionCode 12' newswave-android/app/build.gradle
           grep -q "versionName '0.4.8'" newswave-android/app/build.gradle
           grep -q 'targetSdk 36' newswave-android/app/build.gradle
-          grep -q 'setContentTemplate(list)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
+          grep -q 'setContentTemplate(pane)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           ! grep -q 'PaneTemplate panel=' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -q '<category android:name="androidx.car.app.category.WEATHER"/>' newswave-android/app/src/main/AndroidManifest.xml
       - name: Verify installed version label is dynamically populated
