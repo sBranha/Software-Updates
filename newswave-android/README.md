@@ -1,5 +1,5 @@
-# NewsWave Live Android v0.1.0
-
-Native Android channel browser for national news, local Alabama/Gulf Coast TV, FOX Weather, WeatherWise and NWS radar. Android API 26+. Channel cards, native tabs, search, persisted favorites, in-app official website viewing and external browser fallback. Subscription channels may require provider credentials. No unauthorized rebroadcast or stream scraping.
-
-Build a debug-signed APK: `gradle :app:assembleDebug` in `newswave-android/` with Android SDK platform 35 and Java 17. APK: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions workflow on branch `newswave-android-v0-1` also builds it. This is a test build and has not been verified on a physical phone.
+# NewsWire 0.4.5 — private Android Auto test
+Display name: NewsWire. Android applicationId: `com.newswire.live`.
+This is a new Android application ID distinct from the previous `com.newswave.live` phone APK. Existing Java namespace `com.newswave.live` remains as a code namespace.
+This branch creates **debug-signed** test APK and AAB. For the simpler Google Play **Internal app sharing** method, upload the APK. Google re-signs it with an internal test certificate. Do not upload the old NewsWave APK or this debug AAB into the standard Internal testing release form, which requires a production-upload-signed bundle.
+To distribute through the standard internal testing track later, first configure a persistent upload signing key, then generate a release AAB. Keep private keys out of GitHub. Android Auto weather availability requires real-vehicle verification; an installed phone APK alone is not proof that it will appear on the Explorer screen.
