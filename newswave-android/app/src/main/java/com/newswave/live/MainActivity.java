@@ -2,6 +2,10 @@ package com.newswave.live;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.Manifest;
+import android.os.Build;
+import android.content.pm.PackageManager;
+import android.webkit.GeolocationPermissions;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -58,6 +62,9 @@ public class MainActivity extends Activity {
   private LinearLayout root, list, tabBar;
   private EditText search;
   private WebView web;
+  private static final int WEB_LOCATION_REQUEST = 143;
+  private GeolocationPermissions.Callback pendingLocationCallback;
+  private String pendingLocationOrigin;
   private FrameLayout fullscreen;
   private View custom;
   private WebChromeClient.CustomViewCallback customCallback;
@@ -100,7 +107,7 @@ public class MainActivity extends Activity {
 
   // Categories are intentionally publisher-controlled. Public users cannot add or edit menu buttons.
   private void dashboard(){
-    current=null;query="";if(web!=null){web.destroy();web=null;}
+    current=null;query="";if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
     ScrollView sc=new ScrollView(this);LinearLayout content=column();pad(content,18,20);
     sc.addView(content);root.addView(sc);
@@ -178,7 +185,7 @@ public class MainActivity extends Activity {
 
   private void home(){
     current=null;
-    if(web!=null){web.destroy();web=null;}
+    if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
     LinearLayout header=column();pad(header,20,20);
     TextView back=button("‹  MENU",()->dashboard());header.addView(back);
@@ -279,6 +286,31 @@ public class MainActivity extends Activity {
     c.setOnClickListener(v->watch(ch));
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(12);list.addView(c,p);
   }
+  private boolean hasLocationAccess(){
+    return Build.VERSION.SDK_INT<23
+        || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
+        || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  }
+  // WebView's geolocation permission is separate from Android's runtime permission.
+  // Only WeatherWise gets access; never approve third-party frames automatically.
+  private void respondToLocationRequest(boolean allow){
+    if(pendingLocationCallback!=null){
+      pendingLocationCallback.invoke(pendingLocationOrigin,allow,false);
+      pendingLocationCallback=null;
+      pendingLocationOrigin=null;
+    }
+  }
+  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+    super.onRequestPermissionsResult(requestCode,permissions,results);
+    if(requestCode==WEB_LOCATION_REQUEST){
+      boolean granted=false;
+      for(int result:results) if(result==PackageManager.PERMISSION_GRANTED) granted=true;
+      respondToLocationRequest(granted && hasLocationAccess());
+      if(!granted) android.widget.Toast.makeText(this,
+          "Location was denied. You can enter your city in WeatherWise instead.",
+          android.widget.Toast.LENGTH_LONG).show();
+    }
+  }
   private void watch(Channel ch){
     current=ch;
     root=column();root.setBackgroundColor(BG);setContentView(root);
@@ -294,6 +326,7 @@ public class MainActivity extends Activity {
     web=new WebView(this);web.setBackgroundColor(BG);
     web.getSettings().setJavaScriptEnabled(true);
     web.getSettings().setDomStorageEnabled(true);
+    web.getSettings().setGeolocationEnabled(true);
     web.getSettings().setMediaPlaybackRequiresUserGesture(false);
     web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
     web.setWebViewClient(new WebViewClient(){
@@ -307,6 +340,26 @@ public class MainActivity extends Activity {
       }
     });
     web.setWebChromeClient(new WebChromeClient(){
+      @Override public void onGeolocationPermissionsShowPrompt(String origin,
+          GeolocationPermissions.Callback callback){
+        Uri address=Uri.parse(origin);
+        String host=address.getHost();
+        boolean trusted=current!=null && "weatherwise".equals(current.id)
+            && "https".equalsIgnoreCase(address.getScheme())
+            && host!=null
+            && ("weatherwise.live".equalsIgnoreCase(host)
+                || "www.weatherwise.live".equalsIgnoreCase(host));
+        if(!trusted){callback.invoke(origin,false,false);return;}
+        if(hasLocationAccess()){callback.invoke(origin,true,false);return;}
+        if(Build.VERSION.SDK_INT>=23){
+          respondToLocationRequest(false);
+          pendingLocationCallback=callback;
+          pendingLocationOrigin=origin;
+          MainActivity.this.requestPermissions(new String[]{
+              Manifest.permission.ACCESS_FINE_LOCATION,
+              Manifest.permission.ACCESS_COARSE_LOCATION},WEB_LOCATION_REQUEST);
+        } else callback.invoke(origin,false,false);
+      }
       @Override public void onShowCustomView(View view,CustomViewCallback cb){
         if(custom!=null){cb.onCustomViewHidden();return;}
         custom=view;customCallback=cb;
@@ -339,5 +392,5 @@ public class MainActivity extends Activity {
     if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
-  @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
+  @Override protected void onDestroy(){respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
 }
