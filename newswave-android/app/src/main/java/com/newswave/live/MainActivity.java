@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
-    TextView foot=text("Newswire v0.4.1  •  More sections arrive through official app updates.",12,MUTED,false);
+    TextView foot=text("Newswire v0.4.2  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
@@ -150,7 +150,8 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(13);parent.addView(tile,p);
   }
   private void openSection(String name){tab=name;query="";home();}
-  private void resolveZip(String postal){
+  private void resolveZip(String postal){resolveZip(postal,false);}
+  private void resolveZip(String postal,boolean showSportsAfterSave){
     if(!postal.matches("[0-9]{5}")){android.widget.Toast.makeText(this,"Enter a 5-digit ZIP code",0).show();return;}
     new Thread(()->{
       HttpURLConnection con=null;
@@ -173,7 +174,8 @@ public class MainActivity extends Activity {
              .putString("zip",zip).putString("city",city).putString("state",state)
              .putLong("lat",Double.doubleToLongBits(postalLat))
              .putLong("lon",Double.doubleToLongBits(postalLon)).apply();
-          dashboard();
+          if(showSportsAfterSave){tab="Sports";query="";home();}
+          else dashboard();
         });
       }catch(Exception ex){runOnUiThread(()->android.widget.Toast.makeText(this,"Could not look up ZIP. Check connection.",1).show());}
       finally{if(con!=null)con.disconnect();}
@@ -191,21 +193,60 @@ public class MainActivity extends Activity {
     TextView back=button("‹  MENU",()->dashboard());header.addView(back);
     TextView brand=text("NEWSWIRE  /  "+tab.toUpperCase(Locale.US),24,FG,true);
     LinearLayout.LayoutParams bh=lp(-1,-2);bh.topMargin=dp(13);header.addView(brand,bh);
-    TextView subtitle=text(zip.isEmpty()?"Set a ZIP on the home screen for local results":city+", "+state+"  •  "+zip,13,MUTED,false);
+    TextView subtitle=text(zip.isEmpty()?(tab.equals("Sports")?"Search by ZIP below for local football scores":"Set a ZIP on the home screen for local results"):city+", "+state+"  •  "+zip,13,MUTED,false);
     LinearLayout.LayoutParams sl=lp(-1,-2);sl.topMargin=dp(7);header.addView(subtitle,sl);
     root.addView(header);
     TextView notice=text("OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
-    search=new EditText(this);
-    search.setSingleLine(true);search.setHint("Search "+tab.toLowerCase(Locale.US)+" links…");search.setHintTextColor(MUTED);
-    search.setTextColor(FG);search.setTextSize(16);search.setBackground(box(PANEL,13));pad(search,14,10);
-    LinearLayout.LayoutParams sp=lp(-1,52);sp.setMargins(dp(16),dp(12),dp(16),dp(8));
-    root.addView(search,sp);search.setText(query);
-    search.addTextChangedListener(new TextWatcher(){
-      public void beforeTextChanged(CharSequence s,int a,int c,int d){}
-      public void onTextChanged(CharSequence s,int a,int before,int count){query=s.toString();render();}
-      public void afterTextChanged(Editable s){}
-    });
+    if(tab.equals("Sports")){
+      LinearLayout sportZip=column();pad(sportZip,16,12);
+      TextView instruction=text("FIND HIGH-SCHOOL FOOTBALL SCORES BY ZIP CODE",12,ACCENT,true);
+      sportZip.addView(instruction);
+      LinearLayout controls=row();
+      EditText sportsZipEntry=new EditText(this);
+      sportsZipEntry.setSingleLine(true);
+      sportsZipEntry.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+      sportsZipEntry.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+      sportsZipEntry.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(5)});
+      sportsZipEntry.setText(zip);
+      sportsZipEntry.setSelectAllOnFocus(true);
+      sportsZipEntry.setHint("Enter ZIP e.g. 35950");sportsZipEntry.setHintTextColor(MUTED);
+      sportsZipEntry.setTextColor(FG);sportsZipEntry.setTextSize(16);
+      sportsZipEntry.setBackground(box(PANEL,13));pad(sportsZipEntry,12,10);
+      controls.addView(sportsZipEntry,new LinearLayout.LayoutParams(0,dp(55),1));
+      Runnable doSportsSearch=()->{
+        String postal=sportsZipEntry.getText().toString().trim();
+        resolveZip(postal,true);
+      };
+      TextView find=button("SEARCH",doSportsSearch);
+      LinearLayout.LayoutParams searchLp=lp(-2,55);searchLp.leftMargin=dp(9);
+      controls.addView(find,searchLp);
+      LinearLayout.LayoutParams ctrlLp=lp(-1,-2);ctrlLp.topMargin=dp(9);
+      sportZip.addView(controls,ctrlLp);
+      sportsZipEntry.setOnEditorActionListener((v,actionId,event)->{
+        if(actionId==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            || (event!=null && event.getKeyCode()==android.view.KeyEvent.KEYCODE_ENTER
+                && event.getAction()==android.view.KeyEvent.ACTION_UP)){
+          doSportsSearch.run();return true;
+        }
+        return false;
+      });
+      TextView detail=text("Search saves your ZIP for News, Weather and Sports. Choose an area or state scoreboard below.",12,MUTED,false);
+      LinearLayout.LayoutParams detailLp=lp(-1,-2);detailLp.topMargin=dp(11);
+      sportZip.addView(detail,detailLp);
+      root.addView(sportZip);
+    }else{
+      search=new EditText(this);
+      search.setSingleLine(true);search.setHint("Search "+tab.toLowerCase(Locale.US)+" links…");search.setHintTextColor(MUTED);
+      search.setTextColor(FG);search.setTextSize(16);search.setBackground(box(PANEL,13));pad(search,14,10);
+      LinearLayout.LayoutParams sp=lp(-1,52);sp.setMargins(dp(16),dp(12),dp(16),dp(8));
+      root.addView(search,sp);search.setText(query);
+      search.addTextChangedListener(new TextWatcher(){
+        public void beforeTextChanged(CharSequence s,int a,int c,int d){}
+        public void onTextChanged(CharSequence s,int a,int before,int count){query=s.toString();render();}
+        public void afterTextChanged(Editable s){}
+      });
+    }
     // Category menu is publisher-defined; users cannot add buttons.
     ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
     list=column();pad(list,16,7);scroll.addView(list);
@@ -243,13 +284,20 @@ public class MainActivity extends Activity {
       }catch(Exception ignored){}
     }
     if(tab.equals("Sports")){
-      if(state.matches("[A-Z]{2}")){
-        card(localLink("scores"+state,"High-school football — "+state,"Sports",
-          "State scores & schedules; select nearby teams on the scoreboard",
+      if(state.matches("[A-Z]{2}")&&!city.isEmpty()&&!zip.isEmpty()){
+        try{
+          String local=URLEncoder.encode(city+" "+state+" high school football scores","UTF-8");
+          card(localLink("nearby"+zip,"Football scores near "+city,"Sports",
+              "Local school and team results for ZIP "+zip+" (external search)",
+              "https://www.google.com/search?q="+local));
+          count++;
+        }catch(Exception ignored){}
+        card(localLink("scores"+state,"Statewide football scoreboard — "+state,"Sports",
+          "MaxPreps schedules and scores; select schools in your area",
           "https://www.maxpreps.com/"+state.toLowerCase(Locale.US)+"/football/scores/"));
         count++;
       }else{
-        TextView help=text("Save your ZIP on the main menu to show high-school scores for your state.",15,MUTED,false);
+        TextView help=text("Enter your ZIP above and tap SEARCH to find high-school football scores near you.",15,MUTED,false);
         pad(help,8,13);list.addView(help);
       }
     }
@@ -262,11 +310,11 @@ public class MainActivity extends Activity {
       if(!ch.name.toLowerCase(Locale.US).contains(needle)&&!ch.note.toLowerCase(Locale.US).contains(needle))continue;
       count++; card(ch);
     }
-    if(count==0){
+    if(count==0 && !tab.equals("Sports")){
       TextView empty=text("No stations found.\nTry another search or tab.",16,MUTED,false);
       empty.setGravity(Gravity.CENTER);pad(empty,12,35);list.addView(empty);
     }
-    TextView footer=text("Independent channel guide. Video belongs to each broadcaster. Some channels need a paid login or must open in your browser.",12,MUTED,false);
+    TextView footer=text(tab.equals("Sports")?"Score links are supplied by external providers; school coverage and update times vary.":"Independent channel guide. Video belongs to each broadcaster. Some channels need a paid login or must open in your browser.",12,MUTED,false);
     pad(footer,8,22);list.addView(footer);
   }
   private boolean fav(Channel c){return prefs.getBoolean(c.id,false);}
