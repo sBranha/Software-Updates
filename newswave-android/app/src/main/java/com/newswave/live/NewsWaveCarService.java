@@ -154,6 +154,10 @@ public final class NewsWaveCarService extends CarAppService {
             });
         }
         private void startFollowing(){
+          if(locationListener!=null && locationManager!=null){
+            try{locationManager.removeUpdates(locationListener);}catch(Exception ignored){}
+            locationListener=null;
+          }
           Location start=recentLocation(getCarContext());
           if(start!=null)onPosition(start);
           Context context=getCarContext();
@@ -169,6 +173,7 @@ public final class NewsWaveCarService extends CarAppService {
         }
         private void onPosition(Location loc){
           if(!follow||loc==null)return;
+          if(!loc.hasAccuracy() || loc.getAccuracy()>1200f)return;
           renderer.setPosition(loc.getLatitude(),loc.getLongitude());
           Station nearest=chosen;double best=Double.MAX_VALUE;
           for(Station station:stations){
@@ -182,9 +187,16 @@ public final class NewsWaveCarService extends CarAppService {
             return stations.get(0);
         }
         void choose(Station s){
-            follow=false;renderer.disableFollow();chosen=s;nationwide=false;
-            getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE).edit().putString("station",s.id).apply();
-            renderer.change(chosen,mode,nationwide);invalidate();
+            // Station selection is explicit map navigation. A previously panned
+            // center (e.g. Florida) must not override the selected radar site.
+            follow=false;
+            chosen=s;
+            nationwide=false;
+            renderer.focusStation(s);
+            getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
+                .edit().putString("station",s.id).apply();
+            renderer.change(chosen,mode,nationwide);
+            invalidate();
         }
         private void changeMode(){
             if("SR_BREF".equals(mode))mode="SR_BVEL";
@@ -374,7 +386,10 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean warningsOn=true;
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
+        private float scaleAccum=1f;
         private int zoom=7; // Zoom is independent of GPS-follow status.
+        private int lastDisplayedZoom=7;
+        private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="satellite";
         static String styleName(String style){
             if("road".equals(style))return "Road Map";
@@ -400,6 +415,13 @@ public final class NewsWaveCarService extends CarAppService {
             refresh();
         }
         void disableFollow(){synchronized(lock){followGps=false;}}
+        void focusStation(Station s){
+            synchronized(lock){
+                followGps=false;manualLat=s.lat;manualLon=s.lon;
+                zoom=7;
+            }
+            refresh();
+        }
         void recenter(){
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
@@ -409,12 +431,45 @@ public final class NewsWaveCarService extends CarAppService {
         void zoomIn(){setZoom(1);}
         void zoomOut(){setZoom(-1);}
         private void setZoom(int delta){
-            synchronized(lock){zoom=Math.max(3,Math.min(10,zoom+delta));}
+            final int next;
+            synchronized(lock){
+                next=Math.max(3,Math.min(13,zoom+delta));
+                if(next==zoom)return;
+                zoom=next;
+            }
+            // Give immediate visual feedback from the existing map image rather
+            // than waiting for tile + NOAA radar network downloads to finish.
+            previewZoom();
             refresh();
         }
+        private void previewZoom(){
+            final Bitmap previous;
+            final int oldZoom,newZoom;
+            synchronized(lock){
+                previous=finished;
+                oldZoom=lastDisplayedZoom;
+                newZoom=zoom;
+            }
+            if(previous==null || previous.isRecycled() || Math.abs(newZoom-oldZoom)>4)return;
+            double scale=Math.pow(2,newZoom-oldZoom);
+            if(scale==1.)return;
+            int w=previous.getWidth(),h=previous.getHeight();
+            Bitmap provisional=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+            Canvas canvas=new Canvas(provisional);
+            canvas.drawColor(Color.rgb(13,26,39));
+            android.graphics.Matrix matrix=new android.graphics.Matrix();
+            matrix.setScale((float)scale,(float)scale,w/2f,h/2f);
+            canvas.drawBitmap(previous,matrix,new Paint(Paint.FILTER_BITMAP_FLAG));
+            synchronized(lock){finished=provisional;}
+            display();
+        }
         @Override public void onScale(float x,float y,float factor){
-            if(factor>1.12f)setZoom(1);
-            else if(factor<0.89f)setZoom(-1);
+            // Host supplies a relative gesture scaling factor. Some hosts issue
+            // small increments instead of a single large value; accumulate them.
+            if(!Float.isFinite(factor)||factor<=0)return;
+            scaleAccum*=factor;
+            if(scaleAccum>=1.30f){setZoom(1);scaleAccum=1f;}
+            else if(scaleAccum<=0.77f){setZoom(-1);scaleAccum=1f;}
         }
         @Override public void onScroll(float dx,float dy){
             synchronized(lock){
@@ -600,7 +655,13 @@ public final class NewsWaveCarService extends CarAppService {
                 canvas.drawRoundRect(8,h-30,Math.min(w-8,490),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
                 canvas.drawText("Imagery Esri / OSM · Radar and warnings NOAA/NWS",14,h-13,brush);
-                synchronized(lock){if(rev!=revision){out.recycle();return;}finished=out;}
+                synchronized(lock){
+                    if(rev!=revision){out.recycle();return;}
+                    finished=out;
+                    lastDisplayedZoom=z;
+                    lastDisplayedLat=centerLat;
+                    lastDisplayedLon=centerLon;
+                }
                 display();
             }catch(Throwable e){Log.e(LOG,"Radar rendering failed",e);}
         }
