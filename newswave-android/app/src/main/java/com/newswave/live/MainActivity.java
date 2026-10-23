@@ -112,6 +112,14 @@ public class MainActivity extends Activity {
     postalLon=Double.longBitsToDouble(loc.getLong("lon",Double.doubleToLongBits(Double.NaN)));
     dashboard();
   }
+  // Always show the version of the package actually installed on the device.
+  // Never hardcode a release string in this UI again.
+  private String installedVersion(){
+    try{
+      android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);
+      return info.versionName!=null ? info.versionName : "unknown";
+    }catch(Exception ignored){return "unknown";}
+  }
   private int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
   private GradientDrawable box(int color,int radius){
     GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));
@@ -159,7 +167,7 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
-    TextView foot=text("NewsWire v0.4.5  •  More sections arrive through official app updates.",12,MUTED,false);
+    TextView foot=text("NewsWire v"+installedVersion()+"  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
