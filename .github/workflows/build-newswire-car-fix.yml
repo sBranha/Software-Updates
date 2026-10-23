@@ -67,7 +67,7 @@ jobs:
           from pathlib import Path
           import re
           html=Path('newswave-android/app/src/main/assets/radar.html').read_text()
-          scripts=re.findall(r'<script(?:\\s+[^>]*)?>([\\s\\S]*?)</script>',html)
+          scripts=html.split('<script>')[-1].split('</script>')[:1]
           assert scripts and scripts[-1].strip(), 'embedded script missing'
           Path('/tmp/newswire_radar.js').write_text(scripts[-1])
           PY
