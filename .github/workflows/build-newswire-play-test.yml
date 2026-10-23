@@ -1,0 +1,52 @@
+name: NewsWire Android private Play test
+on:
+  push:
+    branches: [newswire-play-test-v0.4.5]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK API 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Bundle Leaflet map engine locally
+        run: |
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' --output newswave-android/app/src/main/assets/leaflet.js
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' --output newswave-android/app/src/main/assets/leaflet.css
+      - name: Bundle full national radar stations
+        run: python newswave-android/build_radar_stations.py
+      - name: Build debug-signed test APK and bundle
+        run: gradle -p newswave-android :app:assembleDebug :app:bundleDebug --no-daemon
+      - name: Rename test outputs
+        run: |
+          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWire-Play-Test-v0.4.5.apk
+          cp newswave-android/app/build/outputs/bundle/debug/app-debug.aab NewsWire-Play-Test-v0.4.5.aab
+          sha256sum NewsWire-Play-Test-v0.4.5.apk NewsWire-Play-Test-v0.4.5.aab > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-v0.4.5-private-Play-test
+          path: |
+            NewsWire-Play-Test-v0.4.5.apk
+            NewsWire-Play-Test-v0.4.5.aab
+            SHA256SUMS.txt
+          retention-days: 30
+      - name: Publish GitHub prerelease download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view newswire-play-test-v0.4.5 >/dev/null 2>&1; then
+            gh release upload newswire-play-test-v0.4.5 NewsWire-Play-Test-v0.4.5.apk NewsWire-Play-Test-v0.4.5.aab SHA256SUMS.txt --clobber
+          else
+            gh release create newswire-play-test-v0.4.5 NewsWire-Play-Test-v0.4.5.apk NewsWire-Play-Test-v0.4.5.aab SHA256SUMS.txt --target "$GITHUB_SHA" --title "NewsWire v0.4.5 private Play test" --notes "TEST ONLY: Upload the APK through Google Play Internal app sharing, not the Internal testing app bundle release screen. App ID com.newswire.live, target API 36. Google Play re-signs this debug APK for Internal app sharing. Car launcher visibility still needs live testing." --prerelease
+          fi
