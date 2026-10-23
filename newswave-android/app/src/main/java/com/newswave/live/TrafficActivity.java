@@ -39,7 +39,7 @@ public final class TrafficActivity extends Activity {
     private WebView browser;
     private LinearLayout main,toolbar;
     private TextView heading,note,loading, mapButton, reportButton;
-    private boolean reportsMode=false,locationLookup=false;
+    private boolean reportsMode=false,locationLookup=false,manualSelection=false;
 
     @Override public void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
@@ -156,7 +156,7 @@ public final class TrafficActivity extends Activity {
         if(source.mapUrl.isEmpty()){
             loading.setText("No verified DOT live feed configured for "+
                 (state.isEmpty()?"this state":state)+". Choose AL, FL, GA, TN or MS.");
-            browser.loadDataWithBaseURL("https://example.org/",
+            browser.loadDataWithBaseURL(null,
                 "<html><body style='font-family:sans-serif;background:#091321;color:#bfd5e5;padding:20px'>"
                 +"Live DOT traffic coverage for this region is not configured. "
                 +"Please select a supported state.</body></html>","text/html","UTF-8",null);
@@ -176,6 +176,7 @@ public final class TrafficActivity extends Activity {
         String[] codes={"AL","FL","GA","TN","MS"};
         new AlertDialog.Builder(this).setTitle("Choose traffic coverage")
             .setItems(names,(dialog,which)->{
+                manualSelection=true;
                 state=codes[which];
                 source=TrafficSources.forState(state);
                 updateSource();
@@ -204,7 +205,8 @@ public final class TrafficActivity extends Activity {
                 if(gpsState==null)return;
                 TrafficSources.Source candidate=TrafficSources.forState(gpsState);
                 runOnUiThread(()->{
-                    if(!candidate.mapUrl.isEmpty()&&!candidate.state.equals(source.state)){
+                    if(!manualSelection&&!candidate.mapUrl.isEmpty()
+                        &&!candidate.state.equals(source.state)){
                         source=candidate;state=candidate.state;
                         updateSource();
                     }
