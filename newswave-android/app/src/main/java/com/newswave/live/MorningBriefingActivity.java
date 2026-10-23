@@ -149,6 +149,14 @@ public final class MorningBriefingActivity extends Activity {
         }else{
             addLabel("SET YOUR AREA","Allow GPS in NewsWire or save a five-digit ZIP on the home screen.",GOLD);
         }
+        TextView dayPlanner=button("◈  MY DAY · HOURLY WEATHER · SCHOOLS · EVENTS",()->{
+            Intent day=new Intent(this,DayPlannerActivity.class);
+            day.putExtra("city",city);day.putExtra("state",region);
+            day.putExtra("latitude",lat);day.putExtra("longitude",lon);
+            day.putExtra("section","day");startActivity(day);
+        });
+        LinearLayout.LayoutParams dayLp=new LinearLayout.LayoutParams(-1,-2);
+        dayLp.topMargin=dp(14);content.addView(dayPlanner,dayLp);
         TextView personalized=button("★  MY PERSONALIZED NEWS",()->
             startActivity(new Intent(this,PersonalizedNewsActivity.class)));
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);
