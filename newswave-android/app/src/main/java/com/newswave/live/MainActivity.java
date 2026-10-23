@@ -80,6 +80,26 @@ public class MainActivity extends Activity {
   private void openPersonalized(){
     startActivity(new Intent(this,PersonalizedNewsActivity.class));
   }
+  private void openDay(String section){
+    Intent day=new Intent(this,DayPlannerActivity.class);
+    String areaCity=city,areaRegion=state;
+    if(myAreaSnapshot!=null&&!Double.isNaN(dashboardLatitude)){
+      String resolved=myAreaSnapshot.area;
+      int comma=resolved.lastIndexOf(',');
+      if(comma>0){
+        areaCity=resolved.substring(0,comma).trim();
+        areaRegion=resolved.substring(comma+1).trim();
+      }
+    }
+    day.putExtra("city",areaCity);
+    day.putExtra("state",areaRegion);
+    day.putExtra("section",section);
+    if(!Double.isNaN(dashboardLatitude)&&!Double.isNaN(dashboardLongitude)){
+      day.putExtra("latitude",dashboardLatitude);
+      day.putExtra("longitude",dashboardLongitude);
+    }
+    startActivity(day);
+  }
   private void openMorning(){
     startActivity(new Intent(this,MorningBriefingActivity.class));
   }
@@ -360,6 +380,14 @@ public class MainActivity extends Activity {
       0xff235286,this::openPersonalized);
     categoryTile(content,"GOOD MORNING","Your weather and local news briefing","☀",
       0xff8a542e,this::openMorning);
+    categoryTile(content,"MY DAY AT A GLANCE","Weather • School notices • Road conditions • Events","◈",
+      0xff146577,()->openDay("day"));
+    categoryTile(content,"NEXT 12 HOURS","Hourly NWS forecast • Rain chances • Wind","☀",
+      0xff235c86,()->openDay("hours"));
+    categoryTile(content,"SCHOOL CLOSINGS","Official Alabama notices • Publisher coverage","⚠",
+      0xff88602a,()->openDay("schools"));
+    categoryTile(content,"AROUND ME","Local festivals • Concerts • Community events","✦",
+      0xff4b3889,()->openDay("events"));
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
     pad(driveCard,16,16);
