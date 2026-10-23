@@ -95,6 +95,19 @@ jobs:
           grep -q 'trackStorms' newswave-android/app/src/main/assets/radar.html
           grep -q 'nearWarnings' newswave-android/app/src/main/assets/radar.html
           grep -q 'versionCode 15' newswave-android/app/build.gradle
+      - name: Storm Ahead Alerts safety regression checks
+        run: |
+          set -euo pipefail
+          grep -q 'android:foregroundServiceType="location"' newswave-android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.FOREGROUND_SERVICE_LOCATION' newswave-android/app/src/main/AndroidManifest.xml
+          grep -q 'private void inspect(Location fix)' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
+          grep -q 'alerts/active?point=' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
+          grep -q 'if(fix.hasBearing()&&fix.hasSpeed()' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
+          grep -q 'NWS check unavailable' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
+          grep -q 'requestDriveAlerts()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
+          grep -q 'warningsAvailable' newswave-android/app/src/main/java/com/newswave/live/MyAreaData.java
+          grep -q 'START_NOT_STICKY' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
+          grep -q 'versionCode 15' newswave-android/app/build.gradle
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
