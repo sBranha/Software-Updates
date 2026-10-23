@@ -191,40 +191,59 @@ public final class NewsWaveCarService extends CarAppService {
             }
         }
         @NonNull @Override public Template onGetTemplate() {
-            Pane pane=new Pane.Builder()
-                .addRow(new Row.Builder()
-                    .setTitle("Radar: "+chosen.id)
-                    .addText(chosen.name)
-                    .setOnClickListener(()->getScreenManager().push(new StationScreen(getCarContext(),this,stations,0)))
-                    .build())
-                .addRow(new Row.Builder()
-                    .setTitle("Layer: "+productName())
-                    .addText("Tap to change the radar layer")
-                    .setOnClickListener(this::changeMode)
-                    .build())
-                .addRow(new Row.Builder()
-                    .setTitle(nationwide?"Nationwide view":"Local radar view")
-                    .addText("Tap to switch map coverage")
-                    .setOnClickListener(()->{nationwide=!nationwide;renderer.change(chosen,mode,nationwide);invalidate();})
-                    .build())
-                .addRow(new Row.Builder()
-                    .setTitle(follow?"◎ Follow my location: ON":"◎ Follow my location: OFF")
-                    .addText("Recenter radar as the car moves")
-                    .setOnClickListener(()->{
-                      follow=!follow;
-                      if(follow)startFollowing();else renderer.clearPosition();
-                      invalidate();
-                    }).build())
-                .addRow(new Row.Builder()
-                    .setTitle("Update latest scan")
-                    .addText("NOAA / National Weather Service")
-                    .setOnClickListener(()->{renderer.refresh();invalidate();})
+            // PaneTemplate rejects rows with OnClickListener and would throw during
+            // construction, leaving the Android Auto host showing "unexpected error".
+            // ListTemplate is supported inside MapWithContentTemplate (Car API 7+)
+            // and explicitly permits interactive rows.
+            ItemList.Builder items = new ItemList.Builder();
+            items.addItem(new Row.Builder()
+                .setTitle("Radar: " + chosen.id)
+                .addText(chosen.name)
+                .setOnClickListener(() -> getScreenManager().push(
+                    new StationScreen(getCarContext(), this, stations, 0)))
+                .build());
+            items.addItem(new Row.Builder()
+                .setTitle("Layer: " + productName())
+                .addText("Tap to change radar layer")
+                .setOnClickListener(this::changeMode)
+                .build());
+            items.addItem(new Row.Builder()
+                .setTitle(nationwide ? "Nationwide view" : "Local radar view")
+                .addText("Tap to switch map coverage")
+                .setOnClickListener(() -> {
+                    nationwide = !nationwide;
+                    renderer.change(chosen, mode, nationwide);
+                    invalidate();
+                })
+                .build());
+            items.addItem(new Row.Builder()
+                .setTitle(follow ? "Follow my location: ON" : "Follow my location: OFF")
+                .addText("Recenter radar as the car moves")
+                .setOnClickListener(() -> {
+                    follow = !follow;
+                    if (follow) startFollowing();
+                    else renderer.clearPosition();
+                    invalidate();
+                })
+                .build());
+            items.addItem(new Row.Builder()
+                .setTitle("Update latest scan")
+                .addText("NOAA / National Weather Service")
+                .setOnClickListener(() -> {
+                    renderer.refresh();
+                    invalidate();
+                })
+                .build());
+            ListTemplate list = new ListTemplate.Builder()
+                .setSingleList(items.build())
+                .setHeader(new Header.Builder()
+                    .setTitle("NewsWire Weather Radar")
+                    .setStartHeaderAction(Action.APP_ICON)
                     .build())
                 .build();
-            PaneTemplate panel=new PaneTemplate.Builder(pane)
-                .setHeader(new Header.Builder().setTitle("NewsWire Weather Radar")
-                    .setStartHeaderAction(Action.APP_ICON).build()).build();
-            return new MapWithContentTemplate.Builder().setContentTemplate(panel).build();
+            return new MapWithContentTemplate.Builder()
+                .setContentTemplate(list)
+                .build();
         }
     }
 
