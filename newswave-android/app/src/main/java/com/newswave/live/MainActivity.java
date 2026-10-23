@@ -75,6 +75,16 @@ public class MainActivity extends Activity {
     Channel(String a,String b,String c,String d,String e,boolean f){id=a;name=b;category=c;note=d;url=e;signIn=f;}
   }
   private SharedPreferences prefs;
+  // The live My Area dashboard is driven by a foreground GPS fix when allowed.
+  // Saved ZIP coordinates are the reliable fallback.
+  private LinearLayout myAreaCard;
+  private MyAreaData.Snapshot myAreaSnapshot;
+  private boolean dashboardActive=false,areaLoading=false;
+  private String loadedAreaKey="";
+  private double dashboardLatitude=Double.NaN,dashboardLongitude=Double.NaN;
+  private LocationManager dashboardLocationManager;
+  private LocationListener dashboardLocationListener;
+  private static final int DASHBOARD_LOCATION_REQUEST=146;
   private static final int NEWS_NOTIFICATION_REQUEST=145;
   private AppUpdateManager playUpdates;
   private boolean updateAvailable=false;
@@ -210,6 +220,8 @@ public class MainActivity extends Activity {
 
   // Categories are intentionally publisher-controlled. Public users cannot add or edit menu buttons.
   private void dashboard(){
+    stopDashboardGps();
+    dashboardActive=true;
     newsScreenVisible=false;
     current=null;query="";stopNewsGps();if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackground(atmosphere());setContentView(root);
@@ -223,6 +235,12 @@ public class MainActivity extends Activity {
     TextView sub=text("Local news   •   Storm radar   •   Your teams",13,0xffbfd4e6,false);
     LinearLayout.LayoutParams su=lp(-1,-2);su.topMargin=dp(9);hero.addView(sub,su);
     LinearLayout.LayoutParams heroLp=lp(-1,-2);heroLp.bottomMargin=dp(17);content.addView(hero,heroLp);
+    myAreaCard=column();
+    myAreaCard.setBackground(radiantCard(0xff10364b,0xff102235,0xff2b6373));
+    pad(myAreaCard,17,17);
+    LinearLayout.LayoutParams areaLp=lp(-1,-2);areaLp.bottomMargin=dp(17);
+    content.addView(myAreaCard,areaLp);
+    renderMyArea();
     LinearLayout locale=column();locale.setBackground(box(PANEL,18));pad(locale,15,16);
     TextView label=text(zip.isEmpty()?"SET YOUR LOCAL AREA":"LOCAL AREA  •  "+city+", "+state,15,FG,true);
     locale.addView(label);
@@ -257,6 +275,123 @@ public class MainActivity extends Activity {
     pad(alertInfo,5,12);content.addView(alertInfo);
     TextView foot=text("NewsWire v"+installedVersion()+"  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
+    startDashboardGps();
+    refreshMyArea(false);
+  }
+  private void stopDashboardGps(){
+    if(dashboardLocationManager!=null&&dashboardLocationListener!=null){
+      try{dashboardLocationManager.removeUpdates(dashboardLocationListener);}catch(Exception ignored){}
+    }
+    dashboardLocationListener=null;
+  }
+  private void useDashboardLocation(){
+    if(!hasLocationAccess()){
+      requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION},DASHBOARD_LOCATION_REQUEST);
+      return;
+    }
+    startDashboardGps();
+    refreshMyArea(true);
+  }
+  private void startDashboardGps(){
+    if(!dashboardActive||!hasLocationAccess()||dashboardLocationListener!=null)return;
+    try{
+      dashboardLocationManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
+      dashboardLocationListener=loc->{
+        if(loc==null||loc.hasAccuracy()&&loc.getAccuracy()>1500f)return;
+        boolean newPlace=Double.isNaN(dashboardLatitude)
+            ||Math.abs(dashboardLatitude-loc.getLatitude())>.028
+            ||Math.abs(dashboardLongitude-loc.getLongitude())>.035;
+        dashboardLatitude=loc.getLatitude();
+        dashboardLongitude=loc.getLongitude();
+        if(newPlace)refreshMyArea(false);
+      };
+      Location latest=null;
+      for(String provider:dashboardLocationManager.getProviders(true)){
+        Location prev=dashboardLocationManager.getLastKnownLocation(provider);
+        if(prev!=null&&(latest==null||prev.getTime()>latest.getTime()))latest=prev;
+        dashboardLocationManager.requestLocationUpdates(provider,25000,400,
+          dashboardLocationListener,Looper.getMainLooper());
+      }
+      if(latest!=null && System.currentTimeMillis()-latest.getTime()<10*60*1000
+          &&(!latest.hasAccuracy()||latest.getAccuracy()<1500f)){
+        dashboardLatitude=latest.getLatitude();dashboardLongitude=latest.getLongitude();
+      }
+    }catch(Exception error){android.util.Log.w("NewsWireArea","Dashboard GPS unavailable",error);}
+  }
+  private void renderMyArea(){
+    if(!dashboardActive||myAreaCard==null)return;
+    myAreaCard.removeAllViews();
+    TextView label=text("⌖  MY AREA / LIVE",12,0xff70edf1,true);
+    myAreaCard.addView(label);
+    boolean gps=!Double.isNaN(dashboardLatitude);
+    String place=gps?"Following your location":(!city.isEmpty()?city+", "+state+" · ZIP backup":"Set a ZIP or enable location");
+    TextView placeLabel=text(place,13,0xffbed9e8,false);
+    LinearLayout.LayoutParams pp=lp(-1,-2);pp.topMargin=dp(5);myAreaCard.addView(placeLabel,pp);
+    if(areaLoading && myAreaSnapshot==null){
+      TextView loading=text("Loading local weather, warnings and headlines…",13,MUTED,false);
+      pad(loading,4,12);myAreaCard.addView(loading);
+    }else if(myAreaSnapshot!=null){
+      MyAreaData.Snapshot data=myAreaSnapshot;
+      TextView area=text(data.area.toUpperCase(Locale.US),12,0xff67d7e8,true);
+      LinearLayout.LayoutParams ap=lp(-1,-2);ap.topMargin=dp(10);myAreaCard.addView(area,ap);
+      TextView temperature=text(data.temperature,37,FG,true);
+      LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(4);myAreaCard.addView(temperature,tp);
+      TextView desc=text(data.condition+"  •  Wind "+data.wind,13,0xffc7dce9,false);
+      myAreaCard.addView(desc);
+      TextView warning=text(data.warnings.isEmpty()?"✓  No active NWS alerts reported at this point":
+        "⚠  "+data.warnings.size()+" ACTIVE NWS ALERT"+(data.warnings.size()==1?"":"S")+" • "+data.warnings.get(0),
+        12,data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
+      LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(12);
+      myAreaCard.addView(warning,wp);
+      if(!data.headlines.isEmpty()){
+        LocalNewspapers.Headline headline=data.headlines.get(0);
+        TextView top=text("LOCAL HEADLINE  /  "+headline.source,11,0xff70edf1,true);
+        LinearLayout.LayoutParams titleLp=lp(-1,-2);titleLp.topMargin=dp(14);
+        myAreaCard.addView(top,titleLp);
+        TextView story=text(headline.title+"  ›",14,FG,true);
+        pad(story,0,6);myAreaCard.addView(story);
+        story.setOnClickListener(v->openBrowser(headline.url));
+      }else{
+        TextView missing=text("Open News for current regional headlines.",12,MUTED,false);
+        LinearLayout.LayoutParams msg=lp(-1,-2);msg.topMargin=dp(10);myAreaCard.addView(missing,msg);
+      }
+    }else{
+      TextView hint=text("Enable location for weather and alerts around you, or save a ZIP below.",13,MUTED,false);
+      pad(hint,4,12);myAreaCard.addView(hint);
+    }
+    LinearLayout actions=row();
+    TextView radar=button("◎  LIVE RADAR",()->
+      startActivity(new Intent(MainActivity.this,RadarActivity.class)));
+    actions.addView(radar,new LinearLayout.LayoutParams(0,-2,1));
+    TextView location=button("⌖  "+(gps?"REFRESH":"MY LOCATION"),this::useDashboardLocation);
+    LinearLayout.LayoutParams l=lp(-2,-2);l.leftMargin=dp(8);
+    actions.addView(location,l);
+    LinearLayout.LayoutParams ctrl=lp(-1,-2);ctrl.topMargin=dp(12);
+    myAreaCard.addView(actions,ctrl);
+  }
+  private void refreshMyArea(boolean force){
+    if(!dashboardActive)return;
+    final double lat=!Double.isNaN(dashboardLatitude)?dashboardLatitude:postalLat;
+    final double lon=!Double.isNaN(dashboardLongitude)?dashboardLongitude:postalLon;
+    if(Double.isNaN(lat)||Double.isNaN(lon)){renderMyArea();return;}
+    final String key=String.format(Locale.US,"%.3f:%.3f:%s:%s",lat,lon,city,state);
+    if(!force && (areaLoading ||
+        key.equals(loadedAreaKey)&&myAreaSnapshot!=null
+            &&System.currentTimeMillis()-myAreaSnapshot.checkedAt<5*60*1000L)){
+      renderMyArea();return;
+    }
+    loadedAreaKey=key;areaLoading=true;
+    renderMyArea();
+    final String localCity=city,localState=state;
+    new Thread(()->{
+      MyAreaData.Snapshot result=MyAreaData.load(lat,lon,localCity,localState);
+      runOnUiThread(()->{
+        if(!key.equals(loadedAreaKey))return;
+        areaLoading=false;myAreaSnapshot=result;
+        renderMyArea();
+      });
+    },"newswire-area").start();
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
     LinearLayout tile=row();
@@ -311,6 +446,7 @@ public class MainActivity extends Activity {
   }
 
   private void home(){
+    dashboardActive=false;stopDashboardGps();
     newsScreenVisible=tab.equals("News");
     current=null;
     if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
@@ -651,6 +787,12 @@ public class MainActivity extends Activity {
   }
   @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
     super.onRequestPermissionsResult(requestCode,permissions,results);
+    if(requestCode==DASHBOARD_LOCATION_REQUEST){
+      boolean ok=false;
+      for(int result:results)if(result==PackageManager.PERMISSION_GRANTED)ok=true;
+      if(ok){startDashboardGps();refreshMyArea(true);}
+      else android.widget.Toast.makeText(this,"Location is off. Saved ZIP is still available.",1).show();
+    }
     if(requestCode==NEWS_NOTIFICATION_REQUEST){
       if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){
         getSharedPreferences("newswire-news-alerts",MODE_PRIVATE)
@@ -757,7 +899,13 @@ public class MainActivity extends Activity {
     if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
-  @Override protected void onResume(){super.onResume();if(newsScreenVisible&&tab.equals("News")&&current==null)startNewsGps(false);}
-  @Override protected void onStop(){stopNewsGps();super.onStop();}
-  @Override protected void onDestroy(){stopNewsGps();respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
+  @Override protected void onResume(){
+    super.onResume();
+    if(dashboardActive){startDashboardGps();refreshMyArea(false);}
+    if(newsScreenVisible&&tab.equals("News")&&current==null)startNewsGps(false);
+  }
+  @Override protected void onStop(){
+    stopDashboardGps();stopNewsGps();super.onStop();
+  }
+  @Override protected void onDestroy(){stopDashboardGps();stopNewsGps();respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
 }
