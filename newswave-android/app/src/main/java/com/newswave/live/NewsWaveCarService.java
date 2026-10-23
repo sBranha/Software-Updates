@@ -10,6 +10,11 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
+import androidx.core.graphics.drawable.IconCompat;
+import androidx.car.app.model.CarIcon;
+import androidx.car.app.model.ActionStrip;
+import androidx.car.app.navigation.model.MapController;
 import android.location.Location;
 import android.location.LocationManager;
 import android.location.LocationListener;
@@ -128,6 +133,7 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationManager locationManager;
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
+        private boolean warningsEnabled=true;
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
@@ -135,6 +141,7 @@ public final class NewsWaveCarService extends CarAppService {
             chosen=find(old);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
+            renderer.setWarningVisibility(true);
             startFollowing();
             getLifecycle().addObserver((androidx.lifecycle.LifecycleEventObserver)(source,event)->{
               if(event==Lifecycle.Event.ON_DESTROY&&locationManager!=null&&locationListener!=null){
@@ -171,7 +178,7 @@ public final class NewsWaveCarService extends CarAppService {
             return stations.get(0);
         }
         void choose(Station s){
-            follow=false;renderer.clearPosition();chosen=s;nationwide=false;
+            follow=false;renderer.disableFollow();chosen=s;nationwide=false;
             getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE).edit().putString("station",s.id).apply();
             renderer.change(chosen,mode,nationwide);invalidate();
         }
@@ -190,63 +197,108 @@ public final class NewsWaveCarService extends CarAppService {
                 default:return "Reflectivity";
             }
         }
+
+        // Android Auto owns the panel position. Keep the panel minimal, and use
+        // its standard PAN control for a map-focused view on supported hosts.
+        private CarIcon mapIcon(String symbol){
+            Bitmap bmp=Bitmap.createBitmap(48,48,Bitmap.Config.ARGB_8888);
+            Canvas c=new Canvas(bmp);
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.WHITE);
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(symbol.length()>1?24:36);
+            c.drawText(symbol,24,35,paint);
+            return new CarIcon.Builder(IconCompat.createWithBitmap(bmp)).build();
+        }
+        private void setFollow(boolean enabled){
+            follow=enabled;
+            if(enabled){
+                renderer.recenter();
+                startFollowing();
+            }else renderer.disableFollow();
+            invalidate();
+        }
         @NonNull @Override public Template onGetTemplate() {
-            // PaneTemplate rejects rows with OnClickListener and would throw during
-            // construction, leaving the Android Auto host showing "unexpected error".
-            // ListTemplate is supported inside MapWithContentTemplate (Car API 7+)
-            // and explicitly permits interactive rows.
-            ItemList.Builder items = new ItemList.Builder();
-            items.addItem(new Row.Builder()
-                .setTitle("Radar: " + chosen.id)
-                .addText(chosen.name)
-                .setOnClickListener(() -> getScreenManager().push(
-                    new StationScreen(getCarContext(), this, stations, 0)))
-                .build());
-            items.addItem(new Row.Builder()
-                .setTitle("Layer: " + productName())
-                .addText("Tap to change radar layer")
-                .setOnClickListener(this::changeMode)
-                .build());
-            items.addItem(new Row.Builder()
-                .setTitle(nationwide ? "Nationwide view" : "Local radar view")
-                .addText("Tap to switch map coverage")
-                .setOnClickListener(() -> {
-                    nationwide = !nationwide;
-                    renderer.change(chosen, mode, nationwide);
-                    invalidate();
-                })
-                .build());
-            items.addItem(new Row.Builder()
-                .setTitle(follow ? "Follow my location: ON" : "Follow my location: OFF")
-                .addText("Recenter radar as the car moves")
-                .setOnClickListener(() -> {
-                    follow = !follow;
-                    if (follow) startFollowing();
-                    else renderer.clearPosition();
-                    invalidate();
-                })
-                .build());
-            items.addItem(new Row.Builder()
-                .setTitle("Update latest scan")
-                .addText("NOAA / National Weather Service")
-                .setOnClickListener(() -> {
-                    renderer.refresh();
-                    invalidate();
-                })
-                .build());
-            ListTemplate list = new ListTemplate.Builder()
-                .setSingleList(items.build())
-                .setHeader(new Header.Builder()
-                    .setTitle("NewsWire Weather Radar")
-                    .setStartHeaderAction(Action.APP_ICON)
+            Pane status=new Pane.Builder()
+                .addRow(new Row.Builder()
+                    .setTitle("Radar "+chosen.id+"  ·  "+productName())
+                    .addText(warningsEnabled?"NWS warnings on · Use map controls":"NWS warnings off · Use map controls")
                     .build())
                 .build();
+            PaneTemplate pane=new PaneTemplate.Builder(status)
+                .setHeader(new Header.Builder().setTitle("NewsWire Radar")
+                    .setStartHeaderAction(Action.APP_ICON).build()).build();
+            ActionStrip controls=new ActionStrip.Builder()
+                .addAction(new Action.Builder(Action.PAN).setIcon(mapIcon("↔")).build())
+                .addAction(new Action.Builder().setIcon(mapIcon("◎"))
+                    .setOnClickListener(()->setFollow(true)).build())
+                .addAction(new Action.Builder().setIcon(mapIcon("+"))
+                    .setOnClickListener(renderer::zoomIn).build())
+                .addAction(new Action.Builder().setIcon(mapIcon("−"))
+                    .setOnClickListener(renderer::zoomOut).build())
+                .build();
+            MapController mapControls=new MapController.Builder()
+                .setMapActionStrip(controls)
+                .setPanModeListener(isPanning->{ if(isPanning)renderer.disableFollow(); })
+                .build();
+            ActionStrip settings=new ActionStrip.Builder()
+                .addAction(new Action.Builder().setTitle("Options")
+                    .setOnClickListener(()->getScreenManager().push(
+                        new RadarOptionsScreen(getCarContext(),this))).build())
+                .build();
             return new MapWithContentTemplate.Builder()
-                .setContentTemplate(list)
+                .setContentTemplate(pane)
+                .setMapController(mapControls)
+                .setActionStrip(settings)
                 .build();
         }
     }
 
+
+    // Settings are a separate screen: the main radar map is no longer hidden
+    // behind five interactive list rows.
+    private static final class RadarOptionsScreen extends Screen{
+        private final RadarScreen radar;
+        RadarOptionsScreen(CarContext context,RadarScreen radar){super(context);this.radar=radar;}
+        @NonNull @Override public Template onGetTemplate(){
+            ItemList.Builder list=new ItemList.Builder();
+            list.addItem(new Row.Builder().setTitle("Radar station: "+radar.chosen.id)
+                .addText(radar.chosen.name)
+                .setOnClickListener(()->getScreenManager().push(new StationScreen(
+                    getCarContext(),radar,radar.stations,0))).build());
+            list.addItem(new Row.Builder().setTitle("Layer: "+radar.productName())
+                .addText("Tap to change NOAA weather radar product")
+                .setOnClickListener(()->{radar.changeMode();invalidate();}).build());
+            list.addItem(new Row.Builder().setTitle(radar.nationwide?"National radar":"Local radar")
+                .addText("Switch radar coverage; keep current zoom")
+                .setOnClickListener(()->{
+                    radar.nationwide=!radar.nationwide;
+                    radar.renderer.change(radar.chosen,radar.mode,radar.nationwide);
+                    invalidate();radar.invalidate();
+                }).build());
+            list.addItem(new Row.Builder()
+                .setTitle("NWS warning outlines: "+(radar.warningsEnabled?"ON":"OFF"))
+                .addText("Tornado, severe storm, flood and winter warnings")
+                .setOnClickListener(()->{
+                    radar.warningsEnabled=!radar.warningsEnabled;
+                    radar.renderer.setWarningVisibility(radar.warningsEnabled);
+                    invalidate();radar.invalidate();
+                }).build());
+            list.addItem(new Row.Builder()
+                .setTitle("Follow my location: "+(radar.follow?"ON":"OFF"))
+                .addText("Keep the GPS position centered when moving")
+                .setOnClickListener(()->{radar.setFollow(!radar.follow);invalidate();}).build());
+            list.addItem(new Row.Builder().setTitle("Refresh radar and warnings")
+                .addText("Recheck NOAA radar and NWS alerts")
+                .setOnClickListener(()->{
+                    radar.renderer.forceWarningsRefresh();radar.renderer.refresh();
+                }).build());
+            return new ListTemplate.Builder().setSingleList(list.build())
+                .setHeader(new Header.Builder().setTitle("Radar options")
+                    .setStartHeaderAction(Action.BACK).build()).build();
+        }
+    }
     private static final class StationScreen extends Screen {
         private final RadarScreen parent;
         private final List<Station> ordered;
