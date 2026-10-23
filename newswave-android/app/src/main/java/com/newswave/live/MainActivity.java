@@ -212,12 +212,17 @@ public class MainActivity extends Activity {
   private void dashboard(){
     newsScreenVisible=false;
     current=null;query="";stopNewsGps();if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
-    root=column();root.setBackgroundColor(BG);setContentView(root);
+    root=column();root.setBackground(atmosphere());setContentView(root);
     ScrollView sc=new ScrollView(this);LinearLayout content=column();pad(content,18,20);
     sc.addView(content);root.addView(sc);
-    TextView brand=text("◉  NEWSWIRE",29,FG,true);content.addView(brand);
-    TextView sub=text("YOUR NEWS  •  YOUR WEATHER  •  YOUR TEAMS",11,ACCENT,true);
-    LinearLayout.LayoutParams su=lp(-1,-2);su.topMargin=dp(5);su.bottomMargin=dp(22);content.addView(sub,su);
+    LinearLayout hero=column();hero.setBackground(radiantCard(0xff152f4c,0xff0d192b,0xff2e6174));
+    pad(hero,19,20);
+    TextView eyebrow=text("NEWSWIRE   /   LIVE",11,0xff62dbe6,true);hero.addView(eyebrow);
+    TextView brand=text("YOUR WORLD.\\nIN THE KNOW.",27,FG,true);
+    LinearLayout.LayoutParams bp0=lp(-1,-2);bp0.topMargin=dp(8);hero.addView(brand,bp0);
+    TextView sub=text("Local news   •   Storm radar   •   Your teams",13,0xffbfd4e6,false);
+    LinearLayout.LayoutParams su=lp(-1,-2);su.topMargin=dp(9);hero.addView(sub,su);
+    LinearLayout.LayoutParams heroLp=lp(-1,-2);heroLp.bottomMargin=dp(17);content.addView(hero,heroLp);
     LinearLayout locale=column();locale.setBackground(box(PANEL,18));pad(locale,15,16);
     TextView label=text(zip.isEmpty()?"SET YOUR LOCAL AREA":"LOCAL AREA  •  "+city+", "+state,15,FG,true);
     locale.addView(label);
@@ -233,16 +238,32 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams bp=lp(-2,-2);bp.leftMargin=dp(9);ziprow.addView(save,bp);
     LinearLayout.LayoutParams zr=lp(-1,-2);zr.topMargin=dp(12);locale.addView(ziprow,zr);
     LinearLayout.LayoutParams cp=lp(-1,-2);cp.bottomMargin=dp(20);content.addView(locale,cp);
-    categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
-    categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
-    categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
+    categoryTile(content,"NEWS","Your local headlines, live","◉",0xff2b65c3,()->openSection("News"));
+    categoryTile(content,"WEATHER","Satellite radar & NWS warnings","☁",0xff097e98,()->openSection("Weather"));
+    categoryTile(content,"SPORTS","Follow local high-school teams","★",0xffa15620,()->openSection("Sports"));
+    TextView utilities=text("MAKE NEWSWIRE YOURS",12,0xff62dbe6,true);
+    LinearLayout.LayoutParams utilityLp=lp(-1,-2);utilityLp.topMargin=dp(13);
+    utilityLp.bottomMargin=dp(9);content.addView(utilities,utilityLp);
+    TextView alertToggle=button(localNewsNotificationEnabled()?
+      "◉  LOCAL NEWS ALERTS ON · TAP TO TURN OFF":"◉  TURN ON LOCAL NEWS ALERTS",
+      this::toggleNewsNotifications);
+    LinearLayout.LayoutParams alertLp=lp(-1,-2);alertLp.bottomMargin=dp(10);
+    content.addView(alertToggle,alertLp);
+    TextView updates=button(updateAvailable?
+      "↑  NEWSWIRE UPDATE READY IN GOOGLE PLAY":
+      "↑  CHECK FOR APP UPDATES",()->checkForUpdates(true));
+    content.addView(updates);
+    TextView alertInfo=text("Optional local headline notifications appear on your phone, not over the car radar. Updates are handled by Google Play.",11,MUTED,false);
+    pad(alertInfo,5,12);content.addView(alertInfo);
     TextView foot=text("NewsWire v"+installedVersion()+"  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
     LinearLayout tile=row();
     GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{tone,PANEL});
-    bg.setCornerRadius(dp(21));bg.setStroke(dp(1),EDGE);tile.setBackground(bg);pad(tile,19,20);
+    bg.setCornerRadius(dp(21));bg.setStroke(dp(1),EDGE);
+    tile.setBackground(radiantCard(tone,0xff132137,tone));
+    pad(tile,19,20);
     TextView symbol=text(icon,33,FG,true);symbol.setGravity(Gravity.CENTER);
     tile.addView(symbol,lp(49,-2));
     LinearLayout labels=column();TextView name=text(title,22,FG,true);labels.addView(name);
