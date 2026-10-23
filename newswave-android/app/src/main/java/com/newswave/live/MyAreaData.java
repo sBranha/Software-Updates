@@ -25,12 +25,14 @@ final class MyAreaData {
         final List<LocalNewspapers.Headline> headlines;
         final long checkedAt;
         final boolean conditionsAvailable;
+        final boolean warningsAvailable;
         Snapshot(String area,String condition,String temperature,String feelsLike,String wind,
-                 List<String> warnings,List<LocalNewspapers.Headline> headlines,boolean ok){
+                 List<String> warnings,List<LocalNewspapers.Headline> headlines,boolean ok,boolean alertsOk){
             this.area=area;this.condition=condition;this.temperature=temperature;
             this.feelsLike=feelsLike;this.wind=wind;
             this.warnings=warnings;this.headlines=headlines;
             this.checkedAt=System.currentTimeMillis();this.conditionsAvailable=ok;
+            this.warningsAvailable=alertsOk;
         }
     }
     private static JSONObject fetch(String url) throws Exception {
@@ -59,13 +61,14 @@ final class MyAreaData {
     static Snapshot load(double lat,double lon,String city,String region){
         String place=city.isEmpty()?"Current location":city+(region.isEmpty()?"":", "+region);
         String temp="—",feel="—",description="Conditions unavailable",wind="—";
-        boolean ok=false;
+        boolean ok=false,alertsOk=false;
         ArrayList<String> warnings=new ArrayList<>();
         List<LocalNewspapers.Headline> headlines=new ArrayList<>();
         String point=String.format(Locale.US,"%.4f,%.4f",lat,lon);
         // Read only active, actual official NWS weather alerts for this location.
         try {
             JSONObject active=fetch("https://api.weather.gov/alerts/active?point="+point);
+            alertsOk=true;
             JSONArray features=active.optJSONArray("features");
             if(features!=null)for(int n=0;n<Math.min(12,features.length());n++){
                 JSONObject props=features.getJSONObject(n).optJSONObject("properties");
@@ -110,6 +113,6 @@ final class MyAreaData {
             try{headlines=LocalNewspapers.headlines(city,region);}
             catch(Exception error){android.util.Log.w("NewsWireArea","Local headlines unavailable",error);}
         }
-        return new Snapshot(place,description,temp,feel,wind,warnings,headlines,ok);
+        return new Snapshot(place,description,temp,feel,wind,warnings,headlines,ok,alertsOk);
     }
 }
