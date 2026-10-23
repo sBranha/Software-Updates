@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
   private LocationManager newsLocationManager;
   private LocationListener newsLocationListener;
   private boolean newsPermissionRequested=false;
+  private boolean newsScreenVisible=false;
   private boolean newsGpsActive=false;
   private boolean newsGeocoding=false;
   private String newsGpsCity="",newsGpsRegion="";
@@ -132,6 +133,7 @@ public class MainActivity extends Activity {
 
   // Categories are intentionally publisher-controlled. Public users cannot add or edit menu buttons.
   private void dashboard(){
+    newsScreenVisible=false;
     current=null;query="";stopNewsGps();if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
     ScrollView sc=new ScrollView(this);LinearLayout content=column();pad(content,18,20);
@@ -211,6 +213,7 @@ public class MainActivity extends Activity {
   }
 
   private void home(){
+    newsScreenVisible=tab.equals("News");
     current=null;
     if(web!=null){respondToLocationRequest(false);web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
@@ -357,7 +360,7 @@ public class MainActivity extends Activity {
     TextView where=text((newsGpsActive?"● FOLLOWING PHONE  •  ":"⌖ SAVED ZIP / BACKUP  •  ")+areaLabel,14,
         newsGpsActive?ACCENT:MUTED,true);
     pad(where,7,9);list.addView(where);
-    TextView locationHelp=text("Your news changes as you travel. Location is used only while News is open. A nearby-city lookup may use the device's geocoding service.",12,MUTED,false);
+    TextView locationHelp=text("Your news changes as you travel. Location is used only while News is open. City lookup may share coordinates with a geocoding provider.",12,MUTED,false);
     pad(locationHelp,7,5);list.addView(locationHelp);
     TextView retry=button(newsGpsActive?"◎ REFRESH CURRENT LOCATION":"◎ USE CURRENT LOCATION",()->startNewsGps(true));
     LinearLayout.LayoutParams rp=lp(-1,-2);rp.topMargin=dp(8);
@@ -437,7 +440,7 @@ public class MainActivity extends Activity {
     newsLocationListener=null;
   }
   private void startNewsGps(boolean userRequested){
-    if(!"News".equals(tab)||current!=null)return;
+    if(!newsScreenVisible||!"News".equals(tab)||current!=null)return;
     if(!hasLocationAccess()){
       if(Build.VERSION.SDK_INT>=23&&(!newsPermissionRequested||userRequested)){
         newsPermissionRequested=true;
@@ -566,6 +569,8 @@ public class MainActivity extends Activity {
     }
   }
   private void watch(Channel ch){
+    newsScreenVisible=false;
+    stopNewsGps();
     current=ch;
     root=column();root.setBackgroundColor(BG);setContentView(root);
     LinearLayout header=row();pad(header,12,12);
@@ -646,7 +651,7 @@ public class MainActivity extends Activity {
     if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
-  @Override protected void onResume(){super.onResume();if(tab.equals("News")&&current==null)startNewsGps(false);}
+  @Override protected void onResume(){super.onResume();if(newsScreenVisible&&tab.equals("News")&&current==null)startNewsGps(false);}
   @Override protected void onStop(){stopNewsGps();super.onStop();}
   @Override protected void onDestroy(){stopNewsGps();respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
 }
