@@ -58,6 +58,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Callable;
 
 /**
  * Android Auto WEATHER app service. No video, animated radar loops, or browser UI on the car.
@@ -378,8 +380,9 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.4.9 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.5.0 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
+        private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
         private volatile WeatherWarningOverlay.Snapshot warnings=null;
         private long lastWarningRequest=0;
@@ -598,11 +601,32 @@ public final class NewsWaveCarService extends CarAppService {
                 Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
                 int tx0=(int)Math.floor(x0/256),tx1=(int)Math.ceil((x0+w)/256);
                 int ty0=(int)Math.floor(y0/256),ty1=(int)Math.ceil((y0+h)/256);
+                // Fetch map tiles concurrently: sequential network fetches made
+                // a single zoom gesture appear frozen for many seconds.
+                ArrayList<Future<Bitmap>> pendingTiles=new ArrayList<>();
+                ArrayList<int[]> grid=new ArrayList<>();
                 for(int ty=ty0;ty<=ty1;ty++){
-                    synchronized(lock){if(rev!=revision){out.recycle();return;}}
                     for(int tx=tx0;tx<=tx1;tx++){
-                        Bitmap t=tile(tx,ty,z,style);
-                        if(t!=null)canvas.drawBitmap(t, (float)(tx*256-x0),(float)(ty*256-y0),brush);
+                        final int px=tx,py=ty;
+                        grid.add(new int[]{tx,ty});
+                        pendingTiles.add(tileWorkers.submit(()->tile(px,py,z,style)));
+                    }
+                }
+                for(int n=0;n<pendingTiles.size();n++){
+                    synchronized(lock){
+                        if(rev!=revision){
+                            for(Future<Bitmap> job:pendingTiles)job.cancel(true);
+                            out.recycle();return;
+                        }
+                    }
+                    try{
+                        Bitmap t=pendingTiles.get(n).get(15,java.util.concurrent.TimeUnit.SECONDS);
+                        int[] txy=grid.get(n);
+                        if(t!=null)canvas.drawBitmap(t,(float)(txy[0]*256-x0),
+                            (float)(txy[1]*256-y0),brush);
+                    }catch(Exception err){
+                        pendingTiles.get(n).cancel(true);
+                        Log.w(LOG,"Map tile unavailable: "+err.getMessage());
                     }
                 }
                 // WMS request overlays the matching NOAA radar image, not a browser website.
