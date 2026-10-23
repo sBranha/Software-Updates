@@ -12,4 +12,5 @@ dependencies {
   implementation 'androidx.car.app:app-projected:1.7.0'
   implementation 'com.google.android.play:app-update:2.1.0'
   implementation 'androidx.work:work-runtime:2.10.2'
+  implementation 'com.google.guava:guava:33.2.1-android'
 }
