@@ -59,6 +59,68 @@ final class LocalNewspapers {
     try{return URLEncoder.encode(s,"UTF-8");}
     catch(Exception e){return s.replace(" ","+");}
   }
+  /** Topic-focused, attributed RSS headlines. Never infer that a source says
+   * "breaking" unless its actual title contains that term. Score stories are
+   * news, not independently verified live game scores. */
+  static List<Headline> topicHeadlines(String city,String region,String topic) throws Exception {
+    if(city==null||city.trim().isEmpty()||region==null||region.trim().isEmpty())
+      return Collections.emptyList();
+    String query;
+    switch(topic){
+      case "breaking":
+        query="("+city+" "+region+") (breaking news OR emergency OR crash OR wildfire)";
+        break;
+      case "schools":
+        query="("+city+" "+region+") (school closed OR school closure OR school delay)";
+        break;
+      case "football":
+        query="("+city+" "+region+") (high school football score OR final OR Friday night football)";
+        break;
+      default:
+        query="\""+city+"\" \""+region+"\" (news OR local)";
+    }
+    return rssSearch(query,15);
+  }
+  private static List<Headline> rssSearch(String phrase,int maxItems) throws Exception {
+    String address="https://news.google.com/rss/search?q="+encode(phrase)
+        +"&hl=en-US&gl=US&ceid=US%3Aen";
+    HttpURLConnection connection=null;
+    ArrayList<Headline> data=new ArrayList<>();
+    try{
+      connection=(HttpURLConnection)new URL(address).openConnection();
+      connection.setConnectTimeout(8000);
+      connection.setReadTimeout(10000);
+      connection.setRequestProperty("Accept","application/rss+xml, application/xml");
+      connection.setRequestProperty("User-Agent","NewsWire Android/0.5.2");
+      if(connection.getResponseCode()!=200)
+        throw new IllegalStateException("RSS HTTP "+connection.getResponseCode());
+      try(InputStream stream=connection.getInputStream()){
+        XmlPullParser xml=Xml.newPullParser();
+        xml.setInput(stream,"UTF-8");
+        boolean inItem=false;
+        String title="",link="",source="";
+        int event=xml.getEventType();
+        while(event!=XmlPullParser.END_DOCUMENT && data.size()<maxItems){
+          if(event==XmlPullParser.START_TAG){
+            String name=xml.getName();
+            if("item".equals(name)){inItem=true;title="";link="";source="";}
+            else if(inItem&&("title".equals(name)||"link".equals(name)||"source".equals(name))){
+              String value=xml.nextText();
+              if("title".equals(name))title=value;
+              else if("link".equals(name))link=value;
+              else source=value;
+            }
+          }else if(event==XmlPullParser.END_TAG&&"item".equals(xml.getName())){
+            if(!title.isEmpty()&&link.startsWith("https://"))
+              data.add(new Headline(title,source.isEmpty()?"News provider":source,link));
+            inItem=false;
+          }
+          event=xml.next();
+        }
+      }
+    }finally{if(connection!=null)connection.disconnect();}
+    return data;
+  }
   /** Fetch a short attributed live feed on a worker thread; no paywalled article scraping. */
   static List<Headline> headlines(String city,String region) throws Exception {
     String search="\""+city+"\" \""+region+"\" (news OR newspaper OR local)";
