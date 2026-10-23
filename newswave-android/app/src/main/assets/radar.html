@@ -60,7 +60,7 @@
 <section class="section"><div class="sectitle">RADAR DATA PRODUCT</div><div class="products" id="products"></div></section>
 <section class="section"><div class="sectitle">VIEW CONTROLS</div><div class="tools">
 <button class="action" id="compareButton">◫ Compare R / V</button><button class="action" id="previewButton">▶ Scan loop</button><button class="action" id="alertsButton">⚠ NWS Alerts</button>
-<button class="action" id="saveButton">☆ Save station</button><button class="action" id="refreshButton">↻ Refresh</button></div></section>
+<button class="action selected" id="followButton">◎ Follow my location</button><button class="action" id="saveButton">☆ Save station</button><button class="action" id="refreshButton">↻ Refresh</button></div></section>
 <div class="box"><div class="small" id="description">National base reflectivity is a quality-controlled radar mosaic supplied by NOAA. Choose a blue station marker to switch to an individual Doppler radar.</div><div id="scale" class="scale" style="margin-top:11px"></div><div class="legend"><span id="legendA">Light echoes</span><span id="legendB">Strong echoes</span></div><div class="small" id="status" style="margin-top:10px">Map requires an Internet connection.</div></div>
 <div class="box" id="previewBox">
   <div class="previewhead"><div><strong id="previewTitle">NOAA radar loop</strong><div class="small">Animated frames from radar.weather.gov</div></div><button id="closePreview" class="tinybtn">✕</button></div>
@@ -84,6 +84,7 @@ const products=[
 const byId=new Map(), sites=(window.RADAR_STATIONS||[]).filter(s=>s&&/^[KPT][A-Z0-9]{3}$/.test(s.id)&&isFinite(s.lat)&&isFinite(s.lon));
 sites.forEach(s=>byId.set(s.id,s)); 
 let selected=null, current='SR_BREF', map=null, secondary=null, radarLayer=null, splitLayer=null, markers=null, mosaic=null, alerts=null, comparing=false, showAlerts=false, pending=null, preview=false, warningCount=0;
+let gps=null, gpsPin=null, follow=true;
 let saves=[];try{saves=JSON.parse(localStorage.getItem('radarFavorites')||'[]')}catch(e){}
 const mosaicUrl='https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity/MapServer/export';
 function status(t,err){$('status').textContent=t;$('status').className='small '+(err?'error':'');}
@@ -215,12 +216,30 @@ function updateAlerts(){
    status('NWS active tornado, severe thunderstorm, and flash flood warning polygons. Always confirm via official alerts.');
  }).catch(e=>status('NWS warnings layer unavailable right now: '+e.message,true));
 }
+
+window.updateNewsWirePosition=function(lat,lon){
+ if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
+ gps=[lat,lon];
+ if(!map)return;
+ if(!gpsPin){
+   gpsPin=L.circleMarker(gps,{radius:9,color:'#ffffff',weight:3,fillColor:'#2789ff',fillOpacity:1}).addTo(map);
+   gpsPin.bindTooltip('Your current location');
+ }else gpsPin.setLatLng(gps);
+ if(follow){map.setView(gps,Math.max(7,map.getZoom()),{animate:false});}
+};
 function init() {
  if(typeof L==='undefined'){status('Map library could not load. Connect to the Internet and reopen Radar.',true);$('count').textContent='Map offline';return}
  map=L.map('radarMap',{preferCanvas:true,zoomControl:true,zoomSnap:.25,minZoom:3,maxZoom:12}).setView([38.5,-97],4);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap contributors'}).addTo(map);
  map.on('moveend',()=>{if(!selected){clearTimeout(pending);pending=setTimeout(drawMosaic,250)}});
  map.on('zoomend',()=>{if(markers)rebuildMarkers()});
+ $('followButton').onclick=()=>{
+   follow=true;
+   $('followButton').classList.add('selected');
+   if(gps)map.setView(gps,Math.max(7,map.getZoom()),{animate:false});
+   else status('Waiting for phone GPS. Allow location permission to follow your position.');
+ };
+ map.on('dragstart',()=>{follow=false;$('followButton').classList.remove('selected')});
  $('nationalButton').onclick=national;
  $('localButton').onclick=()=>choose(byId.get('KHTX')||sites[0]);
  $('favoritesButton').onclick=()=>{ $('favoritesButton').classList.add('selected');refreshSearch(true);};
@@ -232,7 +251,7 @@ function init() {
  $('alertsButton').onclick=()=>{showAlerts=!showAlerts;$('alertsButton').classList.toggle('selected',showAlerts);updateAlerts()};
  $('saveButton').onclick=()=>{if(!selected)return;const i=saves.indexOf(selected.id);if(i>=0)saves.splice(i,1);else saves.push(selected.id);savePrefs();$('saveButton').textContent=saves.includes(selected.id)?'★ Saved':'☆ Save station'};
  $('refreshButton').onclick=()=>{if(selected){updateRadar();if(preview)drawPreview()}else drawMosaic();if(showAlerts)updateAlerts()};
- renderProducts();national();
+ renderProducts();national();if(gps)window.updateNewsWirePosition(gps[0],gps[1]);
 }
 window.addEventListener('load',init);
 })();

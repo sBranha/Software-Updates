@@ -12,6 +12,9 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.location.Location;
 import android.location.LocationManager;
+import android.location.LocationListener;
+import android.os.Looper;
+import androidx.lifecycle.Lifecycle;
 import android.os.Build;
 import android.util.Log;
 import android.view.Surface;
@@ -121,6 +124,9 @@ public final class NewsWaveCarService extends CarAppService {
         private Station chosen;
         private String mode="SR_BREF";
         private boolean nationwide=false;
+        private boolean follow=true;
+        private LocationManager locationManager;
+        private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
         RadarScreen(CarContext context){
             super(context);
@@ -129,13 +135,43 @@ public final class NewsWaveCarService extends CarAppService {
             chosen=find(old);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
+            startFollowing();
+            getLifecycle().addObserver((source,event)->{
+              if(event==Lifecycle.Event.ON_DESTROY&&locationManager!=null&&locationListener!=null){
+                locationManager.removeUpdates(locationListener);
+              }
+            });
+        }
+        private void startFollowing(){
+          Location start=recentLocation(getCarContext());
+          if(start!=null)onPosition(start);
+          Context context=getCarContext();
+          if(context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED
+            &&context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return;
+          try{
+            locationManager=(LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
+            locationListener=this::onPosition;
+            for(String provider:locationManager.getProviders(true)){
+              locationManager.requestLocationUpdates(provider,12000,35,locationListener,Looper.getMainLooper());
+            }
+          }catch(Exception ex){Log.w(LOG,"Car GPS unavailable",ex);}
+        }
+        private void onPosition(Location loc){
+          if(!follow||loc==null)return;
+          renderer.setPosition(loc.getLatitude(),loc.getLongitude());
+          Station nearest=chosen;double best=Double.MAX_VALUE;
+          for(Station station:stations){
+            double d=sqDist(station,loc.getLatitude(),loc.getLongitude());
+            if(d<best){best=d;nearest=station;}
+          }
+          if(nearest!=chosen){chosen=nearest;renderer.change(chosen,mode,nationwide);invalidate();}
         }
         private Station find(String id){
             for(Station s:stations)if(s.id.equals(id))return s;
             return stations.get(0);
         }
         void choose(Station s){
-            chosen=s;nationwide=false;
+            follow=false;renderer.clearPosition();chosen=s;nationwide=false;
             getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE).edit().putString("station",s.id).apply();
             renderer.change(chosen,mode,nationwide);invalidate();
         }
@@ -171,6 +207,14 @@ public final class NewsWaveCarService extends CarAppService {
                     .addText("Tap to switch map coverage")
                     .setOnClickListener(()->{nationwide=!nationwide;renderer.change(chosen,mode,nationwide);invalidate();})
                     .build())
+                .addRow(new Row.Builder()
+                    .setTitle(follow?"◎ Follow my location: ON":"◎ Follow my location: OFF")
+                    .addText("Recenter radar as the car moves")
+                    .setOnClickListener(()->{
+                      follow=!follow;
+                      if(follow)startFollowing();else renderer.clearPosition();
+                      invalidate();
+                    }).build())
                 .addRow(new Row.Builder()
                     .setTitle("Update latest scan")
                     .addText("NOAA / National Weather Service")
@@ -227,6 +271,12 @@ public final class NewsWaveCarService extends CarAppService {
         private Station station=new Station("KHTX","Huntsville, AL",34.93056,-86.08361);
         private String product="SR_BREF";private boolean usa=false;
         private Bitmap finished;
+        private Double userLat=null,userLon=null;
+        void setPosition(double latitude,double longitude){
+          synchronized(lock){userLat=latitude;userLon=longitude;}
+          refresh();
+        }
+        void clearPosition(){synchronized(lock){userLat=null;userLon=null;}refresh();}
         private final Object lock=new Object();
 
         void change(Station s,String p,boolean national){
@@ -281,7 +331,8 @@ public final class NewsWaveCarService extends CarAppService {
         private void render(Station s,String p,boolean national,int rev,int w,int h){
             try{
                 int z=national?3:7;
-                double centerLat=national?39.0:s.lat,centerLon=national?-98.0:s.lon;
+                Double gLat,gLon; synchronized(lock){gLat=userLat;gLon=userLon;}
+                double centerLat=gLat!=null?gLat:(national?39.0:s.lat),centerLon=gLon!=null?gLon:(national?-98.0:s.lon);
                 double x0=mx(centerLon,z)-w/2.,y0=my(centerLat,z)-h/2.;
                 Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
                 Canvas canvas=new Canvas(out);
@@ -312,7 +363,14 @@ public final class NewsWaveCarService extends CarAppService {
                 }
                 Bitmap radar=download(url);
                 if(radar!=null)canvas.drawBitmap(radar,null,new Rect(0,0,w,h),brush);
-                if(!national){
+                if(gLat!=null){
+                    Paint halo=new Paint(Paint.ANTI_ALIAS_FLAG);halo.setColor(0x99ffffff);
+                    canvas.drawCircle(w/2f,h/2f,15,halo);
+                    halo.setColor(0xff2389ff);canvas.drawCircle(w/2f,h/2f,10,halo);
+                    halo.setColor(Color.WHITE);halo.setStyle(Paint.Style.STROKE);halo.setStrokeWidth(3);
+                    canvas.drawCircle(w/2f,h/2f,10,halo);
+                }
+                if(!national&&gLat==null){
                     // Station center marker, white outlined radar reference point.
                     Paint pin=new Paint(Paint.ANTI_ALIAS_FLAG);
                     pin.setColor(Color.WHITE);pin.setStyle(Paint.Style.STROKE);pin.setStrokeWidth(2.5f);

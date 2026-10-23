@@ -25,6 +25,10 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import java.util.ArrayList;
 import java.util.Locale;
+import org.json.JSONObject;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 
 public class MainActivity extends Activity {
   private static final int BG=Color.rgb(10,15,29), PANEL=Color.rgb(22,31,49), FG=Color.WHITE,
@@ -58,7 +62,9 @@ public class MainActivity extends Activity {
   private View custom;
   private WebChromeClient.CustomViewCallback customCallback;
   private Channel current;
-  private String tab="All";
+  private String tab="News";
+  private String zip="",city="",state="";
+  private double postalLat=Double.NaN,postalLon=Double.NaN;
   private String query="";
   private final String[] tabs={"All","Radar","National","Weather","Local","Favorites"};
 
@@ -67,7 +73,11 @@ public class MainActivity extends Activity {
     getWindow().setStatusBarColor(BG);
     getWindow().setNavigationBarColor(BG);
     prefs=getSharedPreferences("newswave-favorites",MODE_PRIVATE);
-    home();
+    android.content.SharedPreferences loc=getSharedPreferences("newswire-location",MODE_PRIVATE);
+    zip=loc.getString("zip","");city=loc.getString("city","");state=loc.getString("state","");
+    postalLat=Double.longBitsToDouble(loc.getLong("lat",Double.doubleToLongBits(Double.NaN)));
+    postalLon=Double.longBitsToDouble(loc.getLong("lon",Double.doubleToLongBits(Double.NaN)));
+    dashboard();
   }
   private int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
   private GradientDrawable box(int color,int radius){
@@ -87,19 +97,100 @@ public class MainActivity extends Activity {
     TextView t=text(label,14,FG,true);t.setGravity(Gravity.CENTER);
     t.setBackground(box(PANEL,12));pad(t,12,12);t.setOnClickListener(v->onTap.run());return t;
   }
+
+  // Categories are intentionally publisher-controlled. Public users cannot add or edit menu buttons.
+  private void dashboard(){
+    current=null;query="";if(web!=null){web.destroy();web=null;}
+    root=column();root.setBackgroundColor(BG);setContentView(root);
+    ScrollView sc=new ScrollView(this);LinearLayout content=column();pad(content,18,20);
+    sc.addView(content);root.addView(sc);
+    TextView brand=text("◉  NEWSWIRE",29,FG,true);content.addView(brand);
+    TextView sub=text("YOUR NEWS  •  YOUR WEATHER  •  YOUR TEAMS",11,ACCENT,true);
+    LinearLayout.LayoutParams su=lp(-1,-2);su.topMargin=dp(5);su.bottomMargin=dp(22);content.addView(sub,su);
+    LinearLayout locale=column();locale.setBackground(box(PANEL,18));pad(locale,15,16);
+    TextView label=text(zip.isEmpty()?"SET YOUR LOCAL AREA":"LOCAL AREA  •  "+city+", "+state,15,FG,true);
+    locale.addView(label);
+    TextView hint=text("Enter your ZIP once for regional news, weather and school scores.",12,MUTED,false);
+    LinearLayout.LayoutParams hp=lp(-1,-2);hp.topMargin=dp(7);locale.addView(hint,hp);
+    LinearLayout ziprow=row();EditText entry=new EditText(this);entry.setSingleLine(true);
+    entry.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+    entry.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(5)});
+    entry.setText(zip);entry.setHint("5-digit ZIP");entry.setTextSize(16);entry.setTextColor(FG);
+    entry.setHintTextColor(MUTED);entry.setBackground(box(BG,12));pad(entry,11,8);
+    ziprow.addView(entry,new LinearLayout.LayoutParams(0,dp(50),1));
+    TextView save=button("SAVE",()->resolveZip(entry.getText().toString().trim()));
+    LinearLayout.LayoutParams bp=lp(-2,-2);bp.leftMargin=dp(9);ziprow.addView(save,bp);
+    LinearLayout.LayoutParams zr=lp(-1,-2);zr.topMargin=dp(12);locale.addView(ziprow,zr);
+    LinearLayout.LayoutParams cp=lp(-1,-2);cp.bottomMargin=dp(20);content.addView(locale,cp);
+    categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
+    categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
+    categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
+    TextView foot=text("Newswire v0.4.0  •  More sections arrive through official app updates.",12,MUTED,false);
+    pad(foot,5,20);content.addView(foot);
+  }
+  private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
+    LinearLayout tile=row();
+    GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{tone,PANEL});
+    bg.setCornerRadius(dp(21));bg.setStroke(dp(1),EDGE);tile.setBackground(bg);pad(tile,19,20);
+    TextView symbol=text(icon,33,FG,true);symbol.setGravity(Gravity.CENTER);
+    tile.addView(symbol,lp(49,-2));
+    LinearLayout labels=column();TextView name=text(title,22,FG,true);labels.addView(name);
+    TextView info=text(detail,12,0xffd0e3f1,false);
+    LinearLayout.LayoutParams ip=lp(-1,-2);ip.topMargin=dp(5);labels.addView(info,ip);
+    LinearLayout.LayoutParams labelsLp=new LinearLayout.LayoutParams(0,-2,1);labelsLp.leftMargin=dp(13);
+    tile.addView(labels,labelsLp);TextView arrow=text("›",29,FG,true);tile.addView(arrow);
+    tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->click.run());
+    LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=dp(13);parent.addView(tile,p);
+  }
+  private void openSection(String name){tab=name;query="";home();}
+  private void resolveZip(String postal){
+    if(!postal.matches("[0-9]{5}")){android.widget.Toast.makeText(this,"Enter a 5-digit ZIP code",0).show();return;}
+    new Thread(()->{
+      HttpURLConnection con=null;
+      try{
+        con=(HttpURLConnection)new URL("https://api.zippopotam.us/us/"+postal).openConnection();
+        con.setConnectTimeout(9000);con.setReadTimeout(9000);
+        if(con.getResponseCode()!=200)throw new IllegalArgumentException("ZIP not found");
+        java.io.ByteArrayOutputStream buf=new java.io.ByteArrayOutputStream();
+        try(java.io.InputStream input=con.getInputStream()){
+          byte[] block=new byte[2048];int n;while((n=input.read(block))!=-1)buf.write(block,0,n);
+        }
+        JSONObject obj=new JSONObject(buf.toString("UTF-8"));
+        JSONObject place=obj.getJSONArray("places").getJSONObject(0);
+        String foundCity=place.getString("place name"),foundState=place.getString("state abbreviation");
+        double foundLat=Double.parseDouble(place.getString("latitude"));
+        double foundLon=Double.parseDouble(place.getString("longitude"));
+        runOnUiThread(()->{
+          zip=postal;city=foundCity;state=foundState;postalLat=foundLat;postalLon=foundLon;
+          getSharedPreferences("newswire-location",MODE_PRIVATE).edit()
+             .putString("zip",zip).putString("city",city).putString("state",state)
+             .putLong("lat",Double.doubleToLongBits(postalLat))
+             .putLong("lon",Double.doubleToLongBits(postalLon)).apply();
+          dashboard();
+        });
+      }catch(Exception ex){runOnUiThread(()->android.widget.Toast.makeText(this,"Could not look up ZIP. Check connection.",1).show());}
+      finally{if(con!=null)con.disconnect();}
+    }).start();
+  }
+  private Channel localLink(String id,String name,String category,String note,String url){
+    return new Channel(id,name,category,note,url,false);
+  }
+
   private void home(){
     current=null;
     if(web!=null){web.destroy();web=null;}
     root=column();root.setBackgroundColor(BG);setContentView(root);
     LinearLayout header=column();pad(header,20,20);
-    TextView brand=text("◉  NEWSWAVE LIVE",22,FG,true);header.addView(brand);
-    TextView subtitle=text("News channels, local coverage & free NOAA radar.",13,MUTED,false);
+    TextView back=button("‹  MENU",()->dashboard());header.addView(back);
+    TextView brand=text("NEWSWIRE  /  "+tab.toUpperCase(Locale.US),24,FG,true);
+    LinearLayout.LayoutParams bh=lp(-1,-2);bh.topMargin=dp(13);header.addView(brand,bh);
+    TextView subtitle=text(zip.isEmpty()?"Set a ZIP on the home screen for local results":city+", "+state+"  •  "+zip,13,MUTED,false);
     LinearLayout.LayoutParams sl=lp(-1,-2);sl.topMargin=dp(7);header.addView(subtitle,sl);
     root.addView(header);
     TextView notice=text("OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
     search=new EditText(this);
-    search.setSingleLine(true);search.setHint("Search news channels…");search.setHintTextColor(MUTED);
+    search.setSingleLine(true);search.setHint("Search "+tab.toLowerCase(Locale.US)+" links…");search.setHintTextColor(MUTED);
     search.setTextColor(FG);search.setTextSize(16);search.setBackground(box(PANEL,13));pad(search,14,10);
     LinearLayout.LayoutParams sp=lp(-1,52);sp.setMargins(dp(16),dp(12),dp(16),dp(8));
     root.addView(search,sp);search.setText(query);
@@ -108,9 +199,7 @@ public class MainActivity extends Activity {
       public void onTextChanged(CharSequence s,int a,int before,int count){query=s.toString();render();}
       public void afterTextChanged(Editable s){}
     });
-    HorizontalScrollView tabsScroller=new HorizontalScrollView(this);tabsScroller.setHorizontalScrollBarEnabled(false);
-    tabBar=row();pad(tabBar,12,8);tabsScroller.addView(tabBar);
-    root.addView(tabsScroller);makeTabs();
+    // Category menu is publisher-defined; users cannot add buttons.
     ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
     list=column();pad(list,16,7);scroll.addView(list);
     root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));render();
@@ -129,8 +218,39 @@ public class MainActivity extends Activity {
     if(list==null)return;
     list.removeAllViews();
     int count=0;
+    if(tab.equals("Weather")){
+      TextView radar=button("◎  LIVE RADAR  •  GPS FOLLOW",()->startActivity(new Intent(MainActivity.this,RadarActivity.class)));
+      LinearLayout.LayoutParams rp=lp(-1,-2);rp.bottomMargin=dp(13);list.addView(radar,rp);
+      if(!Double.isNaN(postalLat)){
+        card(localLink("zipweather","Local NWS forecast — "+zip,"Weather","Forecast for "+city+", "+state,
+          String.format(Locale.US,"https://forecast.weather.gov/MapClick.php?lat=%.5f&lon=%.5f",postalLat,postalLon)));
+        count++;
+      }
+    }
+    if(tab.equals("News")&&!zip.isEmpty()){
+      try{
+        String searchTerm=URLEncoder.encode(city+" "+state+" local news","UTF-8");
+        card(localLink("zipnews","Local news near "+city,"News","Regional news for your saved ZIP",
+             "https://news.google.com/search?q="+searchTerm+"&hl=en-US&gl=US&ceid=US%3Aen"));
+        count++;
+      }catch(Exception ignored){}
+    }
+    if(tab.equals("Sports")){
+      if(state.matches("[A-Z]{2}")){
+        card(localLink("scores"+state,"High-school football — "+state,"Sports",
+          "State scores & schedules; select nearby teams on the scoreboard",
+          "https://www.maxpreps.com/"+state.toLowerCase(Locale.US)+"/football/scores/"));
+        count++;
+      }else{
+        TextView help=text("Save your ZIP on the main menu to show high-school scores for your state.",15,MUTED,false);
+        pad(help,8,13);list.addView(help);
+      }
+    }
     for(Channel ch:channels){
-      if(!tab.equals("All")&&!tab.equals(ch.category)&&!(tab.equals("Favorites")&&fav(ch)))continue;
+      if(tab.equals("Sports"))continue;
+      if(tab.equals("Weather")&&!ch.category.equals("Weather"))continue;
+      if(tab.equals("News")&&!ch.category.equals("National")&&!ch.category.equals("Local"))continue;
+      if(ch.category.equals("Local")&&!state.equals("AL"))continue;
       String needle=query.toLowerCase(Locale.US);
       if(!ch.name.toLowerCase(Locale.US).contains(needle)&&!ch.note.toLowerCase(Locale.US).contains(needle))continue;
       count++; card(ch);
@@ -216,7 +336,7 @@ public class MainActivity extends Activity {
   @Override public void onBackPressed(){
     if(custom!=null){exitFullscreen();return;}
     if(current!=null){if(web!=null&&web.canGoBack()){web.goBack();return;}home();return;}
-    if(!tab.equals("All")||!query.isEmpty()){tab="All";query="";home();return;}
+    if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
   @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
