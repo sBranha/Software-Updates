@@ -222,7 +222,7 @@ public final class NewsWaveCarService extends CarAppService {
                     .build())
                 .build();
             PaneTemplate panel=new PaneTemplate.Builder(pane)
-                .setHeader(new Header.Builder().setTitle("NewsWave Weather Radar")
+                .setHeader(new Header.Builder().setTitle("NewsWire Weather Radar")
                     .setStartHeaderAction(Action.APP_ICON).build()).build();
             return new MapWithContentTemplate.Builder().setContentTemplate(panel).build();
         }
@@ -261,7 +261,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWaveLive/0.3 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.4.5 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(80,.75f,true){
             @Override protected boolean removeEldestEntry(Map.Entry<String,Bitmap> eldest){return size()>80;}
