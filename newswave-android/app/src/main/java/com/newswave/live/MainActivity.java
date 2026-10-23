@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
-    TextView foot=text("Newswire v0.4.4  •  More sections arrive through official app updates.",12,MUTED,false);
+    TextView foot=text("NewsWire v0.4.5  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
@@ -486,7 +486,7 @@ public class MainActivity extends Activity {
         }
       }catch(Exception ignored){}
       // Fallback client-side reverse geocoding only after permission is granted.
-      // Coordinates are sent directly from the phone to the provider, not via Newswire servers.
+      // Coordinates are sent directly from the phone to the provider, not via NewsWire servers.
       if(foundCity==null||foundCity.trim().isEmpty()){
         HttpURLConnection conn=null;
         try{
