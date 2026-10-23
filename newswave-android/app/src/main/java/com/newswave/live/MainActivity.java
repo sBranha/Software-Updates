@@ -85,6 +85,46 @@ public class MainActivity extends Activity {
   private LocationManager dashboardLocationManager;
   private LocationListener dashboardLocationListener;
   private static final int DASHBOARD_LOCATION_REQUEST=146;
+  private static final int DRIVE_FINE_LOCATION_REQUEST=147;
+  private static final int DRIVE_NOTIFICATION_REQUEST=148;
+  private boolean driveAlertsEnabled(){
+    return getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
+      .getBoolean("enabled",false);
+  }
+  private void requestDriveAlerts(){
+    if(driveAlertsEnabled()){
+      getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
+        .edit().putBoolean("enabled",false).apply();
+      Intent stop=new Intent(this,DriveWarningService.class)
+        .setAction(DriveWarningService.ACTION_STOP);
+      startService(stop);
+      dashboard();
+      return;
+    }
+    if(Build.VERSION.SDK_INT>=23
+       &&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+      requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION},DRIVE_FINE_LOCATION_REQUEST);
+      return;
+    }
+    if(Build.VERSION.SDK_INT>=33
+       &&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+      requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},DRIVE_NOTIFICATION_REQUEST);
+      return;
+    }
+    getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
+      .edit().putBoolean("enabled",true).apply();
+    try{
+      startForegroundService(new Intent(this,DriveWarningService.class));
+      dashboard();
+    }catch(Exception error){
+      getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
+        .edit().putBoolean("enabled",false).apply();
+      android.widget.Toast.makeText(this,
+        "Couldn't start Drive Alerts. Check GPS and notification permissions.",1).show();
+      dashboard();
+    }
+  }
   private static final int NEWS_NOTIFICATION_REQUEST=145;
   private AppUpdateManager playUpdates;
   private boolean updateAvailable=false;
@@ -259,6 +299,22 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Your local headlines, live","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Satellite radar & NWS warnings","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Follow local high-school teams","★",0xffa15620,()->openSection("Sports"));
+    LinearLayout driveCard=column();
+    driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
+    pad(driveCard,16,16);
+    TextView driveTitle=text("⚠  STORM AHEAD ALERTS",15,0xffffdfac,true);
+    driveCard.addView(driveTitle);
+    TextView driveExplain=text(
+      "Optional driving warning monitor: checks active NWS tornado warnings at your GPS position and along your current direction of travel.",12,FG,false);
+    LinearLayout.LayoutParams explp=lp(-1,-2);explp.topMargin=dp(8);
+    driveCard.addView(driveExplain,explp);
+    TextView driveToggle=button(driveAlertsEnabled()?
+      "■  STOP DRIVE ALERTS":"▶  START DRIVE ALERTS",this::requestDriveAlerts);
+    LinearLayout.LayoutParams dl=lp(-1,-2);dl.topMargin=dp(12);driveCard.addView(driveToggle,dl);
+    TextView safety=text("Starts only when you choose it. Displays an ongoing phone notification. It cannot see your complete navigation route or replace Wireless Emergency Alerts.",11,0xffc9c5bc,false);
+    LinearLayout.LayoutParams slp=lp(-1,-2);slp.topMargin=dp(9);driveCard.addView(safety,slp);
+    LinearLayout.LayoutParams drlp=lp(-1,-2);drlp.topMargin=dp(10);drlp.bottomMargin=dp(12);
+    content.addView(driveCard,drlp);
     TextView utilities=text("MAKE NEWSWIRE YOURS",12,0xff62dbe6,true);
     LinearLayout.LayoutParams utilityLp=lp(-1,-2);utilityLp.topMargin=dp(13);
     utilityLp.bottomMargin=dp(9);content.addView(utilities,utilityLp);
@@ -807,6 +863,18 @@ public class MainActivity extends Activity {
   }
   @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
     super.onRequestPermissionsResult(requestCode,permissions,results);
+    if(requestCode==DRIVE_FINE_LOCATION_REQUEST){
+      if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
+        requestDriveAlerts();
+      else android.widget.Toast.makeText(this,
+        "Drive Alerts require precise location to detect warning areas.",1).show();
+    }
+    if(requestCode==DRIVE_NOTIFICATION_REQUEST){
+      if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)
+        requestDriveAlerts();
+      else android.widget.Toast.makeText(this,
+        "Drive Alerts require permission to show tornado-warning notifications.",1).show();
+    }
     if(requestCode==DASHBOARD_LOCATION_REQUEST){
       boolean ok=false;
       for(int result:results)if(result==PackageManager.PERMISSION_GRANTED)ok=true;
