@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
     categoryTile(content,"NEWS","Local & national coverage","◉",0xff2b65c3,()->openSection("News"));
     categoryTile(content,"WEATHER","Forecasts • Live radar • Alerts","☁",0xff097e98,()->openSection("Weather"));
     categoryTile(content,"SPORTS","Local high-school football • Scores","★",0xffa15620,()->openSection("Sports"));
-    TextView foot=text("Newswire v0.4.2  •  More sections arrive through official app updates.",12,MUTED,false);
+    TextView foot=text("Newswire v0.4.3  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){

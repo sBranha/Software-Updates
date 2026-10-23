@@ -10,6 +10,11 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
@@ -51,7 +56,30 @@ public class RadarActivity extends Activity {
         return true;
       }
     });
-    setContentView(radar);
+    // Keep the home control outside the scrollable radar WebView so it is always visible.
+    LinearLayout shell=new LinearLayout(this);
+    shell.setOrientation(LinearLayout.VERTICAL);
+    shell.setBackgroundColor(Color.rgb(9,15,29));
+    LinearLayout toolbar=new LinearLayout(this);
+    toolbar.setPadding(dp(12),dp(7),dp(12),dp(7));
+    toolbar.setBackgroundColor(Color.rgb(12,24,42));
+    TextView homeButton=new TextView(this);
+    homeButton.setText("‹  NEWSWIRE HOME");
+    homeButton.setTextColor(Color.WHITE);
+    homeButton.setTextSize(16);
+    homeButton.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+    homeButton.setGravity(Gravity.CENTER);
+    homeButton.setContentDescription("Return to the Newswire News, Weather, Sports menu");
+    GradientDrawable background=new GradientDrawable();
+    background.setColor(Color.rgb(25,38,61));
+    background.setCornerRadius(dp(14));
+    background.setStroke(dp(1),Color.rgb(55,76,107));
+    homeButton.setBackground(background);
+    homeButton.setOnClickListener(v->returnHome());
+    toolbar.addView(homeButton,new LinearLayout.LayoutParams(-1,dp(50)));
+    shell.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(64)));
+    shell.addView(radar,new LinearLayout.LayoutParams(-1,0,1));
+    setContentView(shell);
     radar.setWebViewClient(new WebViewClient() {
       @Override public void onPageFinished(WebView view,String url){
         loaded=true;if(pendingPosition!=null)deliver(pendingPosition);
@@ -70,6 +98,17 @@ public class RadarActivity extends Activity {
     startLocation();
   }
 
+  private int dp(float number){
+    return (int)(number*getResources().getDisplayMetrics().density+0.5f);
+  }
+  private void returnHome(){
+    // Clear the radar activity and reopen the actual Newswire dashboard,
+    // rather than the Weather section that launched the radar.
+    Intent home=new Intent(this,MainActivity.class);
+    home.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    startActivity(home);
+    finish();
+  }
   private void deliver(Location loc){
     pendingPosition=loc;
     if(loaded&&radar!=null){
@@ -104,7 +143,7 @@ public class RadarActivity extends Activity {
   }
 
   @Override public void onBackPressed() {
-    if (radar != null && radar.canGoBack()) radar.goBack(); else super.onBackPressed();
+    returnHome();
   }
   @Override protected void onDestroy() {
     if(locationManager!=null&&listener!=null)locationManager.removeUpdates(listener);
