@@ -21,6 +21,8 @@
       </intent-filter>
     </service>
     <activity android:name=".TrafficActivity" android:exported="false" />
+    <activity android:name=".MorningBriefingActivity" android:exported="false" />
+    <activity android:name=".PersonalizedNewsActivity" android:exported="false" />
     <activity android:name=".NewsWireDriveActivity" android:exported="false" />
     <activity android:name=".FootballBoardActivity" android:exported="false" />
     <activity android:name=".RadarActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
