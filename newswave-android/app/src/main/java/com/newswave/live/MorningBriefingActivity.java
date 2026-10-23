@@ -28,6 +28,9 @@ public final class MorningBriefingActivity extends Activity {
         CYAN=0xff8deef3,MUTED=0xffb3cbdc,GOLD=0xffffca80;
     private LinearLayout content;
     private boolean loading=false,closed=false;
+    private long refreshStartedAt=0;
+    private String refreshPhase="";
+    private String refreshOutcome="";
     private double lat=Double.NaN,lon=Double.NaN;
     private String city="",region="";
     private MyAreaData.Snapshot snapshot;
@@ -82,15 +85,30 @@ public final class MorningBriefingActivity extends Activity {
         hero.addView(text("Weather. Your town. Your headlines.",13,MUTED,false));
         LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);
         hp.bottomMargin=dp(13);content.addView(hero,hp);
-        content.addView(button("↻  REFRESH THIS MORNING",this::refreshFromGps));
+        TextView refreshControl=button(loading?
+            "⟳  REFRESHING…":"↻  REFRESH WEATHER & HEADLINES",this::refreshFromGps);
+        content.addView(refreshControl);
+        String progress=loading?
+            (refreshPhase.isEmpty()?"Connecting to live sources…":refreshPhase):
+            !refreshOutcome.isEmpty()?refreshOutcome:
+            snapshot==null?"Tap Refresh to check your local area.":
+            "Last checked "+new java.text.SimpleDateFormat("h:mm a",Locale.US)
+                .format(new java.util.Date(snapshot.checkedAt));
+        TextView refreshFeedback=text(progress,12,loading?CYAN:MUTED,false);
+        refreshFeedback.setPadding(dp(6),dp(10),dp(6),dp(4));
+        content.addView(refreshFeedback);
         String area=city.isEmpty()?"Current location / ZIP fallback":city+
             (region.isEmpty()?"":", "+region);
         TextView place=text("⌖ "+area,13,CYAN,true);
         place.setPadding(dp(4),dp(15),dp(4),dp(2));content.addView(place);
         if(loading && snapshot==null){
-            addLabel("PREPARING YOUR BRIEFING","Checking NWS weather and local publishers…",CYAN);
+            addLabel("PREPARING YOUR BRIEFING","Connecting to NWS weather, alerts and local headlines…",CYAN);
         }else if(snapshot!=null){
             MyAreaData.Snapshot d=snapshot;
+            if(loading){
+                addLabel("REFRESH IN PROGRESS",
+                    "Showing the previous check while a fresh update loads. You will see the new check time when it finishes.",CYAN);
+            }
             addLabel("WEATHER RIGHT NOW",d.temperature+"  ·  "+d.condition+
                 "\nWind "+d.wind,CYAN);
             String warnings=!d.warningsAvailable?
@@ -148,8 +166,20 @@ public final class MorningBriefingActivity extends Activity {
         catch(Exception error){android.widget.Toast.makeText(this,"No browser available",0).show();}
     }
     private void refreshFromGps(){
-        if(loading)return;
+        if(loading){
+            long seconds=(System.currentTimeMillis()-refreshStartedAt)/1000;
+            if(seconds<40){
+                android.widget.Toast.makeText(this,
+                    "Refresh is still checking the live services ("+seconds+" seconds).",0).show();
+                return;
+            }
+            // Permit an explicit retry if an earlier network request stalled.
+            generation++;
+        }
         loading=true;
+        refreshStartedAt=System.currentTimeMillis();
+        refreshPhase="Checking your current location…";
+        refreshOutcome="";
         final int revision=++generation;
         new Thread(()->{
             double nextLat=lat,nextLon=lon;
@@ -179,6 +209,12 @@ public final class MorningBriefingActivity extends Activity {
             }
             if(nextCity==null)nextCity="";
             if(nextRegion==null)nextRegion="";
+            runOnUiThread(()->{
+                if(!closed && revision==generation){
+                    refreshPhase="Checking NWS conditions, warnings and local headlines…";
+                    render();
+                }
+            });
             MyAreaData.Snapshot result=Double.isNaN(nextLat)||Double.isNaN(nextLon)?
                 null:MyAreaData.load(nextLat,nextLon,nextCity,nextRegion);
             final String foundCity=nextCity,foundRegion=nextRegion;
@@ -186,7 +222,18 @@ public final class MorningBriefingActivity extends Activity {
             runOnUiThread(()->{
                 if(closed||revision!=generation)return;
                 city=foundCity;region=foundRegion;lat=foundLat;lon=foundLon;
-                loading=false;snapshot=result;render();
+                loading=false;snapshot=result;
+                refreshPhase="";
+                if(result==null){
+                    refreshOutcome="No location is set. Enable GPS or save a ZIP on NewsWire's home screen.";
+                }else{
+                    String time=new java.text.SimpleDateFormat("h:mm a",Locale.US)
+                        .format(new java.util.Date(result.checkedAt));
+                    refreshOutcome="Last checked "+time+" · "+
+                        (!result.conditionsAvailable&&!result.warningsAvailable&&result.headlines.isEmpty()?
+                        "Live sources unavailable; please try again.":"Live source check completed.");
+                }
+                render();
             });
         },"newswire-morning").start();
         render();
