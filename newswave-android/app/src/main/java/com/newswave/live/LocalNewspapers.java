@@ -77,6 +77,9 @@ final class LocalNewspapers {
       case "schools":
         query="("+city+" "+region+") (school closed OR school closure OR school delay)";
         break;
+      case "events":
+        query="("+city+" "+region+") (upcoming festival OR community event OR local concert OR fair OR arts event)";
+        break;
       case "football":
         query="("+city+" "+region+") (high school football score OR final OR Friday night football)";
         break;
