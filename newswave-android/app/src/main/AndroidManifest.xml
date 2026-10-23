@@ -20,6 +20,8 @@
         <category android:name="androidx.car.app.category.WEATHER"/>
       </intent-filter>
     </service>
+    <activity android:name=".TrafficActivity" android:exported="false" />
+    <activity android:name=".NewsWireDriveActivity" android:exported="false" />
     <activity android:name=".FootballBoardActivity" android:exported="false" />
     <activity android:name=".RadarActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
     <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
