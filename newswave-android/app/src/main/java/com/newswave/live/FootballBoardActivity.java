@@ -41,6 +41,8 @@ public final class FootballBoardActivity extends Activity {
     private LinearLayout outer,stories;
     private WebView scoreboard;
     private boolean loading=false;
+    private String chosenSport="football";
+    private TextView sportLabel,lastCheckedLabel;
     private int generation=0;
     private long lastFetchedAt=0;
 
@@ -112,9 +114,23 @@ public final class FootballBoardActivity extends Activity {
         LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);
         rp.leftMargin=dp(10);actionRow.addView(refresh,rp);
         outer.addView(actionRow);
-
+        TextView sportButton=button("★ CHANGE SPORT · FOOTBALL / BASKETBALL / BASEBALL / SOCCER",()->
+            new android.app.AlertDialog.Builder(this).setTitle("School sports coverage")
+                .setItems(new String[]{"Football","Basketball","Baseball & Softball","Soccer"},
+                    (dialog,which)->{
+                        chosenSport=new String[]{"football","basketball","baseball","soccer"}[which];
+                        storiesCache=null;lastFetchedAt=0;
+                        if(sportLabel!=null)sportLabel.setText(
+                            "NEARBY "+chosenSport.toUpperCase(Locale.US)+" REPORTING");
+                        refresh(true);
+                    }).setNegativeButton("Cancel",null).show());
+        LinearLayout.LayoutParams sb=new LinearLayout.LayoutParams(-1,-2);
+        sb.topMargin=dp(11);outer.addView(sportButton,sb);
         TextView nearTitle=text("NEARBY FOOTBALL REPORTS",13,CYAN,true);
         nearTitle.setPadding(0,dp(22),0,dp(8));outer.addView(nearTitle);
+        sportLabel=nearTitle;
+        lastCheckedLabel=text("Publisher feed not checked yet.",11,MUTED,false);
+        outer.addView(lastCheckedLabel);
         TextView note=text("Publisher-reported football results near your saved area. " +
             "Titles link to the original sources; score articles are not verified live game feeds.",
             12,MUTED,false);outer.addView(note);
@@ -190,7 +206,7 @@ public final class FootballBoardActivity extends Activity {
         stories.removeAllViews();
         if(found==null){
             TextView load=text(loading?"Loading local football coverage…":
-                "No live score reports returned for this area. See the scoreboard below.",
+                "No local sports stories returned. The live football scoreboard below is separate.",
                 13,MUTED,false);
             load.setPadding(dp(8),dp(10),dp(8),dp(10));stories.addView(load);return;
         }
@@ -236,13 +252,18 @@ public final class FootballBoardActivity extends Activity {
         final String lookupCity=city,lookupState=state;
         new Thread(()->{
             List<LocalNewspapers.Headline> found=null;
-            try{found=LocalNewspapers.topicHeadlines(lookupCity,lookupState,"football");}
+            final String sport=chosenSport;
+            try{found=LocalNewspapers.topicHeadlines(lookupCity,lookupState,sport);}
             catch(Exception error){android.util.Log.w("NewswireFootball","Football articles unavailable",error);}
             final List<LocalNewspapers.Headline> result=found;
             runOnUiThread(()->{
                 if(generation!=generationId)return;
                 loading=false;storiesCache=result;lastFetchedAt=System.currentTimeMillis();
                 renderStories(result);
+                if(lastCheckedLabel!=null)lastCheckedLabel.setText(
+                    "Publisher feed checked "+new java.text.SimpleDateFormat(
+                    "h:mm a",Locale.US).format(new java.util.Date(lastFetchedAt))+
+                    " · "+chosenSport+" reporting, not verified live scores");
             });
         },"newswire-football").start();
         if(scoreboard!=null&&forced)scoreboard.reload();
