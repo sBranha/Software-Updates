@@ -5,10 +5,10 @@
 
 ## Project and current state
 - Repository: `sBranha/Software-Updates`
-- Active development branch: `newswire-widget-live-v0.6.2`
+- Active development branch: `newswire-radio-favorites-v0.6.3`
 - Android application source: `newswave-android/`
 - Android applicationId: `com.newswire.live`
-- Current source version: `0.6.2`, versionCode `26`; previous completed feature release: `0.5.7`, code 21
+- Current source version: `0.6.3`, versionCode `27`; previous completed feature release: `0.5.7`, code 21
 - Build workflow: `.github/workflows/build-newswire-car-fix.yml`
 - Current work is **Performance & Reliability**, preserving all features from v0.5.7.
 
@@ -72,3 +72,10 @@ _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
 - A separate on-demand Local AM/FM Stations section queries Radio Browser's live directory, prioritizing streams within 160 km of the passed phone GPS/saved ZIP location, with a state-matched fallback for stations lacking directory coordinates.
 - Lists only streams the provider last verified and exposes HTTPS radio playback via Android MediaPlayer on the phone; playback stops when the screen closes, when switching stations, or when the spoken briefing starts.
 - This is internet-streamed radio, not an FM tuner or Android Auto media app. Station listings, licensing, publisher site information and stream availability come from third parties; do not claim all real-world stations are listed.
+
+
+## v0.6.3 — Radio favorites and playback recovery
+- Search local results by station name, genre, region; favorites first or favorites-only. HTTPS stream bookmarks stay on-device and remain visible when directory is offline.
+- Request/release audio focus and stop connections that do not finish preparing within 20 seconds.
+- Preserve existing spoken briefing, widget and phone-only playback. No Android Auto media claims or background playback.
+- CI compiles v0.6.3 versionCode 27 test APK and unsigned release AAB; signed Google Play bundle requires matching accepted upload certificate.

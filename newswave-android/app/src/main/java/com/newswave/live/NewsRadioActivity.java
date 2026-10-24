@@ -16,6 +16,12 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.EditText;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.HashSet;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -45,6 +51,18 @@ public final class NewsRadioActivity extends Activity {
     private MediaPlayer streamPlayer;
     private LocalRadioDirectory.Station playing;
     private int playerGeneration=0;
+    private EditText stationSearch;
+    private TextView favoritesButton;
+    private boolean favoritesOnly=false;
+    private final Handler playerHandler=new Handler(Looper.getMainLooper());
+    private Runnable connectionTimeout;
+    private AudioManager manager;
+    private boolean hasAudioFocus=false;
+    private final AudioManager.OnAudioFocusChangeListener focusChange=code->{
+        if(code==AudioManager.AUDIOFOCUS_LOSS||
+           code==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            runOnUiThread(()->stopStream("Playback stopped for another audio app."));
+    };
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         android.content.SharedPreferences prefs=getSharedPreferences("newswire-location",MODE_PRIVATE);
@@ -104,6 +122,27 @@ public final class NewsRadioActivity extends Activity {
         add(root,text("LOCAL AM/FM STATIONS · LIVE STREAMS",13,CYAN,true),21);
         add(root,text("Nearby stations are discovered automatically from your current area. "+
             "Tap a station to listen live; broadcaster availability varies.",12,MUTED,false),9);
+        stationSearch=new EditText(this);
+        stationSearch.setSingleLine(true);
+        stationSearch.setTextColor(INK);
+        stationSearch.setHintTextColor(MUTED);
+        stationSearch.setTextSize(15);
+        stationSearch.setHint("Search stations by name or type");
+        stationSearch.setPadding(dp(12),dp(12),dp(12),dp(12));
+        stationSearch.setBackground(card());
+        stationSearch.addTextChangedListener(new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            public void onTextChanged(CharSequence s,int start,int before,int count){
+                renderStations();
+            }
+            public void afterTextChanged(Editable e){}
+        });
+        add(root,stationSearch,10);
+        favoritesButton=button("☆  SAVED STATIONS",()->{
+            favoritesOnly=!favoritesOnly;
+            renderStations();
+        });
+        add(root,favoritesButton,8);
         stationStatus=text("Finding nearby stations…",12,CYAN,false);
         add(root,stationStatus,9);
         add(root,button("↻  FIND LOCAL STATIONS",this::loadLocalStations),9);
@@ -198,20 +237,57 @@ public final class NewsRadioActivity extends Activity {
     private void renderStations(){
         if(stationList==null)return;
         stationList.removeAllViews();
-        if(stationsLoading||localStations.isEmpty()){
-            add(stationList,text(stationsLoading?"Searching live radio streams for your area…":
-                "No verified playable stations found nearby. Tap FIND LOCAL STATIONS to retry.",
-                12,MUTED,false),6);
-            return;
+        List<LocalRadioDirectory.Station> bookmarks=RadioStationFavorites.list(this);
+        if(favoritesButton!=null)favoritesButton.setText(favoritesOnly?
+            "★  SAVED ONLY · TAP FOR ALL":
+            "☆  SAVED STATIONS ("+bookmarks.size()+")");
+        List<LocalRadioDirectory.Station> candidates=new ArrayList<>();
+        HashSet<String> used=new HashSet<>();
+        for(LocalRadioDirectory.Station s:bookmarks){
+            if(used.add(s.stream))candidates.add(s);
         }
-        for(LocalRadioDirectory.Station station:localStations){
-            LinearLayout block=new LinearLayout(this);block.setOrientation(1);
-            block.setPadding(dp(13),dp(12),dp(13),dp(12));
+        if(!favoritesOnly)for(LocalRadioDirectory.Station s:localStations){
+            if(used.add(s.stream))candidates.add(s);
+        }
+        String term=stationSearch==null?"":stationSearch.getText().toString()
+            .trim().toLowerCase(Locale.US);
+        int count=0;
+        for(LocalRadioDirectory.Station station:candidates){
+            if(!term.isEmpty()&&!station.name.toLowerCase(Locale.US).contains(term)
+                &&!station.genre.toLowerCase(Locale.US).contains(term)
+                &&!station.region.toLowerCase(Locale.US).contains(term))continue;
+            LinearLayout block=new LinearLayout(this);
+            block.setOrientation(1);block.setPadding(dp(12),dp(10),dp(12),dp(10));
             block.setBackground(card());
-            block.addView(text((playing==station?"▶  ":"◉  ")+station.name,16,INK,true));
-            add(block,text(station.subtitle(),11,MUTED,false),4);
+            LinearLayout heading=new LinearLayout(this);heading.setOrientation(0);
+            heading.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title=text((playing!=null&&playing.stream.equals(station.stream)?
+                "▶  ":"◉  ")+station.name,16,INK,true);
+            heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+            title.setOnClickListener(v->playStation(station));
+            boolean saved=RadioStationFavorites.contains(this,station.stream);
+            TextView star=text(saved?"★":"☆",26,saved?GOLD:CYAN,true);
+            star.setContentDescription((saved?"Remove ":"Save ")+station.name+" favorite");
+            star.setPadding(dp(12),dp(4),dp(3),dp(4));
+            star.setOnClickListener(v->{
+                boolean added=RadioStationFavorites.toggle(this,station);
+                android.widget.Toast.makeText(this,
+                    added?"Station saved":"Station removed from favorites",0).show();
+                renderStations();
+            });
+            heading.addView(star);block.addView(heading);
+            TextView info=text(station.subtitle(),11,MUTED,false);
+            add(block,info,4);
+            info.setOnClickListener(v->playStation(station));
             block.setOnClickListener(v->playStation(station));
-            add(stationList,block,8);
+            add(stationList,block,8);count++;
+        }
+        if(count==0){
+            String empty=stationsLoading?"Finding stations near you…":
+                favoritesOnly?"No saved stations match. Tap the star to save a station.":
+                !term.isEmpty()?"No station matches your search.":
+                "No local stations listed. Tap FIND LOCAL STATIONS to retry.";
+            add(stationList,text(empty,12,MUTED,false),6);
         }
     }
     private void loadLocalStations(){
@@ -245,12 +321,20 @@ public final class NewsRadioActivity extends Activity {
     }
     private void stopStream(String message){
         playerGeneration++;
+        if(connectionTimeout!=null){
+            playerHandler.removeCallbacks(connectionTimeout);
+            connectionTimeout=null;
+        }
         if(streamPlayer!=null){
             try{streamPlayer.reset();streamPlayer.release();}
             catch(Exception ignored){}
             streamPlayer=null;
         }
         playing=null;
+        if(hasAudioFocus&&manager!=null){
+            manager.abandonAudioFocus(focusChange);
+            hasAudioFocus=false;
+        }
         if(message!=null&&stationStatus!=null)stationStatus.setText(message);
         renderStations();
     }
@@ -268,6 +352,16 @@ public final class NewsRadioActivity extends Activity {
         stopStream(null);
         final int revision=++playerGeneration;
         try{
+            manager=(AudioManager)getSystemService(AUDIO_SERVICE);
+            if(manager!=null){
+                int granted=manager.requestAudioFocus(focusChange,
+                    AudioManager.STREAM_MUSIC,AudioManager.AUDIOFOCUS_GAIN);
+                if(granted!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED){
+                    stationStatus.setText("Another app has audio. Try again.");
+                    return;
+                }
+                hasAudioFocus=true;
+            }
             MediaPlayer player=new MediaPlayer();
             streamPlayer=player;
             playing=station;
@@ -275,9 +369,17 @@ public final class NewsRadioActivity extends Activity {
             player.setDataSource(this,Uri.parse(station.stream));
             player.setOnPreparedListener(p->{
                 if(closed||revision!=playerGeneration)return;
-                p.start();
-                if(stationStatus!=null)stationStatus.setText("▶ Live · "+station.name);
-                renderStations();
+                if(connectionTimeout!=null){
+                    playerHandler.removeCallbacks(connectionTimeout);
+                    connectionTimeout=null;
+                }
+                try{
+                    p.start();
+                    if(stationStatus!=null)stationStatus.setText("▶ Live · "+station.name);
+                    renderStations();
+                }catch(RuntimeException error){
+                    stopStream("Station playback failed. Try another.");
+                }
             });
             player.setOnErrorListener((p,what,extra)->{
                 if(!closed&&revision==playerGeneration){
@@ -286,6 +388,11 @@ public final class NewsRadioActivity extends Activity {
                 return true;
             });
             player.prepareAsync();
+            connectionTimeout=()->{
+                if(!closed&&revision==playerGeneration)
+                    stopStream("Station connection timed out. Try another.");
+            };
+            playerHandler.postDelayed(connectionTimeout,20000L);
             stationStatus.setText("Connecting to "+station.name+"…");
             renderStations();
         }catch(Exception problem){
