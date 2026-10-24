@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>NewsWire Live Map</title><link rel="stylesheet" href="leaflet.css">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;font-family:Arial, sans-serif;color:#f0fcff;background:#07121e}
+#map{height:100dvh;width:100%;background:#0a1725}
+.leaflet-container{background:#0b1d2c}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#112d45;color:#f1faff;border:1px solid #3c8b9d}
+.leaflet-popup-content{min-width:175px;font-size:13px}
+#status{position:absolute;z-index:1000;top:12px;right:12px;max-width:55%;padding:9px 12px;
+ border:1px solid #418b9c;border-radius:13px;background:rgba(7,22,38,.92);
+ box-shadow:0 5px 25px rgba(0,0,0,.35);color:#b3f0f6;font-size:11px}
+#legend{position:absolute;z-index:1000;bottom:24px;left:10px;
+ padding:12px;border-radius:13px;border:1px solid #265c71;background:rgba(8,21,37,.9);
+ font-size:11px;line-height:1.9}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:6px}
+#zoomPanel{position:absolute;z-index:1000;right:10px;bottom:28px;display:flex;flex-direction:column;gap:7px}
+#zoomPanel button{font-size:21px;font-weight:bold;border:1px solid #3a809b;
+ padding:9px 13px;border-radius:12px;background:#113a57;color:#eef8ff}
+</style></head><body>
+<div id="map"></div>
+<div id="status" role="status">Satellite weather map loading…</div>
+<div id="legend"><b>LIVE WEATHER HAZARDS</b><div><i class="dot" style="background:#f35a74"></i>Tornado warning</div>
+<div><i class="dot" style="background:#ffc05a"></i>Severe storm / flood</div>
+<div><i class="dot" style="background:#47a6d7"></i>Other mapped alerts</div>
+<div><i class="dot" style="background:#f5f9ff"></i>Your location</div></div>
+<div id="zoomPanel"><button onclick="map.zoomIn()" aria-label="Zoom in">+</button>
+<button onclick="map.zoomOut()" aria-label="Zoom out">−</button></div>
+<script src="leaflet.js"></script><script>
+'use strict';
+const $=id=>document.getElementById(id);
+let map=null,base=null,alertLayer=null,positionMarker=null,warningCount=0;
+function safeMsg(s){$('status').textContent=s}
+function startMap(lat,lon){
+ if(typeof L==='undefined'){safeMsg('Map library unavailable. Try reopening with Internet.');return}
+ if(!Number.isFinite(lat)||!Number.isFinite(lon)){lat=38.5;lon=-97}
+ if(map)return;
+ map=L.map('map',{zoomControl:false,preferCanvas:true,minZoom:3,maxZoom:17,
+   doubleClickZoom:true,scrollWheelZoom:true}).setView([lat,lon],8);
+ base=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+   {maxZoom:17,attribution:'Esri Satellite imagery · NOAA/NWS alerts'}).addTo(map);
+ // Road/place labels remain subtle; failure of this optional layer is harmless.
+ L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+   {maxZoom:17,opacity:.76,attribution:'Esri reference labels'}).addTo(map);
+ positionMarker=L.circleMarker([lat,lon],
+   {radius:9,color:'#fff',weight:3,fillColor:'#2979ff',fillOpacity:1}).addTo(map);
+ positionMarker.bindTooltip('Current location or saved ZIP', {direction:'top'});
+ safeMsg('Satellite map ready · fetching official NWS alerts');
+}
+function setPosition(lat,lon,follow){
+ if(!map){startMap(lat,lon);return}
+ if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+ positionMarker.setLatLng([lat,lon]);
+ if(follow)map.setView([lat,lon],Math.max(8,map.getZoom()));
+}
+function alertColor(event){
+ if(event==='Tornado Warning')return '#ff396b';
+ if(event==='Flash Flood Warning'||event==='Severe Thunderstorm Warning')return '#ffc45a';
+ return '#48a6d8';
+}
+function showWarnings(data,count){
+ if(!map)return;
+ if(alertLayer)map.removeLayer(alertLayer);
+ let shown=0;
+ alertLayer=L.geoJSON(data,{
+  style:feature=>({
+    color:alertColor((feature.properties||{}).event),weight:3,
+    fillColor:alertColor((feature.properties||{}).event),fillOpacity:.14
+  }),
+  onEachFeature:(feature,layer)=>{
+    shown++;
+    const p=feature.properties||{};
+    const box=document.createElement('div');
+    const name=document.createElement('strong');name.textContent=p.event||'NWS Alert';
+    const area=document.createElement('div');area.textContent=(p.area||'').slice(0,160);
+    const end=document.createElement('small');end.textContent='Expires: '+(p.expires||'See warning details');
+    box.append(name,area,end);
+    layer.bindPopup(box);
+  }
+ }).addTo(map);
+ warningCount=count;
+ safeMsg(count===0?'NWS reports no active state alerts at the last check':
+   count+' official active NWS alerts · '+shown+' mapped polygons');
+}
+function mapError(message){safeMsg(message||'NWS warnings temporarily unavailable; never assume all-clear')}
+startMap(38.5,-97);
+</script></body></html>
