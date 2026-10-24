@@ -206,6 +206,14 @@ jobs:
           Path('/tmp/newswire_live_center.js').write_text(s.split('<script>')[-1].split('</script>')[0])
           PY
           node --check /tmp/newswire_live_center.js
+      - name: Verify expanded school sports reporting
+        run: |
+          set -euo pipefail
+          grep -q 'case "basketball"' newswave-android/app/src/main/java/com/newswave/live/LocalNewspapers.java
+          grep -q 'case "baseball"' newswave-android/app/src/main/java/com/newswave/live/LocalNewspapers.java
+          grep -q 'case "soccer"' newswave-android/app/src/main/java/com/newswave/live/LocalNewspapers.java
+          grep -q 'chosenSport' newswave-android/app/src/main/java/com/newswave/live/FootballBoardActivity.java
+          grep -q 'Publisher feed checked' newswave-android/app/src/main/java/com/newswave/live/FootballBoardActivity.java
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
