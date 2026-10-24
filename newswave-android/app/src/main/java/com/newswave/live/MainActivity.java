@@ -116,13 +116,18 @@ public class MainActivity extends Activity {
       android.appwidget.AppWidgetManager.getInstance(this);
     android.content.ComponentName widget=new android.content.ComponentName(
       this,NewsWireWidget.class);
-    if(Build.VERSION.SDK_INT>=26 &&manager.isRequestPinAppWidgetSupported()){
-      manager.requestPinAppWidget(widget,null,null);
-    }else{
-      new AlertDialog.Builder(this).setTitle("Add the NewsWire widget")
-        .setMessage("Long-press your Android home screen, choose Widgets, find NewsWire, and add the weather/news widget. It uses your saved ZIP for updates.")
-        .setPositiveButton("Got it",null).show();
+    try{
+      if(Build.VERSION.SDK_INT>=26 &&manager.isRequestPinAppWidgetSupported()){
+        if(manager.requestPinAppWidget(widget,null,null))return;
+      }
+    }catch(RuntimeException error){
+      android.util.Log.w("NewsWireWidget","Launcher declined widget pin request",error);
     }
+    // Samsung/other launchers may refuse programmatic pinning, or the current
+    // Home screen may lack enough free cells. Offer the reliable manual path.
+    new AlertDialog.Builder(this).setTitle("Add the NewsWire widget")
+      .setMessage("On your Home screen, press and hold an empty area, choose Widgets, then NewsWire. The compact widget needs a free 2 by 2 space. If the screen is full, choose another Home page.")
+      .setPositiveButton("Got it",null).show();
   }
   private void openDay(String section){
     Intent day=new Intent(this,DayPlannerActivity.class);

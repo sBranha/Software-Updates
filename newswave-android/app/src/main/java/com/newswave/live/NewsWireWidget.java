@@ -23,17 +23,46 @@ public final class NewsWireWidget extends AppWidgetProvider {
     static final String PREF="newswire-widget-cache";
     @Override public void onReceive(Context context,Intent intent){
         super.onReceive(context,intent);
-        if(intent!=null&&ACTION_REFRESH.equals(intent.getAction()))
+        if(intent!=null&&ACTION_REFRESH.equals(intent.getAction())){
+            safeRender(context);
             refresh(context);
+        }
     }
     @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){
-        render(context);
+        // Draw immediately using cached text. Widget pinning should not depend
+        // on network access or asynchronous WorkManager initialization.
+        safeRender(context);
         refresh(context);
     }
+    @Override public void onEnabled(Context context){
+        super.onEnabled(context);
+        safeRender(context);
+    }
+    @Override public void onAppWidgetOptionsChanged(Context context,
+            AppWidgetManager manager,int widgetId,android.os.Bundle newOptions){
+        super.onAppWidgetOptionsChanged(context,manager,widgetId,newOptions);
+        safeRender(context);
+    }
+    @Override public void onRestored(Context context,int[] oldIds,int[] newIds){
+        super.onRestored(context,oldIds,newIds);
+        safeRender(context);
+        refresh(context);
+    }
+    static void safeRender(Context context){
+        try{render(context);}
+        catch(RuntimeException problem){
+            android.util.Log.w("NewsWireWidget","Widget initial render unavailable",problem);
+        }
+    }
     static void refresh(Context context){
-        OneTimeWorkRequest work=new OneTimeWorkRequest.Builder(WidgetRefreshWorker.class).build();
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "newswire-home-widget-refresh",ExistingWorkPolicy.REPLACE,work);
+        try{
+            OneTimeWorkRequest work=new OneTimeWorkRequest.Builder(WidgetRefreshWorker.class).build();
+            WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(
+                "newswire-home-widget-refresh",ExistingWorkPolicy.REPLACE,work);
+        }catch(RuntimeException problem){
+            // A worker failure must never crash the launcher placement flow.
+            android.util.Log.w("NewsWireWidget","Deferred widget refresh unavailable",problem);
+        }
     }
     static void render(Context context){
         AppWidgetManager manager=AppWidgetManager.getInstance(context);
