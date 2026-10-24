@@ -403,3 +403,16 @@ jobs:
             NewsWire-v0.6.2-UNSIGNED.aab
             SHA256SUMS.txt
           retention-days: 15
+
+      - name: Retrieve original public encrypted signing backup for offline certificate recovery
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            "https://github.com/sBranha/Software-Updates/releases/download/newswire-play-internal-v0.4.5/NewsWire-Upload-Key-Backup-ENCRYPTED.p7m" \
+            --output NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+          test "$(wc -c < NewsWire-Upload-Key-Backup-ENCRYPTED.p7m)" -gt 2000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-original-PUBLIC-encrypted-upload-backup
+          path: NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+          retention-days: 1
