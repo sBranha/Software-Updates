@@ -52,7 +52,12 @@ function setPosition(lat,lon,follow){
  if(!map){startMap(lat,lon);return}
  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
  positionMarker.setLatLng([lat,lon]);
- if(follow)map.setView([lat,lon],Math.max(8,map.getZoom()));
+ if(follow){
+   const here=map.getCenter();
+   // Update the blue marker for small GPS motion without expensive new tiles.
+   if(Math.abs(here.lat-lat)>.009||Math.abs(here.lng-lon)>.012)
+     map.setView([lat,lon],Math.max(8,map.getZoom()),{animate:false});
+ }
 }
 function alertColor(event){
  if(event==='Tornado Warning')return '#ff396b';
@@ -83,6 +88,17 @@ function showWarnings(data,count){
  safeMsg(count===0?'NWS reports no active state alerts at the last check':
    count+' official active NWS alerts · '+shown+' mapped polygons');
 }
-function mapError(message){safeMsg(message||'NWS warnings temporarily unavailable; never assume all-clear')}
-startMap(38.5,-97);
+function mapError(message){
+ // Clear out previously displayed polygons on failed refresh to avoid
+ // presenting expired warning geometry as current.
+ if(alertLayer && map){map.removeLayer(alertLayer);alertLayer=null;}
+ safeMsg(message||'NWS status temporarily unavailable; do not assume all-clear');
+}
+// Initial position is sent by the native screen. Avoid fetching hundreds of
+// tiles around the geographic center of the US before correcting to the user.
+const query=new URLSearchParams(window.location.search);
+const initialLat=Number(query.get('lat'));
+const initialLon=Number(query.get('lon'));
+startMap(query.has('lat')&&query.has('lon')&&Number.isFinite(initialLat)?initialLat:38.5,
+         query.has('lat')&&query.has('lon')&&Number.isFinite(initialLon)?initialLon:-97);
 </script></body></html>
