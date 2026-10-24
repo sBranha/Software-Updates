@@ -89,6 +89,46 @@ final class ActiveAlertData {
             case "ca":case "california":return "CA";
             case "ny":case "new york":return "NY";
             case "va":case "virginia":return "VA";
+case "ak":case "alaska":return "AK";
+            case "az":case "arizona":return "AZ";
+            case "ar":case "arkansas":return "AR";
+            case "co":case "colorado":return "CO";
+            case "ct":case "connecticut":return "CT";
+            case "de":case "delaware":return "DE";
+            case "hi":case "hawaii":return "HI";
+            case "id":case "idaho":return "ID";
+            case "il":case "illinois":return "IL";
+            case "in":case "indiana":return "IN";
+            case "ia":case "iowa":return "IA";
+            case "ks":case "kansas":return "KS";
+            case "la":case "louisiana":return "LA";
+            case "me":case "maine":return "ME";
+            case "md":case "maryland":return "MD";
+            case "ma":case "massachusetts":return "MA";
+            case "mi":case "michigan":return "MI";
+            case "mn":case "minnesota":return "MN";
+            case "mo":case "missouri":return "MO";
+            case "mt":case "montana":return "MT";
+            case "ne":case "nebraska":return "NE";
+            case "nv":case "nevada":return "NV";
+            case "nh":case "new hampshire":return "NH";
+            case "nj":case "new jersey":return "NJ";
+            case "nm":case "new mexico":return "NM";
+            case "nd":case "north dakota":return "ND";
+            case "oh":case "ohio":return "OH";
+            case "ok":case "oklahoma":return "OK";
+            case "or":case "oregon":return "OR";
+            case "pa":case "pennsylvania":return "PA";
+            case "ri":case "rhode island":return "RI";
+            case "sd":case "south dakota":return "SD";
+            case "ut":case "utah":return "UT";
+            case "vt":case "vermont":return "VT";
+            case "wa":case "washington":return "WA";
+            case "wv":case "west virginia":return "WV";
+            case "wi":case "wisconsin":return "WI";
+            case "wy":case "wyoming":return "WY";
+            case "dc":case "district of columbia":return "DC";
+            case "pr":case "puerto rico":return "PR";
             default:return state.length()==2?state.toUpperCase(Locale.US):"";
         }
     }
@@ -104,13 +144,15 @@ final class ActiveAlertData {
         JSONArray features=data.optJSONArray("features");
         if(features==null)throw new IllegalStateException("NWS response missing features");
         ArrayList<Item> items=new ArrayList<>();
-        for(int i=0;i<features.length()&&items.size()<100;i++){
+        for(int i=0;i<features.length();i++){
             JSONObject feature=features.optJSONObject(i);
             if(feature==null)continue;
             JSONObject p=feature.optJSONObject("properties");
             if(p==null)continue;
             if("Cancel".equalsIgnoreCase(p.optString("messageType","")))continue;
             if(!"Actual".equalsIgnoreCase(p.optString("status","Actual")))continue;
+            if("Test".equalsIgnoreCase(p.optString("messageType",""))||
+               "Exercise".equalsIgnoreCase(p.optString("messageType","")))continue;
             String event=p.optString("event","Weather alert");
             if(event.isEmpty())event="Weather alert";
             String id=feature.optString("id",p.optString("id",""));
@@ -122,6 +164,9 @@ final class ActiveAlertData {
                 p.optString("@id",id),g));
         }
         Collections.sort(items,(x,y)->Integer.compare(rank(x),rank(y)));
+        // Take the most urgent alerts *after* sorting rather than silently
+        // truncating the raw feed before a tornado warning is encountered.
+        if(items.size()>200)items.subList(200,items.size()).clear();
         return new Result(items);
     }
     static int rank(Item i){
