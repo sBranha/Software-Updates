@@ -51,6 +51,7 @@ public final class LiveCenterActivity extends Activity {
     private LocationListener gpsListener;
     private boolean visible=false;
     private long lastAreaLookup=0;
+    private long lastLocationAlertCheck=0;
     private final Runnable periodicCheck=new Runnable(){
         @Override public void run(){
             if(!visible||closed)return;
@@ -226,6 +227,16 @@ public final class LiveCenterActivity extends Activity {
         loading=true;status.setText("Checking current NWS warnings…");
         renderAlerts();
         final int revision=++generation;
+        // Restore manual refresh after a stalled network request.
+        updates.postDelayed(()->{
+            if(closed||revision!=generation||!loading)return;
+            generation++; // Ignore any late response.
+            loading=false;
+            warnings=null; // Never present stale warnings as a current check.
+            status.setText("NWS check timed out — warning status unknown. Tap CHECK NWS to retry.");
+            if(mapReady)map.evaluateJavascript("mapError('NWS check timed out; status unknown')",null);
+            renderAlerts();
+        },30000L);
         final String region=state;
         final double latitude=lat,longitude=lon;
         new Thread(()->{
@@ -344,7 +355,13 @@ public final class LiveCenterActivity extends Activity {
                 lat=nextLat;lon=nextLon;
                 if(mapReady)map.evaluateJavascript(
                     "setPosition("+nextLat+","+nextLon+",true)",null);
-                if(newArea&&System.currentTimeMillis()-lastAreaLookup>60*1000){
+                // Recheck NWS point alerts after significant travel, throttled to five minutes.
+                long now=System.currentTimeMillis();
+                if(newArea&&!loading&&now-lastLocationAlertCheck>=5L*60*1000){
+                    lastLocationAlertCheck=now;
+                    updateAlerts();
+                }
+                if(newArea&&now-lastAreaLookup>60*1000){
                     lastAreaLookup=System.currentTimeMillis();
                     lookupGps();
                 }
