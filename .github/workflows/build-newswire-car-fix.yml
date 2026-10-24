@@ -230,6 +230,23 @@ jobs:
           grep -q 'newSnapshot.warningsAvailable' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -q '4_000_000L' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -Fq 'versionCode 22' newswave-android/app/build.gradle
+      - name: Assert v0.5.8 warning and map reliability safeguards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          alerts=Path('newswave-android/app/src/main/java/com/newswave/live/ActiveAlertData.java').read_text()
+          live=Path('newswave-android/app/src/main/java/com/newswave/live/LiveCenterActivity.java').read_text()
+          html=Path('newswave-android/app/src/main/assets/live_center_map.html').read_text()
+          assert alerts.index('if(Double.isFinite(lat)') < alerts.index('else if(!code.isEmpty())'), 'point warning priority regressed'
+          assert 'warnings=null; // Never present stale warnings' in live, 'failed refresh could show stale warnings'
+          assert '30000L' in live, 'NWS refresh stall timeout missing'
+          assert 'lastLocationAlertCheck' in live and 'updateAlerts();' in live, 'travel warnings may not refresh'
+          assert 'function recenter()' in html and 'followEnabled=false' in html, 'map recenter or manual pan missing'
+          assert 'map.setView([lat,lon],map.getZoom()' in html, 'GPS update resets zoom'
+          print('NewsWire reliability regression assertions passed')
+          PY
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
