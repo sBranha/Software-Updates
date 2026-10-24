@@ -80,6 +80,48 @@ public class MainActivity extends Activity {
   private void openPersonalized(){
     startActivity(new Intent(this,PersonalizedNewsActivity.class));
   }
+  private Intent localIntent(Class<?> target){
+    Intent output=new Intent(this,target);
+    String areaCity=city,areaRegion=state;
+    if(myAreaSnapshot!=null&&!Double.isNaN(dashboardLatitude)){
+      String resolved=myAreaSnapshot.area;
+      int comma=resolved.lastIndexOf(',');
+      if(comma>0){
+        areaCity=resolved.substring(0,comma).trim();
+        areaRegion=resolved.substring(comma+1).trim();
+      }
+    }
+    output.putExtra("city",areaCity);output.putExtra("state",areaRegion);
+    if(!Double.isNaN(dashboardLatitude)&&!Double.isNaN(dashboardLongitude)){
+      output.putExtra("latitude",dashboardLatitude);
+      output.putExtra("longitude",dashboardLongitude);
+    }
+    return output;
+  }
+  private void openLiveCenter(String section){
+    Intent display=localIntent(LiveCenterActivity.class);
+    display.putExtra("section",section);
+    startActivity(display);
+  }
+  private void openTV(){
+    startActivity(localIntent(StationFinderActivity.class));
+  }
+  private void openRadio(){
+    startActivity(localIntent(NewsRadioActivity.class));
+  }
+  private void addHomeWidget(){
+    android.appwidget.AppWidgetManager manager=
+      android.appwidget.AppWidgetManager.getInstance(this);
+    android.content.ComponentName widget=new android.content.ComponentName(
+      this,NewsWireWidget.class);
+    if(Build.VERSION.SDK_INT>=26 &&manager.isRequestPinAppWidgetSupported()){
+      manager.requestPinAppWidget(widget,null,null);
+    }else{
+      new AlertDialog.Builder(this).setTitle("Add the NewsWire widget")
+        .setMessage("Long-press your Android home screen, choose Widgets, find NewsWire, and add the weather/news widget. It uses your saved ZIP for updates.")
+        .setPositiveButton("Got it",null).show();
+    }
+  }
   private void openDay(String section){
     Intent day=new Intent(this,DayPlannerActivity.class);
     String areaCity=city,areaRegion=state;
@@ -388,6 +430,16 @@ public class MainActivity extends Activity {
       0xff88602a,()->openDay("schools"));
     categoryTile(content,"AROUND ME","Local festivals • Concerts • Community events","✦",
       0xff4b3889,()->openDay("events"));
+    categoryTile(content,"LIVE SATELLITE MAP","NWS warning polygons • Nearby stories & roads","◈",
+      0xff075f71,()->openLiveCenter("map"));
+    categoryTile(content,"EMERGENCY CENTER","Official warning details • Issued & expiry times","⚠",
+      0xff81414a,()->openLiveCenter("alerts"));
+    categoryTile(content,"TV STATION FINDER","Nearby broadcasters and their official streams","▣",
+      0xff2a5281,this::openTV);
+    categoryTile(content,"NEWSWIRE RADIO","Tap to hear local news, weather and sports","▶",
+      0xff624277,this::openRadio);
+    categoryTile(content,"HOME SCREEN WIDGET","Weather, NWS alerts and headlines on your phone","▤",
+      0xff235b55,this::addHomeWidget);
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
     pad(driveCard,16,16);
@@ -499,6 +551,10 @@ public class MainActivity extends Activity {
         12,!data.warningsAvailable?0xffffc373:data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
       LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(12);
       myAreaCard.addView(warning,wp);
+      TextView emergency=button("⚠  SEE OFFICIAL WARNINGS ON THE MAP",
+        ()->openLiveCenter("alerts"));
+      LinearLayout.LayoutParams em=lp(-1,-2);em.topMargin=dp(9);
+      myAreaCard.addView(emergency,em);
       if(!data.headlines.isEmpty()){
         LocalNewspapers.Headline headline=data.headlines.get(0);
         TextView top=text("LOCAL HEADLINE  /  "+headline.source,11,0xff70edf1,true);
