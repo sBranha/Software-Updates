@@ -1,7 +1,7 @@
-name: NewsWire 0.5.6 Android Auto weather map and warning build
+name: NewsWire 0.5.7 Android Auto weather map and warning build
 on:
   push:
-    branches: [newswire-my-day-v0.5.6]
+    branches: [newswire-live-center-v0.5.7]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q "applicationId 'com.newswire.live'" newswave-android/app/build.gradle
-          grep -q 'versionCode 20' newswave-android/app/build.gradle
-          grep -q "versionName '0.5.6'" newswave-android/app/build.gradle
+          grep -q 'versionCode 21' newswave-android/app/build.gradle
+          grep -q "versionName '0.5.7'" newswave-android/app/build.gradle
           grep -q 'targetSdk 36' newswave-android/app/build.gradle
           grep -q 'setContentTemplate(pane)' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           ! grep -q 'PaneTemplate panel=' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
@@ -49,7 +49,7 @@ jobs:
           grep -q 'void recenter()' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -q 'WeatherWarningOverlay.draw' newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java
           grep -q 'api.weather.gov/alerts/active' newswave-android/app/src/main/java/com/newswave/live/WeatherWarningOverlay.java
-          grep -q 'versionCode 20' newswave-android/app/build.gradle
+          grep -q 'versionCode 21' newswave-android/app/build.gradle
       - name: Verify minimal weather map and map style selectors
         run: |
           set -euo pipefail
@@ -94,7 +94,7 @@ jobs:
           grep -q 'renderMyArea()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -q 'trackStorms' newswave-android/app/src/main/assets/radar.html
           grep -q 'nearWarnings' newswave-android/app/src/main/assets/radar.html
-          grep -q 'versionCode 20' newswave-android/app/build.gradle
+          grep -q 'versionCode 21' newswave-android/app/build.gradle
       - name: Storm Ahead Alerts safety regression checks
         run: |
           set -euo pipefail
@@ -107,7 +107,7 @@ jobs:
           grep -q 'requestDriveAlerts()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -q 'warningsAvailable' newswave-android/app/src/main/java/com/newswave/live/MyAreaData.java
           grep -q 'START_NOT_STICKY' newswave-android/app/src/main/java/com/newswave/live/DriveWarningService.java
-          grep -q 'versionCode 20' newswave-android/app/build.gradle
+          grep -q 'versionCode 21' newswave-android/app/build.gradle
       - name: Verify breaking news + football pair
         run: |
           set -euo pipefail
@@ -118,7 +118,7 @@ jobs:
           grep -q 'class FootballBoardActivity' newswave-android/app/src/main/java/com/newswave/live/FootballBoardActivity.java
           grep -Fq 'userWidgetId=2070' newswave-android/app/src/main/java/com/newswave/live/FootballBoardActivity.java
           grep -Fq 'FootballBoardActivity' newswave-android/app/src/main/AndroidManifest.xml
-          grep -Fq 'versionCode 20' newswave-android/app/build.gradle
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
       - name: Drive and traffic source regression checks
         run: |
           set -euo pipefail
@@ -137,7 +137,7 @@ jobs:
           grep -q 'openDrive()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -q 'TrafficActivity' newswave-android/app/src/main/AndroidManifest.xml
           grep -q 'NewsWireDriveActivity' newswave-android/app/src/main/AndroidManifest.xml
-          grep -Fq 'versionCode 20' newswave-android/app/build.gradle
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
       - name: Final pair personalized news and morning briefing checks
         run: |
           set -euo pipefail
@@ -153,7 +153,7 @@ jobs:
           grep -q 'openPersonalized()' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -q 'MorningBriefingActivity' newswave-android/app/src/main/AndroidManifest.xml
           grep -q 'PersonalizedNewsActivity' newswave-android/app/src/main/AndroidManifest.xml
-          grep -Fq 'versionCode 20' newswave-android/app/build.gradle
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
       - name: Good Morning refresh regression check
         run: |
           set -euo pipefail
@@ -161,7 +161,7 @@ jobs:
           grep -q 'Last checked' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -q 'refreshStartedAt' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -q 'Live sources unavailable' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
-          grep -Fq 'versionCode 20' newswave-android/app/build.gradle
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
       - name: Four new daily dashboard features regression checks
         run: |
           set -euo pipefail
@@ -177,18 +177,46 @@ jobs:
           grep -q 'this::refresh' newswave-android/app/src/main/java/com/newswave/live/DayPlannerActivity.java
           grep -q 'openDay("schools")' newswave-android/app/src/main/java/com/newswave/live/MainActivity.java
           grep -q 'DayPlannerActivity' newswave-android/app/src/main/AndroidManifest.xml
-          grep -Fq 'versionCode 20' newswave-android/app/build.gradle
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
+      - name: Verify Live Center, radio, stations and widgets
+        run: |
+          set -euo pipefail
+          grep -q 'class ActiveAlertData' newswave-android/app/src/main/java/com/newswave/live/ActiveAlertData.java
+          grep -q 'alerts/active?area=' newswave-android/app/src/main/java/com/newswave/live/ActiveAlertData.java
+          grep -q 'geometry' newswave-android/app/src/main/java/com/newswave/live/ActiveAlertData.java
+          grep -q 'showWarnings' newswave-android/app/src/main/assets/live_center_map.html
+          grep -q 'World_Imagery' newswave-android/app/src/main/assets/live_center_map.html
+          grep -q 'class LiveCenterActivity' newswave-android/app/src/main/java/com/newswave/live/LiveCenterActivity.java
+          grep -q 'class NewsRadioActivity' newswave-android/app/src/main/java/com/newswave/live/NewsRadioActivity.java
+          grep -q 'TextToSpeech' newswave-android/app/src/main/java/com/newswave/live/NewsRadioActivity.java
+          grep -q 'class StationFinderActivity' newswave-android/app/src/main/java/com/newswave/live/StationFinderActivity.java
+          grep -q 'publicfiles.fcc.gov' newswave-android/app/src/main/java/com/newswave/live/StationFinderActivity.java
+          grep -q 'class NewsWireWidget' newswave-android/app/src/main/java/com/newswave/live/NewsWireWidget.java
+          grep -q 'class WidgetRefreshWorker' newswave-android/app/src/main/java/com/newswave/live/WidgetRefreshWorker.java
+          grep -q 'newswire_widget' newswave-android/app/src/main/res/xml/newswire_widget_info.xml
+          grep -q 'NewsWireWidget' newswave-android/app/src/main/AndroidManifest.xml
+          grep -q 'LiveCenterActivity' newswave-android/app/src/main/AndroidManifest.xml
+          grep -Fq 'versionCode 21' newswave-android/app/build.gradle
+      - name: Validate Live Center Map JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('newswave-android/app/src/main/assets/live_center_map.html')
+          s=p.read_text()
+          Path('/tmp/newswire_live_center.js').write_text(s.split('<script>')[-1].split('</script>')[0])
+          PY
+          node --check /tmp/newswire_live_center.js
       - name: Compile release app bundle
         run: gradle -p newswave-android :app:bundleRelease --no-daemon
       - name: Check output bundle archive
         run: |
-          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.5.6-UNSIGNED.aab
-          unzip -t NewsWire-v0.5.6-UNSIGNED.aab >/dev/null
-          sha256sum NewsWire-v0.5.6-UNSIGNED.aab > SHA256SUMS.txt
+          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.5.7-UNSIGNED.aab
+          unzip -t NewsWire-v0.5.7-UNSIGNED.aab >/dev/null
+          sha256sum NewsWire-v0.5.7-UNSIGNED.aab > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.5.6-unsigned-intermediate
+          name: NewsWire-v0.5.7-unsigned-intermediate
           path: |
-            NewsWire-v0.5.6-UNSIGNED.aab
+            NewsWire-v0.5.7-UNSIGNED.aab
             SHA256SUMS.txt
           retention-days: 15
