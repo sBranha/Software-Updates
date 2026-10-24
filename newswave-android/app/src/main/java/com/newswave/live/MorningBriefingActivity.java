@@ -223,23 +223,30 @@ public final class MorningBriefingActivity extends Activity {
                     render();
                 }
             });
-            MyAreaData.Snapshot result=Double.isNaN(nextLat)||Double.isNaN(nextLon)?
-                null:MyAreaData.load(nextLat,nextLon,nextCity,nextRegion);
+            MyAreaData.Snapshot result=null;
+            try{
+                if(!Double.isNaN(nextLat)&&!Double.isNaN(nextLon))
+                    result=MyAreaData.load(nextLat,nextLon,nextCity,nextRegion);
+            }catch(Exception error){
+                android.util.Log.w("NewsWireMorning","Morning refresh unavailable",error);
+            }
+            final MyAreaData.Snapshot newSnapshot=result;
             final String foundCity=nextCity,foundRegion=nextRegion;
             final double foundLat=nextLat,foundLon=nextLon;
             runOnUiThread(()->{
                 if(closed||revision!=generation)return;
                 city=foundCity;region=foundRegion;lat=foundLat;lon=foundLon;
-                loading=false;snapshot=result;
+                loading=false;snapshot=newSnapshot;
                 refreshPhase="";
-                if(result==null){
-                    refreshOutcome="No location is set. Enable GPS or save a ZIP on NewsWire's home screen.";
+                if(newSnapshot==null){
+                    refreshOutcome="Refresh unavailable or no area set. Check your ZIP and try again.";
                 }else{
                     String time=new java.text.SimpleDateFormat("h:mm a",Locale.US)
-                        .format(new java.util.Date(result.checkedAt));
-                    refreshOutcome="Last checked "+time+" · "+
-                        (!result.conditionsAvailable&&!result.warningsAvailable&&result.headlines.isEmpty()?
-                        "Live sources unavailable; please try again.":"Live source check completed.");
+                        .format(new java.util.Date(newSnapshot.checkedAt));
+                    refreshOutcome="Checked "+time+
+                        " · Weather "+(newSnapshot.conditionsAvailable?"OK":"unavailable")+
+                        " · NWS alerts "+(newSnapshot.warningsAvailable?"OK":"unavailable")+
+                        " · Headlines "+newSnapshot.headlines.size();
                 }
                 render();
             });
