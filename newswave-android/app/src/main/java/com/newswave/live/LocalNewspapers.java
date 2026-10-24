@@ -80,6 +80,15 @@ final class LocalNewspapers {
       case "events":
         query="("+city+" "+region+") (upcoming festival OR community event OR local concert OR fair OR arts event)";
         break;
+      case "basketball":
+        query="("+city+" "+region+") (high school basketball OR varsity basketball scores)";
+        break;
+      case "baseball":
+        query="("+city+" "+region+") (high school baseball OR high school softball)";
+        break;
+      case "soccer":
+        query="("+city+" "+region+") (high school soccer OR varsity soccer)";
+        break;
       case "football":
         query="("+city+" "+region+") (high school football score OR final OR Friday night football)";
         break;
