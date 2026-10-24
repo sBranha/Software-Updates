@@ -262,6 +262,12 @@ jobs:
           assert 'private void inspect(Location fix)' in s
           print('Storm Ahead coverage assertions passed')
           PY
+      - name: QA package must not overwrite installed Google Play NewsWire
+        run: |
+          set -euo pipefail
+          grep -Fq "applicationIdSuffix '.test'" newswave-android/app/build.gradle
+          grep -Fq 'android:label="NewsWire TEST"' newswave-android/app/src/debug/AndroidManifest.xml
+          grep -Fq 'versionCode 22' newswave-android/app/build.gradle
       - name: Compile installable debug APK and unsigned release bundle
         run: gradle -p newswave-android :app:assembleDebug :app:bundleRelease --no-daemon
       - name: Verify package archives and checksums
