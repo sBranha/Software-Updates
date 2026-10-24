@@ -44,3 +44,11 @@ Do not reimplement these blindly; inspect the actual HEAD files and test before 
 Continue code edits on this branch using the connected GitHub tools. Run the full build workflow, inspect outcome, verify the exact artifact bytes, archive and package metadata, and only then deliver it. When a user asks "continue NewsWire", act on this repository instead of repeatedly asking them to paste previous chats. Never invent a successful build, Play publication or working download link.
 
 _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
+
+## Final v0.5.8 QA outcome (Oct 24, 2026 UTC)
+- Final GitHub Actions QA run **40060896317 passed**: https://github.com/sBranha/Software-Updates/actions/runs/40060896317
+- Compile, map JavaScript checks, regression checks, APK/AAB ZIP integrity and SHA256 checksum comparison passed.
+- **NewsWire TEST** debug APK now has separate Android application ID `com.newswire.live.test` and label `NewsWire TEST`, so it can be installed alongside the existing Play app. It is NOT the production Play package.
+- The production release AAB `com.newswire.live` remains UNSIGNED, and must NOT be presented as Play-ready.
+- Signing blocker: v0.5.7 AAB signer SHA1 `CE:C0:3B:7E:1A:0A:CD:89:98:89:D3:ED:54:BA:A2:31:8E:C4:04:00`. The available older upload-key backup certificate does not match it. Restore/verify the approved private upload key, or confirm an approved Play Console key reset, before signing. Do not expose private keys in chat or GitHub.
+- Real phone/Android Auto tests and live provider checks still pending. Do not claim publishing to Play completed.
