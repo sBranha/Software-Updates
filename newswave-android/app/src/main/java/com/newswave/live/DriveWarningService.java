@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Explicitly opt-in, user-started foreground location monitoring.
- * Checks active NWS tornado warnings at the present location and at
+ * Checks active NWS tornado, severe thunderstorm and flash flood warnings at the present location and at
  * points projected along the device's current course. It does not know
  * the navigation route and MUST NOT imply that no warning means safety.
  * No driving-map blocking dialogs and no automated car audio.
@@ -62,9 +62,9 @@ public final class DriveWarningService extends Service implements LocationListen
         notifications.createNotificationChannel(new NotificationChannel(MONITOR_CHANNEL,
             "NewsWire driving weather monitoring",NotificationManager.IMPORTANCE_LOW));
         NotificationChannel danger=new NotificationChannel(WARNING_CHANNEL,
-            "Tornado warnings while driving",NotificationManager.IMPORTANCE_HIGH);
+            "Severe weather warnings while driving",NotificationManager.IMPORTANCE_HIGH);
         danger.enableVibration(true);
-        danger.setDescription("Official NWS tornado warnings for your location or heading");
+        danger.setDescription("Official NWS severe weather warnings for your location or heading");
         notifications.createNotificationChannel(danger);
     }
     private PendingIntent launch(){
@@ -164,7 +164,7 @@ public final class DriveWarningService extends Service implements LocationListen
         point.setLongitude(Math.toDegrees(destLon));
         return point;
     }
-    private Set<String> tornadoWarnings(Location location) throws Exception{
+    private Set<String> severeWarnings(Location location) throws Exception{
         String coord=String.format(Locale.US,"%.5f,%.5f",
             location.getLatitude(),location.getLongitude());
         HttpURLConnection connection=null;
@@ -194,41 +194,60 @@ public final class DriveWarningService extends Service implements LocationListen
                 if(item==null)continue;
                 JSONObject props=item.optJSONObject("properties");
                 if(props==null)continue;
-                if(!"Tornado Warning".equalsIgnoreCase(props.optString("event","")))continue;
+                String event=props.optString("event","");
+                if(!"Tornado Warning".equalsIgnoreCase(event)
+                    &&!"Severe Thunderstorm Warning".equalsIgnoreCase(event)
+                    &&!"Flash Flood Warning".equalsIgnoreCase(event))continue;
                 if("Cancel".equalsIgnoreCase(props.optString("messageType","")))continue;
                 if(!"Actual".equalsIgnoreCase(props.optString("status","Actual")))continue;
                 String id=item.optString("id",props.optString("id",""));
-                if(!id.isEmpty())result.add(id);
+                if(!id.isEmpty())result.add(event+"|"+id);
             }
             return result;
         }finally{if(connection!=null)connection.disconnect();}
     }
+    private static String mostUrgent(Set<String> alerts){
+        for(String kind:new String[]{"Tornado Warning","Flash Flood Warning",
+                                     "Severe Thunderstorm Warning"}){
+            for(String key:alerts)if(key.startsWith(kind+"|"))return key;
+        }
+        return null;
+    }
+    private static String warningType(String key){
+        int separator=key.indexOf('|');
+        return separator<0?"NWS Warning":key.substring(0,separator);
+    }
     private void inspect(Location fix) throws Exception{
-        Set<String> current=tornadoWarnings(fix);
+        Set<String> current=severeWarnings(fix);
         if(!active)return;
-        if(!current.isEmpty()){
-            emit("IN_WARNING",current.iterator().next(),
-                "Tornado warning at your location",
-                "An active NWS tornado warning covers your location. Seek safe shelter; do not continue driving into the storm.");
+        String atLocation=mostUrgent(current);
+        if(atLocation!=null){
+            String event=warningType(atLocation);
+            emit("IN_WARNING",atLocation,
+                event+" at your location",
+                "Official NWS "+event+" covers your current position. "+
+                ("Tornado Warning".equals(event)?"Seek sturdy shelter immediately.":
+                "Flash Flood Warning".equals(event)?"Never drive through flooded roads.":
+                "Monitor official guidance and seek shelter if threatened."));
             return;
         }
-        // Heading samples only when the fix carries a meaningful course and
-        // motion. A GPS point does not reveal the driver's actual intended route.
+        // Straight-line heading is not a navigation route or storm-motion forecast.
         if(fix.hasBearing()&&fix.hasSpeed()&&fix.getSpeed()>=5f
             &&fix.getAccuracy()<=100f){
             for(double meters:new double[]{3200,8000}){
                 Location point=projected(fix,meters);
-                Set<String> future=tornadoWarnings(point);
+                Set<String> future=severeWarnings(point);
                 if(!active)return;
-                for(String id:future){
-                    if(!current.contains(id)){
-                        String miles=String.format(Locale.US,"%.0f",meters/1609.344);
-                        emit("AHEAD",id,
-                            "Tornado warning ahead on your heading",
-                            "Your current direction may enter an NWS tornado warning in about "
-                            +miles+" miles. Avoid the warned area and seek official guidance.");
-                        return;
-                    }
+                future.removeAll(current);
+                String ahead=mostUrgent(future);
+                if(ahead!=null){
+                    String event=warningType(ahead);
+                    String miles=String.format(Locale.US,"%.0f",meters/1609.344);
+                    emit("AHEAD",ahead,event+" ahead on your heading",
+                        "Your current heading may enter an official NWS "+event+
+                        " area in approximately "+miles+
+                        " miles. This is not a route or arrival-time prediction. Check official guidance.");
+                    return;
                 }
             }
         }
