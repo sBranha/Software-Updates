@@ -292,12 +292,19 @@ public final class LiveCenterActivity extends Activity {
                 runOnUiThread(()->{
                     if(closed)return;
                     boolean moved=Double.isNaN(lat)||Math.abs(lat-a)>.02||Math.abs(lon-b)>.02;
-                    if(!moved)return;
-                    lat=a;lon=b;city=c;state=st;
-                    areaLabel.setText("⌖ "+(city.isEmpty()?"Your location":city+", "+state)+" · GPS");
+                    boolean changedArea=!st.isEmpty()&&!st.equalsIgnoreCase(state);
+                    boolean changedCity=!c.isEmpty()&&!c.equalsIgnoreCase(city);
+                    if(!moved&&!changedArea&&!changedCity)return;
+                    lat=a;lon=b;
+                    if(!c.isEmpty())city=c;
+                    if(!st.isEmpty())state=st;
+                    areaLabel.setText("⌖ "+(city.isEmpty()?"Your GPS position":city+", "+state)+" · GPS");
                     if(mapReady)map.evaluateJavascript("setPosition("+a+","+b+",true)",null);
-                    if(loading){generation++;loading=false;}
-                    updateAlerts();loadNews();
+                    if(changedArea||warnings==null&&!loading){
+                        if(loading){generation++;loading=false;}
+                        updateAlerts();
+                    }
+                    if(changedArea||changedCity)loadNews();
                 });
             }catch(Exception error){android.util.Log.w("NewsWireLive","GPS unavailable",error);}
         },"newswire-live-gps").start();
