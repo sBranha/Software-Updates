@@ -160,7 +160,8 @@ jobs:
           grep -q 'REFRESHING' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -q 'Last checked' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -q 'refreshStartedAt' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
-          grep -q 'Live sources unavailable' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
+          grep -q 'Refresh unavailable or no area set' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
+          grep -q 'newSnapshot.warningsAvailable' newswave-android/app/src/main/java/com/newswave/live/MorningBriefingActivity.java
           grep -Fq 'versionCode 22' newswave-android/app/build.gradle
       - name: Four new daily dashboard features regression checks
         run: |
