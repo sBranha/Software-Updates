@@ -457,14 +457,22 @@ public final class NewsWaveCarService extends CarAppService {
             double scale=Math.pow(2,newZoom-oldZoom);
             if(scale==1.)return;
             int w=previous.getWidth(),h=previous.getHeight();
-            Bitmap provisional=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
-            Canvas canvas=new Canvas(provisional);
-            canvas.drawColor(Color.rgb(13,26,39));
-            android.graphics.Matrix matrix=new android.graphics.Matrix();
-            matrix.setScale((float)scale,(float)scale,w/2f,h/2f);
-            canvas.drawBitmap(previous,matrix,new Paint(Paint.FILTER_BITMAP_FLAG));
-            synchronized(lock){finished=provisional;}
-            display();
+            // Large Android Auto surfaces plus rapid pinch gestures can
+            // exhaust memory if we allocate an unbounded preview bitmap.
+            if(w<=0||h<=0||(long)w*h>4_000_000L)return;
+            try{
+                Bitmap provisional=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+                Canvas canvas=new Canvas(provisional);
+                canvas.drawColor(Color.rgb(13,26,39));
+                android.graphics.Matrix matrix=new android.graphics.Matrix();
+                matrix.setScale((float)scale,(float)scale,w/2f,h/2f);
+                canvas.drawBitmap(previous,matrix,new Paint(Paint.FILTER_BITMAP_FLAG));
+                synchronized(lock){finished=provisional;}
+                display();
+            }catch(OutOfMemoryError memory){
+                Log.w(LOG,"Car zoom preview skipped due to memory pressure");
+                // The actual tiles will still render through refresh().
+            }
         }
         @Override public void onScale(float x,float y,float factor){
             // Host supplies a relative gesture scaling factor. Some hosts issue
