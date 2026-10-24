@@ -20,7 +20,8 @@
 .meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 14px 11px}.meta .title{font-size:16px;font-weight:800}.meta .note{font-size:11px;color:var(--muted);margin-top:4px}.badge{background:#183b43;color:#83f2e4;border-radius:10px;padding:6px 9px;font-size:10px;font-weight:750;white-space:nowrap}
 .mapstylebar{display:flex;gap:7px;margin:0 12px 10px;flex-wrap:wrap}.stylebtn{border:1px solid #32475b;background:#17263b;color:#e6f7ff;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700}.stylebtn.active{background:#123f4e;border-color:#24a7bc;color:#89eff3}
 .mapShell{position:relative;margin:0 11px;border:1px solid #31516b;border-radius:18px;overflow:hidden;background:#111c2c}
-.stormWidget{margin:10px 12px 0;border:1px solid #3c7288;background:linear-gradient(130deg,#10364b,#091b2a);border-radius:17px;padding:13px}.stormTitle{color:#8cecf6;font-size:12px;letter-spacing:1.2px;font-weight:900}.stormActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.stormActions button{background:#184356;border:1px solid #327d96;color:#f0fdff;padding:11px 12px;border-radius:11px;font-weight:750;flex:1;min-width:135px}.stormWarn{margin-top:9px;color:#d5e8f4;font-size:12px}.mapGrid{height:min(58vh,530px);min-height:350px;display:grid;grid-template-columns:1fr}.mapGrid.compare{grid-template-columns:1fr 1fr}.map{height:100%;width:100%;background:#111a28}.mapGrid.compare .map:nth-child(2){border-left:2px solid #2b5269;display:block}.map:nth-child(2){display:none}
+.stormWidget{margin:10px 12px 0;border:1px solid #3c7288;background:linear-gradient(130deg,#10364b,#091b2a);border-radius:17px;padding:13px}.stormTitle{color:#8cecf6;font-size:12px;letter-spacing:1.2px;font-weight:900}.stormActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.stormActions button{background:#184356;border:1px solid #327d96;color:#f0fdff;padding:11px 12px;border-radius:11px;font-weight:750;flex:1;min-width:135px}.stormWarn{margin-top:9px;color:#d5e8f4;font-size:12px}
+.threatList{display:grid;gap:8px;margin-top:11px}.threatRow{background:#13283d;border:1px solid #3a667b;border-left:4px solid #ffa34e;border-radius:11px;padding:11px;color:#eaf8ff;width:100%;text-align:left}.threatRow strong{display:block;font-size:12px;color:#ffe09d}.threatRow span{display:block;font-size:11px;margin-top:5px;color:#bdcede}.threatExplainer{margin-top:9px;font-size:11px;color:#a9c6d6;line-height:1.45}.mapGrid{height:min(58vh,530px);min-height:350px;display:grid;grid-template-columns:1fr}.mapGrid.compare{grid-template-columns:1fr 1fr}.map{height:100%;width:100%;background:#111a28}.mapGrid.compare .map:nth-child(2){border-left:2px solid #2b5269;display:block}.map:nth-child(2){display:none}
 .mapLabels{position:absolute;top:10px;left:84px;right:11px;display:flex;justify-content:space-between;pointer-events:none;z-index:450}.mapLabel{background:#0e1b2ee6;border:1px solid #40617a;border-radius:8px;padding:5px 9px;font-size:10px;font-weight:800;letter-spacing:.6px}
 .leaflet-container{font-family:inherit!important;background:#101c2d!important}.leaflet-control-attribution{font-size:9px!important}.leaflet-control-zoom a{background:#15283d!important;color:#e8faff!important;border-color:#31516b!important}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#15253a!important;color:#edf7ff!important}
 .mapHint{position:absolute;z-index:460;bottom:25px;left:50%;transform:translateX(-50%);border-radius:9px;padding:7px 12px;white-space:nowrap;background:#0a1427dd;color:#dbf5fc;font-size:10px;pointer-events:none}
@@ -55,8 +56,9 @@
 </div>
 <div class="stormWidget">
  <div class="stormTitle">STORM WATCH / YOUR CURRENT AREA</div>
- <div class="stormActions"><button id="trackStorms">▶ NOAA STORM LOOP</button><button id="nearWarnings">⚠ WARNINGS NEAR ME</button></div>
+ <div class="stormActions"><button id="trackStorms">▶ NOAA STORM LOOP</button><button id="nearWarnings">⚠ WARNINGS NEAR ME</button><button id="nearbyThreats" aria-pressed="false">◎ NEARBY THREATS</button></div>
  <div id="stormStatus" class="stormWarn">Use GPS to check official NWS warnings near you.</div>
+ <div id="threatPanel" hidden><div id="threatSummary" class="stormWarn" role="status">Waiting for current GPS and NWS warnings…</div><div id="threatList" class="threatList"></div><div class="threatExplainer">Distance to official NWS warning boundaries within 100 miles, not storm-cell motion or an arrival forecast. Some alerts have no mapped area. Keep official emergency alerts enabled.</div></div>
  </div>
  <div class="mapstylebar" aria-label="Radar map type"><button id="styleSatellite" class="stylebtn active">Satellite</button><button id="styleTerrain" class="stylebtn">Terrain</button><button id="styleRoad" class="stylebtn">Road Map</button></div>
 <div class="mapShell">
@@ -77,6 +79,7 @@
 <div class="foot">Data: <a href="https://radar.weather.gov/">NOAA / National Weather Service</a> · Station inventory: NOAA Coastal Services · Base map: © OpenStreetMap contributors. Unofficial independent viewer, not endorsed by NOAA. Radial velocity is motion toward/away from a radar, not ground-level wind speed. Do not use this app as your only source for life-safety warnings. <span id="stationFoot"></span></div>
 <script src="leaflet.js"></script>
 <script src="stations.js"></script>
+<script src="storm_tracking.js"></script>
 <script>
 (function(){
 'use strict';
@@ -93,6 +96,9 @@ sites.forEach(s=>byId.set(s.id,s));
 let selected=null, current='SR_BREF', map=null, secondary=null, radarLayer=null, splitLayer=null, markers=null, mosaic=null, alerts=null, comparing=false, showAlerts=true, pending=null, preview=false, warningCount=0;
 let gps=null, gpsPin=null, follow=true, baseLayer=null, compareBaseLayer=null;
 let nearbyAlertStatus='';
+let nearbyThreatsEnabled=false,nearbyThreatFeatures=null,nearbyThreatFetchedAt=0;
+let nearbyThreatLoading=false,nearbyThreatRequestAt=0,nearbyThreatError='';
+let lastThreatRenderedAt=0,lastThreatPosition=null;
 let mapStyle='satellite';try{mapStyle=localStorage.getItem('newswireRadarMapStyle')||'satellite'}catch(e){};
 if(!['satellite','terrain','road'].includes(mapStyle))mapStyle='satellite';
 let saves=[];try{saves=JSON.parse(localStorage.getItem('radarFavorites')||'[]')}catch(e){}
@@ -252,6 +258,76 @@ function playStormLoop(){
  $('previewBox').scrollIntoView({behavior:'smooth',block:'start'});
  $('stormStatus').textContent='NOAA '+selected.id+' radar history · not a future forecast.';
 }
+
+function updateTrackedThreatList(){
+ if(!nearbyThreatsEnabled)return;
+ const summary=$('threatSummary'),list=$('threatList');
+ list.replaceChildren();
+ if(!gps){summary.textContent='GPS unavailable. Allow location to see nearby official warnings.';return;}
+ if(!window.NewsWireStormTracker){summary.textContent='Storm tracking component unavailable. Check official NWS alerts.';return;}
+ if(!Array.isArray(nearbyThreatFeatures)){
+   summary.textContent=nearbyThreatLoading?'Loading official NWS warning boundaries…':
+      'NWS warning data unavailable. Do not assume your location is safe.';
+   return;
+ }
+ const ageMinutes=Math.max(0,Math.floor((Date.now()-nearbyThreatFetchedAt)/60000));
+ const stale=ageMinutes>=10;
+ let note=(stale?'⚠ NWS feed is '+ageMinutes+' minutes old':
+     'NWS warning data checked '+(ageMinutes<1?'just now':ageMinutes+' min ago'));
+ if(nearbyThreatError)note+=' · Refresh failed. Confirm with NWS.';
+ const nearest=window.NewsWireStormTracker.nearby(nearbyThreatFeatures,gps[0],gps[1],100,6);
+ summary.textContent=note+' · '+(nearest.length?
+   nearest.length+' closest mapped hazards':'No mapped storm warning boundaries within 100 miles; unmapped alerts may apply');
+ for(const item of nearest){
+   const row=document.createElement('button');row.type='button';row.className='threatRow';
+   const heading=document.createElement('strong');
+   heading.textContent=(item.inside?'INSIDE WARNING AREA':Math.round(item.miles)+' mi to boundary')+' · '+item.event;
+   const area=document.createElement('span');area.textContent=item.area;
+   const expiry=document.createElement('span');
+   const date=Date.parse(item.expires);
+   expiry.textContent='NWS'+(Number.isFinite(date)?' · Expires '+new Date(date).toLocaleString():' · Expiration unavailable')+' · Tap to locate';
+   row.append(heading,area,expiry);
+   row.onclick=()=>{
+     try{
+       const bounds=L.geoJSON(item.feature).getBounds();
+       if(bounds.isValid()){
+         follow=false;$('followButton').classList.remove('selected');
+         map.fitBounds(bounds.pad(.15),{maxZoom:10});
+         $('hint').textContent='Selected NWS warning area · tap boundary for official details';
+         $('mapGrid').scrollIntoView({behavior:'smooth',block:'center'});
+       }
+     }catch(e){summary.textContent='Could not locate this warning area. Use official NWS alerts.';}
+   };
+   list.appendChild(row);
+ }
+ lastThreatPosition=gps.slice();lastThreatRenderedAt=Date.now();
+}
+function fetchTrackedThreats(){
+ if(nearbyThreatLoading||!gps)return;
+ nearbyThreatLoading=true;nearbyThreatRequestAt=Date.now();nearbyThreatError='';
+ updateTrackedThreatList();
+ fetch('https://api.weather.gov/alerts/active?status=actual',
+  {headers:{Accept:'application/geo+json'}})
+ .then(r=>{if(!r.ok)throw Error('NWS HTTP '+r.status);return r.json()})
+ .then(data=>{
+   if(!Array.isArray(data.features))throw Error('NWS warning features missing');
+   nearbyThreatFeatures=data.features.filter(f=>f&&f.geometry&&
+     window.NewsWireStormTracker.stormEvent((f.properties||{}).event));
+   nearbyThreatFetchedAt=Date.now();nearbyThreatError='';
+ })
+ .catch(e=>{nearbyThreatError=String(e.message||e);})
+ .finally(()=>{nearbyThreatLoading=false;updateTrackedThreatList();});
+}
+function toggleNearbyThreats(){
+ nearbyThreatsEnabled=!nearbyThreatsEnabled;
+ $('nearbyThreats').classList.toggle('selected',nearbyThreatsEnabled);
+ $('nearbyThreats').setAttribute('aria-pressed',String(nearbyThreatsEnabled));
+ $('threatPanel').hidden=!nearbyThreatsEnabled;
+ if(!nearbyThreatsEnabled)return;
+ updateTrackedThreatList();
+ if(!nearbyThreatFeatures||Date.now()-nearbyThreatFetchedAt>300000)fetchTrackedThreats();
+}
+
 function warningsNearMe(){
  if(!gps){$('stormStatus').textContent='Allow GPS access to check NWS warnings for your location.';return;}
  $('stormStatus').textContent='Checking active National Weather Service alerts…';
@@ -275,6 +351,11 @@ function updateAlerts(){
  fetch('https://api.weather.gov/alerts/active?status=actual',{headers:{'Accept':'application/geo+json'}})
  .then(r=>{if(!r.ok)throw Error('NWS returned '+r.status);return r.json()})
  .then(data=>{
+   if(nearbyThreatsEnabled && Array.isArray(data.features)){
+     nearbyThreatFeatures=data.features.filter(f=>f&&f.geometry&&
+        window.NewsWireStormTracker.stormEvent((f.properties||{}).event));
+     nearbyThreatFetchedAt=Date.now();nearbyThreatError='';updateTrackedThreatList();
+   }
    if(!showAlerts)return;
    const allowed=/^(Tornado Warning|Severe Thunderstorm Warning|Flash Flood Warning|Flood Warning|Extreme Wind Warning|Snow Squall Warning|Winter Storm Warning|Tornado Watch|Severe Thunderstorm Watch)$/;
    const subset={type:'FeatureCollection',features:(data.features||[]).filter(f=>f.geometry&&allowed.test((f.properties||{}).event||''))};
@@ -294,6 +375,11 @@ window.updateNewsWirePosition=function(lat,lon){
  }else gpsPin.setLatLng(gps);
  if(follow){map.setView(gps,Math.max(7,map.getZoom()),{animate:false});}
  if(!nearbyAlertStatus && $('stormStatus'))$('stormStatus').textContent='GPS active · tap WARNINGS NEAR ME to check this location';
+ if(nearbyThreatsEnabled){
+   const moved=!lastThreatPosition||Math.abs(lastThreatPosition[0]-lat)>.025||Math.abs(lastThreatPosition[1]-lon)>.03;
+   if(moved||Date.now()-lastThreatRenderedAt>30000)updateTrackedThreatList();
+   if(Date.now()-nearbyThreatFetchedAt>300000&&Date.now()-nearbyThreatRequestAt>150000)fetchTrackedThreats();
+ }
 };
 function init() {
  if(typeof L==='undefined'){status('Map library could not load. Connect to the Internet and reopen Radar.',true);$('count').textContent='Map offline';return}
@@ -319,10 +405,11 @@ function init() {
  $('previewButton').onclick=()=>{if(!selected){playStormLoop();return}preview=!preview;if(preview){drawPreview();$('previewBox').scrollIntoView({behavior:'smooth',block:'center'})}else $('previewBox').style.display='none'};
  $('trackStorms').onclick=playStormLoop;
  $('nearWarnings').onclick=warningsNearMe;
+ $('nearbyThreats').onclick=toggleNearbyThreats;
  $('closePreview').onclick=()=>{preview=false;$('previewBox').style.display='none'};
  $('alertsButton').onclick=()=>{showAlerts=!showAlerts;$('alertsButton').classList.toggle('selected',showAlerts);updateAlerts()};
  $('saveButton').onclick=()=>{if(!selected)return;const i=saves.indexOf(selected.id);if(i>=0)saves.splice(i,1);else saves.push(selected.id);savePrefs();$('saveButton').textContent=saves.includes(selected.id)?'★ Saved':'☆ Save station'};
- $('refreshButton').onclick=()=>{if(selected){updateRadar();if(preview)drawPreview()}else drawMosaic();if(showAlerts)updateAlerts()};
+ $('refreshButton').onclick=()=>{if(selected){updateRadar();if(preview)drawPreview()}else drawMosaic();if(showAlerts)updateAlerts();if(nearbyThreatsEnabled)fetchTrackedThreats()};
  renderProducts();national();$('alertsButton').classList.add('selected');updateAlerts();if(gps)window.updateNewsWirePosition(gps[0],gps[1]);
 }
 window.addEventListener('load',init);
