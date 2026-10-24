@@ -16,6 +16,7 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
+import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -38,6 +39,7 @@ public final class DayPlannerActivity extends Activity {
     private static final int BG=0xff071728,FG=Color.WHITE,
         CYAN=0xff8ae5ee,MUTED=0xffb4c9d7,AMBER=0xffffcd85,SOFT=0xff8ce5bb;
     private final ExecutorService workers=Executors.newFixedThreadPool(4);
+    private final Handler refreshWatchdog=new Handler(Looper.getMainLooper());
     private ScrollView scroll;
     private LinearLayout root,overview,hoursContainer,schoolContainer,eventContainer;
     private TextView status;
@@ -250,13 +252,26 @@ public final class DayPlannerActivity extends Activity {
         // Keep the previous information visible, but label it as stale until updated.
         // If a feed fails, the user can still read the previous content with its timestamp.
         final int rev=++generation;
+        // Release the refresh control even if one feed never returns.
+        refreshWatchdog.postDelayed(()->{
+            if(closed||rev!=generation||!refreshing)return;
+            generation++; // Ignore late results from this check.
+            refreshing=false;
+            sourceError=true;
+            status.setText("Refresh timed out. Some sources are unavailable; previous data may be outdated. Tap REFRESH ALL to retry.");
+            renderAll();
+        },35000L);
         status.setText("Refreshing official sources… Previous check: "+
             (updatedAt==0?"never":new SimpleDateFormat("h:mm a",Locale.US)
                 .format(new Date(updatedAt)))+" · updating");
         renderAll();
         workers.execute(()->{
-            MyAreaData.Snapshot result=(!Double.isNaN(lat)&&!Double.isNaN(lon))?
-                MyAreaData.load(lat,lon,city,region):null;
+            MyAreaData.Snapshot data=null;
+            try{
+                if(Double.isFinite(lat)&&Double.isFinite(lon))
+                    data=MyAreaData.load(lat,lon,city,region);
+            }catch(Exception error){android.util.Log.w("NewsWireDay","Current weather unavailable",error);}
+            final MyAreaData.Snapshot result=data;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
                 if(result!=null)weather=result;
