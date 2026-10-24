@@ -5,10 +5,10 @@
 
 ## Project and current state
 - Repository: `sBranha/Software-Updates`
-- Active development branch: `newswire-radio-favorites-v0.6.3`
+- Active development branch: `newswire-live-tv-v0.6.4`
 - Android application source: `newswave-android/`
 - Android applicationId: `com.newswire.live`
-- Current source version: `0.6.3`, versionCode `27`; previous completed feature release: `0.5.7`, code 21
+- Current source version: `0.6.4`, versionCode `28`; previous completed feature release: `0.5.7`, code 21
 - Build workflow: `.github/workflows/build-newswire-car-fix.yml`
 - Current work is **Performance & Reliability**, preserving all features from v0.5.7.
 
@@ -79,3 +79,11 @@ _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
 - Request/release audio focus and stop connections that do not finish preparing within 20 seconds.
 - Preserve existing spoken briefing, widget and phone-only playback. No Android Auto media claims or background playback.
 - CI compiles v0.6.3 versionCode 27 test APK and unsigned release AAB; signed Google Play bundle requires matching accepted upload certificate.
+
+
+## v0.6.4 — Live TV & NewsWire Radio continuity
+- Phone-only Live TV page linked from dashboard: verified broadcaster-owned official live news pages, national free services and geolocated north/central/south Alabama stations. In-app WebView playback attempted; official browser fallback when sites disallow WebView or require sign-in. No unlicensed transport URLs or circumvention.
+- Save favorite TV channels locally; search by name or network, view All/Local/National/Saved.
+- Fullscreen custom video handling; release player when closed; existing TV station finder remains available.
+- Full radio search/favorites and all other v0.6.3 features retained.
+- Use versionCode 28 and ensure signing certificate is the same as Google Play's accepted key before claiming signed AAB ready.

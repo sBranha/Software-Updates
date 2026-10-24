@@ -106,7 +106,7 @@ public class MainActivity extends Activity {
     startActivity(display);
   }
   private void openTV(){
-    startActivity(localIntent(StationFinderActivity.class));
+    startActivity(localIntent(LiveTVActivity.class));
   }
   private void openRadio(){
     startActivity(localIntent(NewsRadioActivity.class));
@@ -521,7 +521,7 @@ public class MainActivity extends Activity {
       0xff075f71,()->openLiveCenter("map"));
     categoryTile(content,"EMERGENCY CENTER","Official warning details • Issued & expiry times","⚠",
       0xff81414a,()->openLiveCenter("alerts"));
-    categoryTile(content,"TV STATION FINDER","Nearby broadcasters and their official streams","▣",
+    categoryTile(content,"LIVE TV","Local stations · national news · watch in-app","▣",
       0xff2a5281,this::openTV);
     categoryTile(content,"NEWSWIRE RADIO","Tap to hear local news, weather and sports","▶",
       0xff624277,this::openRadio);

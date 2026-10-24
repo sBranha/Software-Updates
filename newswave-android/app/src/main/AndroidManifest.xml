@@ -31,6 +31,7 @@
     </receiver>
     <activity android:name=".LiveCenterActivity" android:exported="false"/>
     <activity android:name=".StationFinderActivity" android:exported="false"/>
+    <activity android:name=".LiveTVActivity" android:exported="false" android:hardwareAccelerated="true"/>
     <activity android:name=".NewsRadioActivity" android:exported="false"/>
     <activity android:name=".DayPlannerActivity" android:exported="false" />
     <activity android:name=".MorningBriefingActivity" android:exported="false" />
