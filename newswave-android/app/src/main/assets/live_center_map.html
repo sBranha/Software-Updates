@@ -26,11 +26,13 @@
 <div><i class="dot" style="background:#47a6d7"></i>Other mapped alerts</div>
 <div><i class="dot" style="background:#f5f9ff"></i>Your location</div></div>
 <div id="zoomPanel"><button onclick="map.zoomIn()" aria-label="Zoom in">+</button>
-<button onclick="map.zoomOut()" aria-label="Zoom out">−</button></div>
+<button onclick="map.zoomOut()" aria-label="Zoom out">−</button>
+<button onclick="recenter()" aria-label="Recenter on current location" style="font-size:17px">⌖</button></div>
 <script src="leaflet.js"></script><script>
 'use strict';
 const $=id=>document.getElementById(id);
 let map=null,base=null,alertLayer=null,positionMarker=null,warningCount=0;
+let lastPosition=null,followEnabled=true;
 function safeMsg(s){$('status').textContent=s}
 function startMap(lat,lon){
  if(typeof L==='undefined'){safeMsg('Map library unavailable. Try reopening with Internet.');return}
@@ -43,21 +45,28 @@ function startMap(lat,lon){
  // Road/place labels remain subtle; failure of this optional layer is harmless.
  L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
    {maxZoom:17,opacity:.76,attribution:'Esri reference labels'}).addTo(map);
+ lastPosition=[lat,lon];
  positionMarker=L.circleMarker([lat,lon],
    {radius:9,color:'#fff',weight:3,fillColor:'#2979ff',fillOpacity:1}).addTo(map);
  positionMarker.bindTooltip('Current location or saved ZIP', {direction:'top'});
+ map.on('dragstart',()=>{followEnabled=false;});
  safeMsg('Satellite map ready · fetching official NWS alerts');
 }
 function setPosition(lat,lon,follow){
  if(!map){startMap(lat,lon);return}
  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+ lastPosition=[lat,lon];
  positionMarker.setLatLng([lat,lon]);
- if(follow){
+ if(follow&&followEnabled){
    const here=map.getCenter();
    // Update the blue marker for small GPS motion without expensive new tiles.
    if(Math.abs(here.lat-lat)>.009||Math.abs(here.lng-lon)>.012)
-     map.setView([lat,lon],Math.max(8,map.getZoom()),{animate:false});
+     map.setView([lat,lon],map.getZoom(),{animate:false});
  }
+}
+function recenter(){
+ followEnabled=true;
+ if(map&&lastPosition)map.setView(lastPosition,Math.max(8,map.getZoom()),{animate:false});
 }
 function alertColor(event){
  if(event==='Tornado Warning')return '#ff396b';
