@@ -39,8 +39,8 @@ final class MyAreaData {
         HttpURLConnection conn=null;
         try {
             conn=(HttpURLConnection)new URL(url).openConnection();
-            conn.setConnectTimeout(7000);
-            conn.setReadTimeout(10000);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(7000);
             conn.setRequestProperty("Accept","application/geo+json, application/json");
             conn.setRequestProperty("User-Agent","NewsWire (newswire weather / local information app)");
             if(conn.getResponseCode()!=200)throw new java.io.IOException("HTTP "+conn.getResponseCode());
@@ -70,13 +70,27 @@ final class MyAreaData {
             JSONObject active=fetch("https://api.weather.gov/alerts/active?point="+point);
             JSONArray features=active.optJSONArray("features");
             alertsOk=features!=null;
-            if(features!=null)for(int n=0;n<Math.min(12,features.length());n++){
-                JSONObject props=features.getJSONObject(n).optJSONObject("properties");
+            if(features!=null)for(int n=0;n<Math.min(80,features.length());n++){
+                JSONObject props=features.optJSONObject(n)==null?null:
+                    features.optJSONObject(n).optJSONObject("properties");
                 if(props==null)continue;
-                if("Cancel".equalsIgnoreCase(props.optString("messageType","")))continue;
+                String type=props.optString("messageType","");
+                if("Cancel".equalsIgnoreCase(type)||"Test".equalsIgnoreCase(type)||
+                    "Exercise".equalsIgnoreCase(type))continue;
+                if(!"Actual".equalsIgnoreCase(props.optString("status","Actual")))continue;
                 String title=props.optString("event","").trim();
                 if(!title.isEmpty()&&!warnings.contains(title))warnings.add(title);
             }
+            // Put life-threatening warnings first in compact phone views.
+            java.util.Collections.sort(warnings,(a,b)->{
+                int priorityA=a.equalsIgnoreCase("Tornado Warning")?0:
+                    a.equalsIgnoreCase("Flash Flood Warning")?1:
+                    a.equalsIgnoreCase("Severe Thunderstorm Warning")?2:3;
+                int priorityB=b.equalsIgnoreCase("Tornado Warning")?0:
+                    b.equalsIgnoreCase("Flash Flood Warning")?1:
+                    b.equalsIgnoreCase("Severe Thunderstorm Warning")?2:3;
+                return Integer.compare(priorityA,priorityB);
+            });
         }catch(Exception error){android.util.Log.w("NewsWireArea","NWS alerts unavailable",error);}
         try {
             JSONObject points=fetch("https://api.weather.gov/points/"+point);
