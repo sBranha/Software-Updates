@@ -50,6 +50,7 @@ public final class DayPlannerActivity extends Activity {
     private boolean closed=false,refreshing=false,sourceError=false;
     private int generation=0,pending=0;
     private long updatedAt=0;
+    private long refreshStartedAt=0;
 
     private int dp(int v){return (int)(getResources().getDisplayMetrics().density*v+.5f);}
     private GradientDrawable background(int a,int b,int stroke){
@@ -235,20 +236,30 @@ public final class DayPlannerActivity extends Activity {
     }
     private void refresh(){
         if(refreshing){
-            android.widget.Toast.makeText(this,"NewsWire is still checking live sources.",0).show();
-            return;
+            long seconds=(System.currentTimeMillis()-refreshStartedAt)/1000;
+            if(seconds<35){
+                android.widget.Toast.makeText(this,
+                    "Still checking live sources ("+seconds+" seconds).",0).show();
+                return;
+            }
+            // An old network task may be stuck. Allow retry and reject its late result.
+            generation++;
         }
-        refreshing=true;sourceError=false;updatedAt=0;pending=4;
-        weather=null;hours=null;schoolReports=null;communityReports=null;
+        refreshing=true;sourceError=false;pending=4;
+        refreshStartedAt=System.currentTimeMillis();
+        // Keep the previous information visible, but label it as stale until updated.
+        // If a feed fails, the user can still read the previous content with its timestamp.
         final int rev=++generation;
-        status.setText("Refreshing official forecast, alerts, schools and events…");
+        status.setText("Refreshing official sources… Previous check: "+
+            (updatedAt==0?"never":new SimpleDateFormat("h:mm a",Locale.US)
+                .format(new Date(updatedAt)))+" · updating");
         renderAll();
         workers.execute(()->{
             MyAreaData.Snapshot result=(!Double.isNaN(lat)&&!Double.isNaN(lon))?
                 MyAreaData.load(lat,lon,city,region):null;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
-                weather=result;
+                if(result!=null)weather=result;
                 complete(rev,result==null);
             });
         });
@@ -259,7 +270,8 @@ public final class DayPlannerActivity extends Activity {
             final DayPlannerData.Forecast result=data;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
-                hours=result;complete(rev,result==null);
+                if(result!=null)hours=result;
+                complete(rev,result==null);
             });
         });
         workers.execute(()->{
@@ -269,7 +281,8 @@ public final class DayPlannerActivity extends Activity {
             final List<LocalNewspapers.Headline> found=result;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
-                schoolReports=found;complete(rev,found==null);
+                if(found!=null)schoolReports=found;
+                complete(rev,found==null);
             });
         });
         workers.execute(()->{
@@ -279,7 +292,8 @@ public final class DayPlannerActivity extends Activity {
             final List<LocalNewspapers.Headline> found=result;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
-                communityReports=found;complete(rev,found==null);
+                if(found!=null)communityReports=found;
+                complete(rev,found==null);
             });
         });
     }
@@ -289,10 +303,11 @@ public final class DayPlannerActivity extends Activity {
         pending--;
         if(pending<=0){
             refreshing=false;updatedAt=System.currentTimeMillis();
-            status.setText("Last checked "+
+            status.setText("Checked "+
                 new SimpleDateFormat("h:mm a",Locale.US).format(new Date(updatedAt))+
-                (sourceError?" · Some sources unavailable":" · Sources checked"));
-        }else status.setText("Checking live sources… "+(4-pending)+" of 4 completed");
+                (sourceError?" · Some sources unavailable; earlier results may remain":
+                    " · All four sources checked"));
+        }else status.setText("Refreshing… "+(4-pending)+" of 4 source checks completed");
         renderAll();
     }
     private void locateOnce(){
