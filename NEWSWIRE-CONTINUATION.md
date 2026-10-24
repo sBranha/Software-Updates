@@ -5,10 +5,10 @@
 
 ## Project and current state
 - Repository: `sBranha/Software-Updates`
-- Active development branch: `newswire-widget-fix-v0.6.1`
+- Active development branch: `newswire-widget-live-v0.6.2`
 - Android application source: `newswave-android/`
 - Android applicationId: `com.newswire.live`
-- Current source version: `0.6.1`, versionCode `25`; previous completed feature release: `0.5.7`, code 21
+- Current source version: `0.6.2`, versionCode `26`; previous completed feature release: `0.5.7`, code 21
 - Build workflow: `.github/workflows/build-newswire-car-fix.yml`
 - Current work is **Performance & Reliability**, preserving all features from v0.5.7.
 
@@ -57,3 +57,11 @@ _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
 - Safe initial render even if deferred WorkManager scheduling fails; handle restore and resize.
 - Widget pin button checks request outcome and shows manual Home-screen path when launcher rejects it.
 - Play production version code 25; debug test APK separate from installed Google Play package. Widget placement still needs a physical device/launcher check.
+
+
+## v0.6.2 — Live Location & Widget Reliability
+- On phone app's foreground My Area / News screens, a resolved GPS location may feed the widget. No GPS collection starts in widget or background worker. Foreground fix expires after 30 minutes and automatically falls back to saved ZIP.
+- Cache keyed by the selected area prevents an out-of-order response or moved location from displaying weather/alerts for the wrong region.
+- Widget displays a stale warning status after 60 minutes; on failed NWS fetch, never displays an all-clear. Manual refresh shows a progress state and handles failures.
+- Dashboard and widget can share a single freshly retrieved NWS/local-news snapshot; saving a ZIP requests an update. 
+- This branch's CI builds NewsWire v0.6.2 test APK and unsigned AAB. Do not assert device testing or Play publication without evidence.

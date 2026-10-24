@@ -707,6 +707,14 @@ public class MainActivity extends Activity {
       runOnUiThread(()->{
         if(!key.equals(loadedAreaKey))return;
         areaLoading=false;myAreaSnapshot=result;
+        // Share only a foreground-obtained location with the widget. Never start
+        // background GPS or allow a stale ZIP response to overwrite live GPS.
+        if(isGps)WidgetAreaResolver.rememberForegroundFix(
+            this,lat,lon,result.area.equals("Current location")?"":result.area.split(",")[0],
+            result.area.contains(",")?result.area.substring(result.area.lastIndexOf(',')+1).trim():"");
+        WidgetAreaResolver.Area widgetArea=WidgetAreaResolver.resolve(this);
+        if(widgetArea!=null&&widgetArea.fromGps==isGps)
+            WidgetRefreshWorker.publish(this,widgetArea,result);
         renderMyArea();
       });
     },"newswire-area").start();
@@ -800,6 +808,9 @@ public class MainActivity extends Activity {
              .putString("zip",zip).putString("city",city).putString("state",state)
              .putLong("lat",Double.doubleToLongBits(postalLat))
              .putLong("lon",Double.doubleToLongBits(postalLon)).apply();
+          // Refresh widget when the ZIP backup changes; the last foreground
+          // GPS fix remains preferred until it expires.
+          NewsWireWidget.refresh(this);
           if(showSportsAfterSave){tab="Sports";query="";home();}
           else dashboard();
         });
@@ -1121,6 +1132,10 @@ public class MainActivity extends Activity {
           boolean changed=!newCity.equalsIgnoreCase(newsGpsCity)||!newRegion.equalsIgnoreCase(newsGpsRegion);
           newsGpsCity=newCity;newsGpsRegion=newRegion;newsGpsLatitude=lat;newsGpsLongitude=lon;
           newsGpsActive=true;
+          if(changed){
+            WidgetAreaResolver.rememberForegroundFix(this,lat,lon,newCity,newRegion);
+            NewsWireWidget.refresh(this);
+          }
           if(changed&&tab.equals("News")&&current==null)render();
         }
       });
