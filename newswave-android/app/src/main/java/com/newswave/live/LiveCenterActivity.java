@@ -13,6 +13,9 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.location.LocationListener;
+import android.os.Handler;
+import android.os.Looper;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -43,6 +46,18 @@ public final class LiveCenterActivity extends Activity {
     private int generation=0;
     private ActiveAlertData.Result warnings;
     private long checkedAt=0;
+    private final Handler updates=new Handler(Looper.getMainLooper());
+    private LocationManager gpsManager;
+    private LocationListener gpsListener;
+    private boolean visible=false;
+    private long lastAreaLookup=0;
+    private final Runnable periodicCheck=new Runnable(){
+        @Override public void run(){
+            if(!visible||closed)return;
+            if(!loading)updateAlerts();
+            updates.postDelayed(this,5L*60*1000);
+        }
+    };
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         android.content.SharedPreferences prefs=
@@ -128,7 +143,10 @@ public final class LiveCenterActivity extends Activity {
         });
         LinearLayout.LayoutParams web=new LinearLayout.LayoutParams(-1,dp(395));
         web.topMargin=dp(10);root.addView(map,web);
-        map.loadUrl("file:///android_asset/live_center_map.html");
+        if(Double.isNaN(lat)||Double.isNaN(lon))
+            map.loadUrl("file:///android_asset/live_center_map.html");
+        else map.loadUrl(String.format(Locale.US,
+            "file:///android_asset/live_center_map.html?lat=%.5f&lon=%.5f",lat,lon));
 
         alertsPanel=new LinearLayout(this);alertsPanel.setOrientation(1);
         add(root,alertsPanel,12);
@@ -284,12 +302,64 @@ public final class LiveCenterActivity extends Activity {
             }catch(Exception error){android.util.Log.w("NewsWireLive","GPS unavailable",error);}
         },"newswire-live-gps").start();
     }
+    @Override protected void onStart(){
+        super.onStart();
+        visible=true;
+        updates.removeCallbacks(periodicCheck);
+        updates.postDelayed(periodicCheck,5L*60*1000);
+        followLocation();
+    }
+    @Override protected void onStop(){
+        visible=false;
+        updates.removeCallbacks(periodicCheck);
+        if(gpsManager!=null&&gpsListener!=null){
+            try{gpsManager.removeUpdates(gpsListener);}catch(Exception ignored){}
+        }
+        gpsListener=null;
+        super.onStop();
+    }
+    private void followLocation(){
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED
+          &&checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return;
+        if(gpsListener!=null)return;
+        try{
+            gpsManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
+            gpsListener=fix->{
+                if(fix==null||!visible||closed||
+                    fix.hasAccuracy()&&fix.getAccuracy()>1000f)return;
+                double nextLat=fix.getLatitude(),nextLon=fix.getLongitude();
+                if(!Double.isFinite(nextLat)||!Double.isFinite(nextLon))return;
+                boolean different=Double.isNaN(lat)||Math.abs(lat-nextLat)>.001||
+                    Math.abs(lon-nextLon)>.001;
+                boolean newArea=Double.isNaN(lat)||Math.abs(lat-nextLat)>.035||
+                    Math.abs(lon-nextLon)>.035;
+                if(!different)return;
+                lat=nextLat;lon=nextLon;
+                if(mapReady)map.evaluateJavascript(
+                    "setPosition("+nextLat+","+nextLon+",true)",null);
+                if(newArea&&System.currentTimeMillis()-lastAreaLookup>60*1000){
+                    lastAreaLookup=System.currentTimeMillis();
+                    lookupGps();
+                }
+            };
+            for(String provider:gpsManager.getProviders(true)){
+                try{
+                    gpsManager.requestLocationUpdates(provider,15000L,150f,
+                        gpsListener,Looper.getMainLooper());
+                }catch(Exception error){android.util.Log.w("NewsWireLive","GPS provider unavailable",error);}
+            }
+        }catch(Exception error){android.util.Log.w("NewsWireLive","Could not follow GPS",error);}
+    }
     private void open(String url){
         try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
         catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",0).show();}
     }
     @Override protected void onDestroy(){
         closed=true;generation++;
+        updates.removeCallbacks(periodicCheck);
+        if(gpsManager!=null&&gpsListener!=null){
+            try{gpsManager.removeUpdates(gpsListener);}catch(Exception ignored){}
+        }
         if(map!=null){map.stopLoading();map.destroy();map=null;}
         super.onDestroy();
     }
