@@ -5,10 +5,10 @@
 
 ## Project and current state
 - Repository: `sBranha/Software-Updates`
-- Active development branch: `newswire-reliability-v0.5.8`
+- Active development branch: `newswire-safety-dashboard-v0.6.0`
 - Android application source: `newswave-android/`
 - Android applicationId: `com.newswire.live`
-- Current source version: `0.5.8`, versionCode `22`; previous completed feature release: `0.5.7`, code 21
+- Current source version: `0.6.0`, versionCode `24`; previous completed feature release: `0.5.7`, code 21
 - Build workflow: `.github/workflows/build-newswire-car-fix.yml`
 - Current work is **Performance & Reliability**, preserving all features from v0.5.7.
 
@@ -35,7 +35,7 @@ Do not reimplement these blindly; inspect the actual HEAD files and test before 
 ## What to do next
 1. Read the branch HEAD and recent commits rather than reverting to v0.5.7.
 2. Inspect the latest GitHub Actions run for this branch: if successful, download and validate the test APK and AAB; if failed, read failed step logs and fix errors.
-3. Verify versionCode 22 and the correct Android package name in deliverables.
+3. Verify versionCode 24 and the correct Android package name in deliverables.
 4. **Critical signing caveat:** An available old keystore backup has been found to have a certificate mismatch with the key used for prior accepted releases. Do not sign with that wrong keystore or claim a Google Play-ready signed AAB. Locate and verify the accepted upload signing key/certificate before signing. If unavailable, deliver the verified unsigned AAB and clearly distinguish it from an upload-ready release; an installable test APK may be separately signed for testing if appropriate.
 5. Inspect release behavior for refresh, GPS, official NWS data and Android Auto; do not claim physical-device tests you haven't performed.
 6. Share clickable verified download links for every completed downloadable file, and summarize exactly what is done vs pending.
@@ -44,3 +44,9 @@ Do not reimplement these blindly; inspect the actual HEAD files and test before 
 Continue code edits on this branch using the connected GitHub tools. Run the full build workflow, inspect outcome, verify the exact artifact bytes, archive and package metadata, and only then deliver it. When a user asks "continue NewsWire", act on this repository instead of repeatedly asking them to paste previous chats. Never invent a successful build, Play publication or working download link.
 
 _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
+
+## Latest updater repair (v0.6.0 branch)
+- Regular background Play Store updates remain controlled by Google Play auto-update settings; they do not require NewsWire to launch the in-app update flow.
+- MainActivity previously only recognized AppUpdateType.IMMEDIATE and falsely told users they were up to date when flexible-only was offered. Fixed to prefer FLEXIBLE, fall back to IMMEDIATE, and show accurate no-update/unknown results.
+- Handle completed flexible downloads with user-confirmed install, restore state after returning to app, and fall back to Play listing when an in-app flow isn't allowed.
+- v0.5.9 is submitted by user and should not be overwritten by development branch. v0.6.0 is not published to Google Play.

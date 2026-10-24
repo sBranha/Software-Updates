@@ -26,6 +26,8 @@ import android.graphics.drawable.GradientDrawable;
 import com.google.android.play.core.appupdate.AppUpdateManager;
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
 import com.google.android.play.core.appupdate.AppUpdateOptions;
+import com.google.android.play.core.install.InstallStateUpdatedListener;
+import com.google.android.play.core.install.model.InstallStatus;
 import com.google.android.play.core.install.model.AppUpdateType;
 import com.google.android.play.core.install.model.UpdateAvailability;
 import android.net.Uri;
@@ -215,7 +217,27 @@ public class MainActivity extends Activity {
   private AppUpdateManager playUpdates;
   private boolean updateAvailable=false;
   private boolean checkingUpdate=false;
+  private boolean updateDownloaded=false;
+  private boolean updatePromptVisible=false;
+  private TextView updateAction;
   private long lastUpdatePoll=0;
+  // The Google Play Store owns ordinary background auto-updates. This listener
+  // only completes optional in-app flexible updates initiated by the user.
+  private final InstallStateUpdatedListener playUpdateListener=state->{
+    if(state.installStatus()==InstallStatus.DOWNLOADED){
+      runOnUiThread(()->{
+        updateDownloaded=true;
+        renderUpdateAction();
+        promptToFinishUpdate();
+      });
+    }else if(state.installStatus()==InstallStatus.FAILED){
+      runOnUiThread(()->{
+        checkingUpdate=false;
+        android.widget.Toast.makeText(this,
+          "Google Play download failed; you can retry in Play Store.",1).show();
+      });
+    }
+  };
   private boolean localNewsNotificationEnabled(){
     return getSharedPreferences("newswire-news-alerts",MODE_PRIVATE).getBoolean("enabled",false);
   }
@@ -268,34 +290,94 @@ public class MainActivity extends Activity {
     if(MorningBriefingWorker.enabled(this))
       MorningBriefingWorker.configure(this,true);
     playUpdates=AppUpdateManagerFactory.create(this);
+    playUpdates.registerListener(playUpdateListener);
     checkForUpdates(false);
+  }
+  private void renderUpdateAction(){
+    if(updateAction==null)return;
+    updateAction.setText(updateDownloaded?"✓  UPDATE DOWNLOADED · INSTALL NOW":
+      updateAvailable?"↑  NEWSWIRE UPDATE READY IN GOOGLE PLAY":
+      "↑  CHECK FOR APP UPDATES");
+  }
+  private void openNewsWirePlayListing(){
+    Uri market=Uri.parse("market://details?id="+getPackageName());
+    try{startActivity(new Intent(Intent.ACTION_VIEW,market).setPackage("com.android.vending"));}
+    catch(Exception first){
+      openBrowser("https://play.google.com/store/apps/details?id="+getPackageName());
+    }
+  }
+  private void promptToFinishUpdate(){
+    if(!updateDownloaded || updatePromptVisible || isFinishing() ||
+       (Build.VERSION.SDK_INT>=17 && isDestroyed()))return;
+    updatePromptVisible=true;
+    new AlertDialog.Builder(this)
+      .setTitle("NewsWire update downloaded")
+      .setMessage("Google Play finished downloading the update. Install it and restart NewsWire now?")
+      .setPositiveButton("Install", (dialog,which)->{
+        updatePromptVisible=false;
+        playUpdates.completeUpdate().addOnFailureListener(error->{
+          android.widget.Toast.makeText(this,
+            "Could not finish the update. Try again or open Google Play.",1).show();
+        });
+      })
+      .setNegativeButton("Later",(dialog,which)->updatePromptVisible=false)
+      .setOnCancelListener(dialog->updatePromptVisible=false)
+      .show();
   }
   private void checkForUpdates(boolean interactive){
     if(playUpdates==null)playUpdates=AppUpdateManagerFactory.create(this);
+    if(interactive&&updateDownloaded){promptToFinishUpdate();return;}
     if(checkingUpdate)return;
     long now=System.currentTimeMillis();
-    if(!interactive && now-lastUpdatePoll<5*60*1000L)return;
+    if(!interactive&&now-lastUpdatePoll<5*60*1000L)return;
     checkingUpdate=true;lastUpdatePoll=now;
     playUpdates.getAppUpdateInfo().addOnSuccessListener(info->{
       checkingUpdate=false;
-      boolean available=info.updateAvailability()==UpdateAvailability.UPDATE_AVAILABLE;
-      if(available && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)){
-        updateAvailable=true;
-        if(interactive){
-          playUpdates.startUpdateFlow(info,this,
-            AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build());
-        }else if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){
-          android.widget.Toast.makeText(this,"NewsWire update available in Google Play",1).show();
-        }else dashboard();
+      if(info.installStatus()==InstallStatus.DOWNLOADED){
+        updateDownloaded=true;renderUpdateAction();
+        if(interactive)promptToFinishUpdate();
+        return;
+      }
+      int availability=info.updateAvailability();
+      boolean available=availability==UpdateAvailability.UPDATE_AVAILABLE;
+      // Flexible is less disruptive; fall back to immediate only when Play permits it.
+      int type=info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)?
+        AppUpdateType.FLEXIBLE:
+        info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)?
+          AppUpdateType.IMMEDIATE:-1;
+      updateAvailable=available;
+      renderUpdateAction();
+      if(!interactive)return; // Never interrupt Google's automatic background update policy.
+      if(available && type>=0){
+        playUpdates.startUpdateFlow(info,this,
+          AppUpdateOptions.newBuilder(type).build())
+          .addOnFailureListener(error->{
+            android.widget.Toast.makeText(this,
+              "Could not start in-app update. Open the NewsWire Play Store page.",1).show();
+            openNewsWirePlayListing();
+          });
+      }else if(available){
+        android.widget.Toast.makeText(this,
+          "New version available; open Google Play to install it.",1).show();
+        openNewsWirePlayListing();
+      }else if(availability==UpdateAvailability.UPDATE_NOT_AVAILABLE){
+        android.widget.Toast.makeText(this,
+          "Google Play has not offered a newer NewsWire version to this device yet.",1).show();
+      }else if(availability==UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS){
+        android.widget.Toast.makeText(this,
+          "An in-app update is already in progress.",1).show();
       }else{
-        updateAvailable=false;
-        if(interactive)android.widget.Toast.makeText(this,
-          "You're on the latest Google Play version of NewsWire.",1).show();
+        android.widget.Toast.makeText(this,
+          "Google Play could not confirm your update status. Open Play Store.",1).show();
+        openNewsWirePlayListing();
       }
     }).addOnFailureListener(error->{
       checkingUpdate=false;
-      if(interactive)android.widget.Toast.makeText(this,
-        "Update check unavailable. Verify your Google Play connection.",1).show();
+      if(interactive){
+        android.widget.Toast.makeText(this,
+          "Cannot check updates through Google Play. Opening the store.",1).show();
+        openNewsWirePlayListing();
+      }
     });
   }
   private void showSmartNewsSettings(){
@@ -473,9 +555,10 @@ public class MainActivity extends Activity {
       this::showSmartNewsSettings);
     LinearLayout.LayoutParams settingsLp=lp(-1,-2);
     settingsLp.bottomMargin=dp(10);content.addView(alertSettings,settingsLp);
-    TextView updates=button(updateAvailable?
-      "↑  NEWSWIRE UPDATE READY IN GOOGLE PLAY":
+    TextView updates=button(updateDownloaded?"✓  UPDATE DOWNLOADED · INSTALL NOW":
+      updateAvailable?"↑  NEWSWIRE UPDATE READY IN GOOGLE PLAY":
       "↑  CHECK FOR APP UPDATES",()->checkForUpdates(true));
+    updateAction=updates;
     content.addView(updates);
     TextView alertInfo=text("Optional local headline notifications appear on your phone, not over the car radar. Updates are handled by Google Play.",11,MUTED,false);
     pad(alertInfo,5,12);content.addView(alertInfo);
@@ -1206,9 +1289,26 @@ public class MainActivity extends Activity {
     super.onResume();
     if(dashboardActive){startDashboardGps();refreshMyArea(false);}
     if(newsScreenVisible&&tab.equals("News")&&current==null)startNewsGps(false);
+    if(playUpdates!=null){
+      // A download can finish while the app is away; recover interrupted flows.
+      playUpdates.getAppUpdateInfo().addOnSuccessListener(info->{
+        if(info.installStatus()==InstallStatus.DOWNLOADED){
+          updateDownloaded=true;renderUpdateAction();promptToFinishUpdate();
+        }else if(info.updateAvailability()==
+            UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS &&
+            info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)){
+          playUpdates.startUpdateFlow(info,this,
+            AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build());
+        }
+      });
+    }
   }
   @Override protected void onStop(){
     stopDashboardGps();stopNewsGps();super.onStop();
   }
-  @Override protected void onDestroy(){stopDashboardGps();stopNewsGps();respondToLocationRequest(false);if(web!=null)web.destroy();super.onDestroy();}
+  @Override protected void onDestroy(){
+    if(playUpdates!=null)playUpdates.unregisterListener(playUpdateListener);
+    stopDashboardGps();stopNewsGps();respondToLocationRequest(false);
+    if(web!=null)web.destroy();super.onDestroy();
+  }
 }
