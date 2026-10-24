@@ -135,10 +135,12 @@ case "ak":case "alaska":return "AK";
     static Result load(String region,double lat,double lon)throws Exception {
         String code=stateCode(region);
         String request;
-        if(!code.isEmpty())request="https://api.weather.gov/alerts/active?area="+code;
-        else if(!Double.isNaN(lat)&&!Double.isNaN(lon))
+        // Prefer the actual GPS/ZIP point over statewide alerts when available.
+        // Statewide feeds can show hundreds of warnings unrelated to the driver.
+        if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)
             request=String.format(Locale.US,
                 "https://api.weather.gov/alerts/active?point=%.4f,%.4f",lat,lon);
+        else if(!code.isEmpty())request="https://api.weather.gov/alerts/active?area="+code;
         else throw new IllegalArgumentException("Set ZIP or allow location to retrieve warnings");
         JSONObject data=fetch(request);
         JSONArray features=data.optJSONArray("features");
