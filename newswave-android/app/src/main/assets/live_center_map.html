@@ -18,9 +18,17 @@
 #zoomPanel{position:absolute;z-index:1000;right:10px;bottom:28px;display:flex;flex-direction:column;gap:7px}
 #zoomPanel button{font-size:21px;font-weight:bold;border:1px solid #3a809b;
  padding:9px 13px;border-radius:12px;background:#113a57;color:#eef8ff}
+#mapTypes{position:absolute;z-index:1000;top:70px;left:10px;display:flex;gap:6px}
+#mapTypes button{border:1px solid #4386a2;background:#092b40e8;color:#eaf7ff;border-radius:9px;padding:9px;font-size:11px;font-weight:bold}
+#mapTypes button.active{background:#277383}
 </style></head><body>
 <div id="map"></div>
 <div id="status" role="status">Satellite weather map loading…</div>
+<div id="mapTypes" role="group" aria-label="Map style">
+  <button id="satelliteType" onclick="setMapStyle('satellite')">Satellite</button>
+  <button id="terrainType" onclick="setMapStyle('terrain')">Terrain</button>
+  <button id="roadType" onclick="setMapStyle('road')">Road</button>
+</div>
 <div id="legend"><b>LIVE WEATHER HAZARDS</b><div><i class="dot" style="background:#f35a74"></i>Tornado warning</div>
 <div><i class="dot" style="background:#ffc05a"></i>Severe storm / flood</div>
 <div><i class="dot" style="background:#47a6d7"></i>Other mapped alerts</div>
@@ -33,6 +41,25 @@
 const $=id=>document.getElementById(id);
 let map=null,base=null,alertLayer=null,positionMarker=null,warningCount=0;
 let lastPosition=null,followEnabled=true;
+let mapStyle='satellite';
+try{const remembered=localStorage.getItem('newswireLiveMapStyle');
+    if(['satellite','terrain','road'].includes(remembered))mapStyle=remembered;}catch(e){}
+function setMapStyle(style){
+ if(!['satellite','terrain','road'].includes(style))return;
+ mapStyle=style;
+ try{localStorage.setItem('newswireLiveMapStyle',style)}catch(e){}
+ if(map){
+   if(base)map.removeLayer(base);
+   let url=style==='road'?'https://tile.openstreetmap.org/{z}/{x}/{y}.png':
+     'https://services.arcgisonline.com/ArcGIS/rest/services/'+
+     (style==='terrain'?'World_Topo_Map':'World_Imagery')+'/MapServer/tile/{z}/{y}/{x}';
+   base=L.tileLayer(url,{maxZoom:17,attribution:style==='road'?'© OpenStreetMap contributors':'© Esri & partners'}).addTo(map);
+   base.bringToBack();
+ }
+ for(const [name,id] of [['satellite','satelliteType'],['terrain','terrainType'],['road','roadType']]){
+   const b=$(id);if(b){b.classList.toggle('active',name===style);b.setAttribute('aria-pressed',String(name===style));}
+ }
+}
 function safeMsg(s){$('status').textContent=s}
 function startMap(lat,lon){
  if(typeof L==='undefined'){safeMsg('Map library unavailable. Try reopening with Internet.');return}
@@ -40,11 +67,7 @@ function startMap(lat,lon){
  if(map)return;
  map=L.map('map',{zoomControl:false,preferCanvas:true,minZoom:3,maxZoom:17,
    doubleClickZoom:true,scrollWheelZoom:true}).setView([lat,lon],8);
- base=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-   {maxZoom:17,attribution:'Esri Satellite imagery · NOAA/NWS alerts'}).addTo(map);
- // Road/place labels remain subtle; failure of this optional layer is harmless.
- L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-   {maxZoom:17,opacity:.76,attribution:'Esri reference labels'}).addTo(map);
+ setMapStyle(mapStyle);
  lastPosition=[lat,lon];
  positionMarker=L.circleMarker([lat,lon],
    {radius:9,color:'#fff',weight:3,fillColor:'#2979ff',fillOpacity:1}).addTo(map);

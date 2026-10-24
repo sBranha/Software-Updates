@@ -132,6 +132,7 @@ public final class NewsWaveCarService extends CarAppService {
         private String mode="SR_BREF";
         private boolean nationwide=false;
         private boolean follow=true;
+        private volatile Location lastFix;
         private LocationManager locationManager;
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
@@ -174,8 +175,10 @@ public final class NewsWaveCarService extends CarAppService {
           }catch(Exception ex){Log.w(LOG,"Car GPS unavailable",ex);}
         }
         private void onPosition(Location loc){
-          if(!follow||loc==null)return;
-          if(!loc.hasAccuracy() || loc.getAccuracy()>1200f)return;
+          if(loc==null||!loc.hasAccuracy()||loc.getAccuracy()>250f||
+             System.currentTimeMillis()-loc.getTime()>120000L)return;
+          lastFix=new Location(loc); // GPS is independent of manual map panning.
+          if(!follow)return;
           renderer.setPosition(loc.getLatitude(),loc.getLongitude());
           Station nearest=chosen;double best=Double.MAX_VALUE;
           for(Station station:stations){
@@ -279,6 +282,10 @@ public final class NewsWaveCarService extends CarAppService {
         RadarOptionsScreen(CarContext context,RadarScreen radar){super(context);this.radar=radar;}
         @NonNull @Override public Template onGetTemplate(){
             ItemList.Builder list=new ItemList.Builder();
+            list.addItem(new Row.Builder().setTitle("Safety dashboard")
+                .addText("GPS location, NWS warnings and refresh")
+                .setOnClickListener(()->getScreenManager().push(
+                    new SafetyDashboardScreen(getCarContext(),radar))).build());
             list.addItem(new Row.Builder()
                 .setTitle("Map type: "+RadarRenderer.styleName(radar.mapStyle))
                 .addText("Satellite, terrain, or road map")
@@ -320,6 +327,88 @@ public final class NewsWaveCarService extends CarAppService {
                     .setStartHeaderAction(Action.BACK).build()).build();
         }
     }
+
+    /** Android Auto warning summary. Point-based NWS data; never a route prediction. */
+    private static final class SafetyDashboardScreen extends Screen {
+        private final RadarScreen radar;
+        private final ExecutorService worker=Executors.newSingleThreadExecutor();
+        private final android.os.Handler ui=new android.os.Handler(Looper.getMainLooper());
+        private boolean disposed=false,loading=false,checked=false;
+        private long checkedAt=0;
+        private String message="No official warning data retrieved";
+        private List<ActiveAlertData.Item> alerts=Collections.emptyList();
+        SafetyDashboardScreen(CarContext context,RadarScreen radar){
+            super(context);this.radar=radar;
+            getLifecycle().addObserver((androidx.lifecycle.LifecycleEventObserver)(source,event)->{
+                if(event==Lifecycle.Event.ON_DESTROY){disposed=true;worker.shutdownNow();}
+            });
+            refreshSafety();
+        }
+        private Location currentGps(){
+            Location loc=radar.lastFix;
+            if(loc==null||!loc.hasAccuracy()||loc.getAccuracy()>250||
+                System.currentTimeMillis()-loc.getTime()>120000L)return null;
+            return new Location(loc);
+        }
+        private void refreshSafety(){
+            if(disposed||loading)return;
+            final Location fix=currentGps();
+            checked=false;checkedAt=0;alerts=Collections.emptyList();
+            if(fix==null){message="No recent accurate GPS. Enable phone location.";invalidate();return;}
+            loading=true;message="";invalidate();
+            worker.execute(()->{
+                try{
+                    final ActiveAlertData.Result result=ActiveAlertData.load("",
+                        fix.getLatitude(),fix.getLongitude());
+                    ui.post(()->{
+                        if(disposed)return;
+                        loading=false;checked=true;checkedAt=result.fetchedAt;
+                        alerts=result.items;message="";invalidate();
+                    });
+                }catch(Exception error){
+                    Log.w(LOG,"Car NWS check unavailable",error);
+                    ui.post(()->{
+                        if(disposed)return;
+                        loading=false;checked=false;alerts=Collections.emptyList();
+                        message="NWS unavailable; warning status UNKNOWN. Use official alerts.";
+                        invalidate();
+                    });
+                }
+            });
+        }
+        @NonNull @Override public Template onGetTemplate(){
+            ItemList.Builder items=new ItemList.Builder();
+            final Location fix=currentGps();
+            if(fix==null)items.addItem(new Row.Builder().setTitle("GPS unavailable")
+                .addText("Allow location and refresh").build());
+            else items.addItem(new Row.Builder().setTitle("Current GPS")
+                .addText("Fix "+Math.max(0,(System.currentTimeMillis()-fix.getTime())/1000)+" sec old").build());
+            if(loading)items.addItem(new Row.Builder().setTitle("Checking NWS warnings")
+                .addText("Fetching official alerts for GPS position").build());
+            else if(!checked)items.addItem(new Row.Builder().setTitle("Warning status: UNKNOWN")
+                .addText(message).build());
+            else{
+                items.addItem(new Row.Builder().setTitle(alerts.isEmpty()?
+                    "No active NWS alerts returned":alerts.size()+" NWS alerts")
+                    .addText("Checked "+new java.text.SimpleDateFormat("h:mm a",Locale.US)
+                        .format(new java.util.Date(checkedAt))+" · not a safety guarantee").build());
+                for(int n=0;n<Math.min(3,alerts.size());n++){
+                    ActiveAlertData.Item alert=alerts.get(n);
+                    items.addItem(new Row.Builder().setTitle(alert.event)
+                        .addText(alert.area+" · expires "+ActiveAlertData.time(alert.expires)).build());
+                }
+            }
+            items.addItem(new Row.Builder().setTitle("Refresh NWS status")
+                .addText("Check official alerts for current location")
+                .setOnClickListener(this::refreshSafety).build());
+            items.addItem(new Row.Builder().setTitle("Storm Ahead is opt-in")
+                .addText("Enable driving alerts on phone; no route or arrival forecast").build());
+            return new ListTemplate.Builder().setSingleList(items.build())
+                .setHeader(new Header.Builder().setTitle("Safety dashboard")
+                    .setStartHeaderAction(Action.BACK).build()).build();
+        }
+    }
+
     /** Choose a background map; saved for every subsequent car session. */
     private static final class MapStyleScreen extends Screen {
         private final RadarScreen radar;

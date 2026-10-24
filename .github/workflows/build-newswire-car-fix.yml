@@ -278,10 +278,31 @@ jobs:
                            'DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS',
                            'openNewsWirePlayListing()', 'renderUpdateAction()'):
               assert expected in s, expected+' was removed'
-          assert 'You're on the latest Google Play version of NewsWire.' not in s
+          assert "You're on the latest Google Play version of NewsWire." not in s
           assert 'AppUpdateOptions.newBuilder(type).build()' in s
           print('NewsWire Play updater regression guards passed')
           PY
+      - name: Check car safety dashboard and live map controls
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          car=Path('newswave-android/app/src/main/java/com/newswave/live/NewsWaveCarService.java').read_text()
+          m=Path('newswave-android/app/src/main/assets/live_center_map.html').read_text()
+          assert 'class SafetyDashboardScreen' in car
+          assert 'ActiveAlertData.load(' in car
+          assert 'Warning status: UNKNOWN' in car
+          assert 'lastFix=new Location(loc)' in car
+          assert 'function setMapStyle(style)' in m
+          assert 'mapStyle=' in m and 'alertLayer=L.geoJSON' in m
+          print('Car dashboard and live map controls verified')
+          PY
+          node - <<'JS'
+          const s=require('fs').readFileSync('newswave-android/app/src/main/assets/live_center_map.html','utf8');
+          const a=s.lastIndexOf('<script>'),b=s.lastIndexOf('</script>');
+          new Function(s.slice(a+8,b));
+          console.log('Live map JavaScript syntax passed');
+          JS
       - name: QA package must not overwrite installed Google Play NewsWire
         run: |
           set -euo pipefail
