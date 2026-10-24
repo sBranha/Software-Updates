@@ -4,6 +4,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.MediaPlayer;
+import android.media.AudioManager;
+import android.net.Uri;
+import android.view.View;
+import java.util.ArrayList;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -32,6 +37,14 @@ public final class NewsRadioActivity extends Activity {
     private TextToSpeech voice;
     private long fetchedAt=0;
     private int generation=0;
+    private LinearLayout stationList;
+    private TextView stationStatus;
+    private List<LocalRadioDirectory.Station> localStations=new ArrayList<>();
+    private boolean stationsLoading=false;
+    private int stationGeneration=0;
+    private MediaPlayer streamPlayer;
+    private LocalRadioDirectory.Station playing;
+    private int playerGeneration=0;
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         android.content.SharedPreferences prefs=getSharedPreferences("newswire-location",MODE_PRIVATE);
@@ -50,7 +63,7 @@ public final class NewsRadioActivity extends Activity {
                 if(pendingSpeak){pendingSpeak=false;play();}
             }else status.setText("Android Text-to-Speech isn't available.");
         }));
-        draw();refresh();
+        draw();refresh();loadLocalStations();
     }
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5);}
     private GradientDrawable card(){
@@ -88,8 +101,18 @@ public final class NewsRadioActivity extends Activity {
             status.setText("Audio stopped.");
         }),9);
         add(root,button("↻  REFRESH THE NEWS & WEATHER",this::refresh),9);
-        add(root,button("←  BACK TO NEWSWIRE",this::finish),9);
+        add(root,text("LOCAL AM/FM STATIONS · LIVE STREAMS",13,CYAN,true),21);
+        add(root,text("Nearby stations are discovered automatically from your current area. "+
+            "Tap a station to listen live; broadcaster availability varies.",12,MUTED,false),9);
+        stationStatus=text("Finding nearby stations…",12,CYAN,false);
+        add(root,stationStatus,9);
+        add(root,button("↻  FIND LOCAL STATIONS",this::loadLocalStations),9);
+        add(root,button("■  STOP LIVE RADIO",()->stopStream("Live station stopped.")),9);
+        stationList=new LinearLayout(this);stationList.setOrientation(1);
+        add(root,stationList,12);
+        add(root,button("←  BACK TO NEWSWIRE",this::finish),13);
         details=new LinearLayout(this);details.setOrientation(1);add(root,details,16);
+        renderStations();
         add(root,text("Spoken briefing requires an explicit Play tap on your phone. "+
             "News headlines are attributed to publishers; sports stories are not live score feeds. "+
             "This is not a substitute for NWS warning sirens or Wireless Emergency Alerts.",
@@ -145,6 +168,7 @@ public final class NewsRadioActivity extends Activity {
         if(snapshot==null){
             status.setText("Waiting for the news and weather to load.");return;
         }
+        stopStream(null);
         if(!ready){pendingSpeak=true;status.setText("Preparing phone voice…");return;}
         StringBuilder script=new StringBuilder("NewsWire local briefing. ");
         if(!city.isEmpty())script.append("Around ").append(city).append(". ");
@@ -171,8 +195,112 @@ public final class NewsRadioActivity extends Activity {
         voice.speak(script.toString(),TextToSpeech.QUEUE_FLUSH,null,"newswire_radio_"+fetchedAt);
         status.setText("Now speaking your NewsWire local briefing…");
     }
+    private void renderStations(){
+        if(stationList==null)return;
+        stationList.removeAllViews();
+        if(stationsLoading||localStations.isEmpty()){
+            add(stationList,text(stationsLoading?"Searching live radio streams for your area…":
+                "No verified playable stations found nearby. Tap FIND LOCAL STATIONS to retry.",
+                12,MUTED,false),6);
+            return;
+        }
+        for(LocalRadioDirectory.Station station:localStations){
+            LinearLayout block=new LinearLayout(this);block.setOrientation(1);
+            block.setPadding(dp(13),dp(12),dp(13),dp(12));
+            block.setBackground(card());
+            block.addView(text((playing==station?"▶  ":"◉  ")+station.name,16,INK,true));
+            add(block,text(station.subtitle(),11,MUTED,false),4);
+            block.setOnClickListener(v->playStation(station));
+            add(stationList,block,8);
+        }
+    }
+    private void loadLocalStations(){
+        if(stationsLoading)return;
+        stationsLoading=true;
+        if(stationStatus!=null)stationStatus.setText("Discovering local stations…");
+        renderStations();
+        final int current=++stationGeneration;
+        // Only a foreground-opened radio page starts station discovery.
+        new Thread(()->{
+            List<LocalRadioDirectory.Station> found=null;
+            String error=null;
+            try{found=LocalRadioDirectory.nearby(lat,lon,city,state);}
+            catch(Exception problem){
+                android.util.Log.w("NewsWireRadio","Station directory unavailable",problem);
+                error="Station directory unavailable. Check internet and retry.";
+            }
+            final List<LocalRadioDirectory.Station> stations=found;
+            final String message=error;
+            runOnUiThread(()->{
+                if(closed||current!=stationGeneration)return;
+                stationsLoading=false;
+                localStations=stations==null?new ArrayList<>():stations;
+                stationStatus.setText(message!=null?message:
+                    localStations.isEmpty()?"No HTTPS radio streams listed for this area.":
+                    localStations.size()+" station streams found near "+
+                        (city.isEmpty()?"your location":city)+". Tap to listen.");
+                renderStations();
+            });
+        },"newswire-radio-stations").start();
+    }
+    private void stopStream(String message){
+        playerGeneration++;
+        if(streamPlayer!=null){
+            try{streamPlayer.reset();streamPlayer.release();}
+            catch(Exception ignored){}
+            streamPlayer=null;
+        }
+        playing=null;
+        if(message!=null&&stationStatus!=null)stationStatus.setText(message);
+        renderStations();
+    }
+    private void playStation(LocalRadioDirectory.Station station){
+        if(station==playing&&streamPlayer!=null){
+            stopStream("Live station stopped.");
+            return;
+        }
+        if(!station.stream.startsWith("https://")){
+            stationStatus.setText("Stream unavailable in NewsWire.");
+            return;
+        }
+        pendingSpeak=false;
+        if(voice!=null)voice.stop();
+        stopStream(null);
+        final int revision=++playerGeneration;
+        try{
+            MediaPlayer player=new MediaPlayer();
+            streamPlayer=player;
+            playing=station;
+            player.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            player.setDataSource(this,Uri.parse(station.stream));
+            player.setOnPreparedListener(p->{
+                if(closed||revision!=playerGeneration)return;
+                p.start();
+                if(stationStatus!=null)stationStatus.setText("▶ Live · "+station.name);
+                renderStations();
+            });
+            player.setOnErrorListener((p,what,extra)->{
+                if(!closed&&revision==playerGeneration){
+                    stopStream("This station's live stream could not play. Try another.");
+                }
+                return true;
+            });
+            player.prepareAsync();
+            stationStatus.setText("Connecting to "+station.name+"…");
+            renderStations();
+        }catch(Exception problem){
+            android.util.Log.w("NewsWireRadio","Stream failed to start",problem);
+            stopStream("Station unavailable right now. Choose a different station.");
+        }
+    }
+    @Override protected void onStop(){
+        // Don't unexpectedly keep station audio running in the background.
+        stopStream(null);
+        super.onStop();
+    }
     @Override protected void onDestroy(){
-        closed=true;generation++;
+        closed=true;generation++;stationGeneration++;
+        stopStream(null);
         if(voice!=null){voice.stop();voice.shutdown();voice=null;}
         super.onDestroy();
     }

@@ -65,3 +65,10 @@ _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
 - Widget displays a stale warning status after 60 minutes; on failed NWS fetch, never displays an all-clear. Manual refresh shows a progress state and handles failures.
 - Dashboard and widget can share a single freshly retrieved NWS/local-news snapshot; saving a ZIP requests an update. 
 - This branch's CI builds NewsWire v0.6.2 test APK and unsigned AAB. Do not assert device testing or Play publication without evidence.
+
+
+## v0.6.2 added local live radio station streams
+- NewsWire Radio retains the existing TextToSpeech local briefing.
+- A separate on-demand Local AM/FM Stations section queries Radio Browser's live directory, prioritizing streams within 160 km of the passed phone GPS/saved ZIP location, with a state-matched fallback for stations lacking directory coordinates.
+- Lists only streams the provider last verified and exposes HTTPS radio playback via Android MediaPlayer on the phone; playback stops when the screen closes, when switching stations, or when the spoken briefing starts.
+- This is internet-streamed radio, not an FM tuner or Android Auto media app. Station listings, licensing, publisher site information and stream availability come from third parties; do not claim all real-world stations are listed.

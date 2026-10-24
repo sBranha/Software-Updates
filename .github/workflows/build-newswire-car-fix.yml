@@ -357,6 +357,26 @@ jobs:
           assert 'ExistingWorkPolicy.REPLACE' in widget
           print('Widget GPS/fallback, accurate stale warning and refresh regression checks passed')
           PY
+      - name: Local radio stations and phone stream regression checks
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          folder=Path('newswave-android/app/src/main/java/com/newswave/live')
+          radio=(folder/'NewsRadioActivity.java').read_text()
+          directory=(folder/'LocalRadioDirectory.java').read_text()
+          for phrase in ('geo_lat=%.5f', 'geo_distance=160000', 'countrycode=US',
+                         'hidebroken=true','is_https=true','url_resolved',
+                         'lastcheckok', 'stations.sort(', 'stateName('):
+              assert phrase in directory, phrase
+          for phrase in ('loadLocalStations()', 'MediaPlayer', 'prepareAsync()',
+                         'stopStream(null)', 'onStop()', 'runOnUiThread(',
+                         'LOCAL AM/FM STATIONS', 'PLAY MY NEWSWIRE BRIEFING'):
+              assert phrase in radio,phrase
+          assert 'new Thread(()->' in radio
+          assert 'station.stream.startsWith("https://")' in radio
+          print('Nearby radio stream discovery and lifecycle regression guards passed')
+          PY
       - name: QA package must not overwrite installed Google Play NewsWire
         run: |
           set -euo pipefail
