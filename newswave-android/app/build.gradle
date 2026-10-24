@@ -3,7 +3,13 @@ android {
  namespace 'com.newswave.live'
  compileSdk 36
  defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 22; versionName '0.5.8' }
- buildTypes { release { minifyEnabled false } }
+ buildTypes {
+   debug {
+     applicationIdSuffix '.test'
+     versionNameSuffix '-test'
+   }
+   release { minifyEnabled false }
+ }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
