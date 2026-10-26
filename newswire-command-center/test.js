@@ -57,10 +57,24 @@ test('desktop and Android share the exact command center resources',()=>{
  assert.match(build,/newswire-command-center/);
  assert.match(html,/engine\.js/);assert.match(html,/app\.js/);
  assert.match(script,/api\.weather\.gov\/alerts\/active/);
- assert.match(script,/status=actual&limit=500/);
+ assert.match(script,/async function nationwideFetch/);
+ assert.match(script,/Tornado%20Warning/);
+ assert.match(script,/limit=500/);
  assert.match(script,/LOCAL ALERTS TAKE PRIORITY/);
  assert.match(script,/window\.updateNewsWirePosition/);
  assert.match(activity,/newswire:\/\/gps/);assert.match(activity,/android_asset\/index\.html/);
  assert.match(live,/NationwideCommandCenterActivity/);
  new Function(script);
+});
+
+test('separate user-draggable Windows/Mac panels are packaged',()=>{
+ const pkg=require('./package.json');
+ for(const item of ['local.html','warnings.html','panels.js','panels.css','desktop.css','workspace-ui.js','window-layout.cjs'])
+  assert.ok(pkg.build.files.includes(item),item);
+ const local=fs.readFileSync(path.join(__dirname,'local.html'),'utf8');
+ const warnings=fs.readFileSync(path.join(__dirname,'warnings.html'),'utf8');
+ const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
+ assert.match(local,/data-view="local"/);assert.match(warnings,/data-view="warnings"/);
+ assert.match(main,/new BrowserWindow/);assert.match(main,/newswire-window-layout.json/);
+ assert.match(main,/newswire:workspace-state/);assert.match(main,/function arrange\(/);
 });
