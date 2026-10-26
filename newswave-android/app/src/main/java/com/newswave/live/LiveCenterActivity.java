@@ -129,6 +129,8 @@ public final class LiveCenterActivity extends Activity {
         LinearLayout.LayoutParams qb=new LinearLayout.LayoutParams(0,-2,1);
         qb.rightMargin=dp(6);quick.addView(back,qb);
         quick.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));add(root,quick,9);
+        add(root,button("⚡ NATIONWIDE STORM COMMAND CENTER",()->
+            startActivity(new Intent(this,NationwideCommandCenterActivity.class))),9);
         map=new WebView(this);map.setBackgroundColor(BG);
         map.getSettings().setJavaScriptEnabled(true);
         map.getSettings().setDomStorageEnabled(true);
