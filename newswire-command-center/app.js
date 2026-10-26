@@ -6,6 +6,7 @@ const EVERY_MS=90000, AUTO_GAP_MS=45000, MANUAL_PAUSE_MS=120000;
 const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
 let auto=true,voice=false,satellite=true,lastFly=0,pauseUntil=0;
+let deckSelectedIndex=-1,feedOk=false;
 let home=null,pointIds=new Set(),localAlerts=[],localVerified=false,localError='',lastChecked=null;
 const sayStatus=message=>{$('status').textContent=message};
 function setting(k,v){try{if(v===undefined)return localStorage.getItem('nwcc-'+k);localStorage.setItem('nwcc-'+k,v)}catch(e){return null}}
@@ -85,6 +86,31 @@ function draw(){
   div.append(b,p);layer.bindPopup(div);layer.on('click',()=>detail(a));
  }}).addTo(map);
 }
+function deckReport(){
+ if(!window.NewsWireDesktopBridge)return;
+ window.NewsWireDesktopBridge.reportState({
+  warningCount:alerts.length,
+  localTornado:localVerified&&localAlerts.some(a=>a.event==='Tornado Warning'),
+  localVerified,feedOk,lastChecked:lastChecked?lastChecked.getTime():null,
+  auto,voice,satellite
+ });
+}
+function deckBind(){
+ if(!window.NewsWireDesktopBridge)return;
+ const ids={'home':'home','country':'country','resume':'resume','auto':'auto',
+  'voice':'voice','satellite':'style','refresh':'refresh'};
+ window.NewsWireDesktopBridge.onAction(action=>{
+  if(action==='warning-latest'||action==='warning-next'){
+   if(alerts.length){
+    deckSelectedIndex=action==='warning-latest'?0:(deckSelectedIndex+1)%alerts.length;
+    select(alerts[deckSelectedIndex],true);
+   }else sayStatus(feedOk?'No active tornado warnings returned.':'Warning feed unavailable. Status unknown.');
+  }else if(action==='zoom-in'||action==='zoom-out'){
+   if(map){pauseUntil=Date.now()+MANUAL_PAUSE_MS;map.setZoom(map.getZoom()+(action==='zoom-in'?1:-1));}
+  }else if(ids[action])$(ids[action]).click();
+  deckReport();
+ });
+}
 function render(){
  const list=$('list');list.replaceChildren();
  setText('count',String(alerts.length));
@@ -163,7 +189,7 @@ async function refresh(){
    const newlyLocal=!seen.has(localNwsTornado.id);
    if(newlyLocal){speech('Tornado warning affecting your selected location. Follow National Weather Service instructions.');}
   }
-  alerts=next;draw();render();lastChecked=new Date();initialized=true;
+  alerts=next;draw();render();lastChecked=new Date();feedOk=true;initialized=true;deckSelectedIndex=-1;
   const currentIds=new Set(next.map(a=>a.id)); // Keep IDs seen across updates in this session.
   for(const id of currentIds)seen.add(id);
   if(seen.size>1000)seen=new Set(currentIds);
@@ -173,10 +199,11 @@ async function refresh(){
    if(Date.now()-lastFly>15000){warningCenter(localNwsTornado);detail(localNwsTornado);lastFly=Date.now();setText('mapHint','LOCAL TORNADO WARNING TAKES PRIORITY');}
   }else maybeFly(fresh);
  }catch(err){
+  feedOk=false;
   sayStatus('NWS nationwide feed unavailable — warning status UNKNOWN ('+err.message+').');
   setText('checked','Last successful NWS check: '+(lastChecked?lastChecked.toLocaleTimeString():'none')+' · currently stale/unknown');
   if(!localVerified)showLocal();
- }finally{clearTimeout(timeout);checking=false;$('refresh').disabled=false}
+ }finally{clearTimeout(timeout);checking=false;$('refresh').disabled=false;deckReport()}
 }
 function restoreAuto(){pauseUntil=0;auto=true;setButtons();setText('mapHint','Auto-fly resumed for new nationwide tornado warnings.');maybeFly(alerts.slice(0,1))}
 function bind(){
@@ -205,6 +232,7 @@ function bind(){
  $('auto').addEventListener('click',()=>{auto=!auto;setting('auto',String(auto));setButtons()});
  $('voice').addEventListener('click',()=>{voice=!voice;setting('voice',String(voice));setButtons()});
  $('style').addEventListener('click',()=>{satellite=!satellite;setting('satellite',String(satellite));mapStyle()});
+ for(const id of ['auto','voice','style'])$(id).addEventListener('click',deckReport);
 }
 // Native Android can forward GPS through this entrypoint while WebView is visible.
 window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
@@ -213,7 +241,7 @@ window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
 window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
  loadHome();auto=setting('auto')!=='false';satellite=setting('satellite')!=='false';
- setButtons();mapInit();bind();markHome();refresh();
+ setButtons();mapInit();bind();deckBind();markHome();deckReport();refresh();
  setInterval(()=>{if(!document.hidden)refresh()},EVERY_MS);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!lastChecked||Date.now()-lastChecked.getTime()>EVERY_MS))refresh()});
 }
