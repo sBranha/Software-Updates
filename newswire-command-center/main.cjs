@@ -133,11 +133,16 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:focus-warning',(event,id)=>{
   if(!isTrusted(event.sender)||typeof id!=='string'||id.length>350)return;
   const win=newWindow('map');
-  win?.webContents.send('newswire:workspace-focus',id);
+  if(!win)return;
+  const send=()=>win.webContents.send('newswire:workspace-focus',id);
+  if(win.webContents.isLoading())win.webContents.once('did-finish-load',send);else send();
  });
  ipcMain.on('newswire:set-zip',(event,zip)=>{
   if(!isTrusted(event.sender)||!/^\d{5}$/.test(String(zip)))return;
-  const map=views.get('map');if(map&&!map.isDestroyed())map.webContents.send('newswire:workspace-zip',zip);
+  const map=newWindow('map');
+  if(!map)return;
+  const send=()=>map.webContents.send('newswire:workspace-zip',zip);
+  if(map.webContents.isLoading())map.webContents.once('did-finish-load',send);else send();
  });
  bridge=createBridge(deliver);
  session.defaultSession.setPermissionRequestHandler((webContents,permission,callback)=>{
