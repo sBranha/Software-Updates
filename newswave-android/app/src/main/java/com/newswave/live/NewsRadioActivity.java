@@ -132,7 +132,7 @@ public final class NewsRadioActivity extends Activity {
         add(root,noaaStatus,10);
         add(root,button("↻  FIND NOAA WEATHER RADIO STREAMS",this::loadNoaaStations),9);
         add(root,button("⌖  OFFICIAL NOAA RADIO STATION DIRECTORY",()->
-            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.weather.gov/nwr/stations"))),9);
+            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.weather.gov/nwr/stations")))),9);
         noaaList=new LinearLayout(this);noaaList.setOrientation(1);
         add(root,noaaList,10);
         add(root,text("LOCAL AM/FM STATIONS · LIVE STREAMS",13,CYAN,true),21);
