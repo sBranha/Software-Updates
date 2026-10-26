@@ -100,6 +100,13 @@ final class LocalNewspapers {
   private static List<Headline> rssSearch(String phrase,int maxItems) throws Exception {
     String address="https://news.google.com/rss/search?q="+encode(phrase)
         +"&hl=en-US&gl=US&ceid=US%3Aen";
+    return rssFeed(address,maxItems);
+  }
+  /** National edition of Google News RSS. Provider names remain attached to stories. */
+  static List<Headline> nationalHeadlines() throws Exception {
+    return rssFeed("https://news.google.com/rss?hl=en-US&gl=US&ceid=US%3Aen",20);
+  }
+  private static List<Headline> rssFeed(String address,int maxItems)throws Exception {
     HttpURLConnection connection=null;
     ArrayList<Headline> data=new ArrayList<>();
     try{
