@@ -11,13 +11,14 @@ const sayStatus=message=>{$('status').textContent=message};
 function setting(k,v){try{if(v===undefined)return localStorage.getItem('nwcc-'+k);localStorage.setItem('nwcc-'+k,v)}catch(e){return null}}
 function fmtDate(raw){if(!raw)return 'Not stated';const d=new Date(raw);return Number.isFinite(d.getTime())?d.toLocaleString():'Not stated'}
 function setText(id,value){$(id).textContent=value}
-function layerUrl(){return satellite?'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}':
- 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'}
+function layerUrl(){return satellite?
+ 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}':
+ 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}'}
 let base;
 function mapStyle(){
  if(!map)return;
  if(base)map.removeLayer(base);
- base=L.tileLayer(layerUrl(),{maxZoom:17,attribution:'Tiles © Esri & partners'}).addTo(map);base.bringToBack();
+ base=L.tileLayer(layerUrl(),{maxZoom:18,maxNativeZoom:16,attribution:'Map services and data: U.S. Geological Survey, National Geospatial Program'}).addTo(map);base.bringToBack();
  $('style').textContent=satellite?'Satellite map':'Street map';$('style').setAttribute('aria-pressed',String(satellite));
 }
 function mapInit(){
