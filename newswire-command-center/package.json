@@ -1,6 +1,6 @@
 {
   "name": "newswire-command-center",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Free nationwide storm warning command center using official NWS alert data",
   "main": "main.cjs",
@@ -18,11 +18,47 @@
     "appId": "net.newswire.commandcenter",
     "productName": "NewsWire Command Center",
     "copyright": "NewsWire",
-    "directories": {"output": "dist"},
-    "files": ["index.html", "engine.js", "app.js", "main.cjs"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "engine.js",
+      "app.js",
+      "main.cjs",
+      "preload.cjs",
+      "deck-bridge.cjs"
+    ],
     "asar": true,
-    "win": {"target": [{"target": "nsis", "arch": ["x64"]}], "artifactName": "NewsWire-Command-Center-0.7.0-Windows-Setup.${ext}"},
-    "mac": {"target": [{"target": "dmg", "arch": ["x64", "arm64"]}], "artifactName": "NewsWire-Command-Center-0.7.0-Mac-${arch}.${ext}", "category": "public.app-category.weather"},
-    "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "createDesktopShortcut": true}
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "NewsWire-Command-Center-0.7.1-Windows-Setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "NewsWire-Command-Center-0.7.1-Mac-${arch}.${ext}",
+      "category": "public.app-category.weather"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true
+    }
   }
 }
