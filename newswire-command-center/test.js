@@ -78,3 +78,27 @@ test('separate user-draggable Windows/Mac panels are packaged',()=>{
  assert.match(main,/new BrowserWindow/);assert.match(main,/newswire-window-layout.json/);
  assert.match(main,/newswire:workspace-state/);assert.match(main,/function arrange\(/);
 });
+
+test('image-three desktop dashboard is the active Electron window and preserves required controls',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
+ const html=fs.readFileSync(path.join(__dirname,'desktop-concept3.html'),'utf8');
+ const css=fs.readFileSync(path.join(__dirname,'concept3.css'),'utf8');
+ const ui=fs.readFileSync(path.join(__dirname,'concept3-ui.js'),'utf8');
+ const pkg=require('./package.json');
+ assert.match(main,/map:'desktop-concept3.html'/);
+ for(const id of ['zip','setZip','myGps','auto','voice','style','refresh','status','map','mapHint',
+  'home','country','resume','localStatus','count','checked','list','detail','official',
+  'warningBanner','mapFooterState','arrange-workspace'])
+  assert.match(html,new RegExp('id="'+id+'"'),id);
+ for(const token of ['class="primaryNav"','class="leftPanel"','class="centerPanel"',
+  'class="rightPanel"','class="dashboardStrip"','data-open-panel="warnings"',
+  'data-open-panel="local"'])
+  assert.ok(html.includes(token),token);
+ for(const source of ['concept3.css','concept3-ui.js','workspace-ui.js','app.js'])
+  assert.ok(html.includes(source),source);
+ for(const source of ['desktop-concept3.html','concept3.css','concept3-ui.js'])
+  assert.ok(pkg.build.files.includes(source),source);
+ assert.match(css,/grid-template-columns:210px/);
+ assert.match(html,/NO RADAR VELOCITY IN THIS BUILD/);
+ new Function(ui);
+});
