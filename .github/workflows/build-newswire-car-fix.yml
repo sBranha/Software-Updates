@@ -1,7 +1,7 @@
 name: NewsWire 0.6.7 Android Auto weather map and warning build
 on:
   push:
-    branches: [newswire-car-street-follow-v0.6.7]
+    branches: [newswire-noaa-radio-v0.6.7]
   workflow_dispatch:
 permissions:
   contents: read
