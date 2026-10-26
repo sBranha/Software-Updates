@@ -1,0 +1,31 @@
+:root{--bg:#041120;--panel:#0b2036;--line:#1c3f60;--text:#ebf7ff;--muted:#96b9d6;--aqua:#65d8ff;--red:#ff5269;--gold:#ffc16d}
+body{overflow:hidden;background:radial-gradient(circle at 50% -15%,#113b65,#041120 57%)}
+header{min-height:79px;padding:12px 25px;background:linear-gradient(105deg,#07192d 25%,#0d2e50 70%,#08182a);border-bottom:1px solid #22517d}
+header .headline{font-size:clamp(20px,2.1vw,30px);font-weight:870;letter-spacing:-.045em}
+header .eyebrow{color:#72d4ff}
+header .free{color:#b7ffed;background:#12423c;font-size:10px}
+.toolbar{background:#07192b;border-bottom:1px solid #1f466b;padding:11px 17px;box-shadow:0 2px 20px #0006;gap:7px}
+.toolbar button{padding:10px 13px;background:linear-gradient(135deg,#123d63,#112c49);border-color:#2b5f89}
+.toolbar button:hover{background:#1b5886}.toolbar button.toggle[aria-pressed=true]{background:#10537f}
+.toolbar input{width:83px}
+.full-workspace{display:grid;grid-template-columns:176px minmax(0,1fr);height:calc(100dvh - 149px);min-height:400px}
+.rail{background:linear-gradient(180deg,#0d243e,#061426);border-right:1px solid #2c5170;display:flex;flex-direction:column;gap:9px;padding:14px 9px;min-width:0}
+.rail .railTitle{text-transform:uppercase;font-size:10px;letter-spacing:.18em;color:#71d5fa;padding:8px 9px;font-weight:850}
+.rail button{border:1px solid transparent;text-align:left;border-radius:9px;padding:12px 10px;background:transparent;color:#d7e9fb;box-shadow:none;font-size:12px}
+.rail button:hover{background:#153958;border-color:#22628a}.rail button.primary{background:#115a98;border-color:#2a83c2;color:white}
+.rail .divider{height:1px;background:#1d4464;margin:9px 3px}
+.rail .foot{margin-top:auto;border:1px solid #1d4669;border-radius:11px;background:#0b273e;padding:12px;color:#99bbd4;font-size:11px}
+.rail .foot b{color:#cdeeff}
+.workspace{height:100%;min-height:0;grid-template-columns:minmax(0,1fr) minmax(300px,325px)}
+.sidebar{background:linear-gradient(180deg,#0b2238,#051624)}
+.sidebarSection{padding:14px 17px}.sidebarTitle{color:#6ddaff}
+.sidebar #list .warning{border-radius:7px;margin:4px 6px;width:calc(100% - 12px);border:1px solid #294c6b;border-left:3px solid #fc4b72;background:#0f2d46}
+.sidebar #list .warning:hover{background:#1a4565}.sidebar .count{color:#ffc66f}
+.mapShell{border-right:1px solid #286084}
+.mapLabel{background:#091d34ec;border:1px solid #397baa;box-shadow:0 6px 30px #0008}
+.mapActions{bottom:17px;left:13px}.mapActions button{border-color:#37749f;box-shadow:0 5px 15px #0009}
+.workspace .sidebar footer{background:#071524}
+.sidebar #localStatus{font-weight:600}
+.signal{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:1110px){.full-workspace{grid-template-columns:135px minmax(0,1fr)}.rail button{font-size:11px;padding:10px 6px}.workspace{grid-template-columns:minmax(0,1fr) 285px}}
+@media(max-width:850px){body{overflow:auto}.full-workspace{grid-template-columns:1fr;height:auto}.rail{flex-direction:row;flex-wrap:wrap}.rail .foot,.rail .railTitle,.rail .divider{display:none}.workspace{height:auto;min-height:0;grid-template-columns:1fr}.mapShell{height:56vh}.sidebar{height:55vh}.signal{max-width:none;white-space:normal}}
