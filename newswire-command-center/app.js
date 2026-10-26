@@ -87,12 +87,21 @@ function draw(){
  }}).addTo(map);
 }
 function deckReport(){
- if(!window.NewsWireDesktopBridge)return;
- window.NewsWireDesktopBridge.reportState({
+ const bridge=window.NewsWireDesktopBridge;
+ if(!bridge)return;
+ bridge.reportState({
   warningCount:alerts.length,
   localTornado:localVerified&&localAlerts.some(a=>a.event==='Tornado Warning'),
   localVerified,feedOk,lastChecked:lastChecked?lastChecked.getTime():null,
   auto,voice,satellite
+ });
+ if(typeof bridge.publishWorkspace==='function')bridge.publishWorkspace({
+  feedOk,warningCount:alerts.length,
+  localStatus:$('localStatus').textContent,
+  location:home?home.label:'Set a ZIP or use GPS',
+  checked:$('checked').textContent,
+  warnings:alerts.map(a=>({id:a.id,area:a.area,expires:a.expires,
+   headline:a.headline,instruction:a.instruction,url:E.officialUrl(a)}))
  });
 }
 function deckBind(){
@@ -124,12 +133,29 @@ function render(){
  }
 }
 async function officialFetch(url,signal){
- const r=await fetch(url,{headers:{Accept:'application/geo+json'},cache:'no-store',signal});
- if(!r.ok)throw Error('NWS HTTP '+r.status);
- const data=await r.json();if(!data||!Array.isArray(data.features))throw Error('NWS returned unexpected data');
- // Warn rather than implying complete coverage when server provides a paginated response.
- if(data.pagination&&data.pagination.next)throw Error('Nationwide list is paginated; complete coverage not verified');
- return data;
+ let next=url,all=[],pages=0;
+ while(next&&pages<15){
+  const r=await fetch(next,{headers:{Accept:'application/geo+json'},cache:'no-store',signal});
+  if(!r.ok)throw Error('NWS HTTP '+r.status);
+  const data=await r.json();
+  if(!data||!Array.isArray(data.features))throw Error('NWS returned unexpected data');
+  all.push(...data.features);pages++;
+  next=data.pagination&&data.pagination.next||null;
+  if(next){
+   const u=new URL(next);
+   if(u.protocol!=='https:'||u.hostname!=='api.weather.gov'||!u.pathname.startsWith('/alerts'))
+    throw Error('Untrusted NWS pagination URL');
+  }
+ }
+ if(next)throw Error('NWS pagination exceeded safe page limit; coverage unknown');
+ return {type:'FeatureCollection',features:all};
+}
+async function nationwideFetch(signal){
+ try{return await officialFetch(NOAA+'?event=Tornado%20Warning',signal)}
+ catch(e){
+  if(!String(e.message).includes('HTTP 400'))throw e;
+  return officialFetch(NOAA+'?limit=500',signal);
+ }
 }
 function localWarningRank(a){
  if(a.event==='Tornado Warning')return 0;
@@ -177,7 +203,7 @@ async function refresh(){
  try{
   // Two official requests in parallel: nationwide event filter and safety-first local point warnings.
   const responses=await Promise.allSettled([
-   officialFetch(NOAA+'?event=Tornado%20Warning&status=actual&limit=500',controller.signal),
+   nationwideFetch(controller.signal),
    fetchLocal(controller.signal)
   ]);
   showLocal();
@@ -241,7 +267,18 @@ window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
 window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
  loadHome();auto=setting('auto')!=='false';satellite=setting('satellite')!=='false';
- setButtons();mapInit();bind();deckBind();markHome();deckReport();refresh();
+ setButtons();mapInit();bind();deckBind();markHome();
+ if(window.NewsWireDesktopBridge){
+  const bridge=window.NewsWireDesktopBridge;
+  if(typeof bridge.onFocusWarning==='function')bridge.onFocusWarning(id=>{
+   const item=alerts.find(a=>a.id===id);
+   if(item)select(item,true);else sayStatus('Selected warning is no longer in the active feed.');
+  });
+  if(typeof bridge.onSetZip==='function')bridge.onSetZip(zip=>{
+   if(/^\d{5}$/.test(zip)){$('zip').value=zip;$('setZip').click();}
+  });
+ }
+ deckReport();refresh();
  setInterval(()=>{if(!document.hidden||window.NewsWireDesktopBridge)refresh()},EVERY_MS);
  if(window.NewsWireDesktopBridge)setInterval(deckReport,5000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!lastChecked||Date.now()-lastChecked.getTime()>EVERY_MS))refresh()});
