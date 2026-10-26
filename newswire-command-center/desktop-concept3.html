@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#061728"><title>NewsWire — Weather, News & Alerts Command Center</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="concept3.css"></head>
+<body>
+<header class="masthead">
+ <div class="brand"><div class="mark" aria-hidden="true">⚡</div><div><div class="brandTitle">News<span>Wire</span> <small>v0.7.3</small></div><div class="brandSub">NATIONWIDE WEATHER, NEWS & ALERTS</div></div></div>
+ <nav class="primaryNav" aria-label="Main sections">
+  <button type="button" class="navLink" data-open-panel="local"><span>⌂</span>Home</button>
+  <button type="button" class="navLink active" id="nav-map"><span>▧</span>Map</button>
+  <button type="button" class="navLink" data-open-panel="local"><span>☁</span>Weather</button>
+  <button type="button" class="navLink" data-open-panel="warnings"><span>⚠</span>Alerts</button>
+  <button type="button" class="navLink" disabled title="Local news module is planned"><span>▤</span>News</button>
+  <button type="button" class="navLink" disabled title="Traffic module is planned"><span>▰</span>Traffic</button>
+  <button type="button" class="navLink" disabled title="Sports module is planned"><span>◉</span>Sports</button>
+  <button type="button" class="navLink" disabled title="Camera module is planned"><span>▣</span>Camera</button>
+  <button type="button" class="navLink" id="settings" title="Toggle monitoring and voice settings"><span>⚙</span>Settings</button>
+ </nav>
+ <div class="topLocation"><span aria-hidden="true">⌖</span><span id="headerLocation">Set your ZIP</span></div>
+</header>
+<div class="controlStrip" id="controls">
+ <div class="locationControls"><label for="zip">YOUR ZIP</label><input id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]*" placeholder="35950" aria-label="Five-digit United States ZIP"><button id="setZip">Set location</button><button id="myGps">Use GPS</button></div>
+ <div class="monitorControls"><button id="auto" class="toggle" aria-pressed="true">Auto-fly: ON</button><button id="voice" class="toggle" aria-pressed="false">Voice: OFF</button><button id="refresh">↻ Refresh NWS</button><button id="arrange-workspace">▦ Arrange 3 Monitors</button></div>
+ <div id="status" class="feedStatus" role="status">Waiting for official warning data…</div>
+</div>
+<div class="shell">
+ <aside class="leftPanel">
+  <div class="localBlock">
+   <div class="sectionHeading">⌖ CURRENT LOCATION</div>
+   <div class="localName" id="heroLocation">Select your ZIP or GPS</div>
+   <div class="weatherPlaceholder"><div class="weatherIcon" aria-hidden="true">☁</div><div><strong>LOCAL WEATHER</strong><small>Forecast display planned</small></div></div>
+   <div class="localWarning"><span class="miniLabel">LOCAL SAFETY STATUS</span><div id="leftLocalStatus">Checking official local alerts…</div></div>
+  </div>
+  <div class="divider"></div>
+  <div class="sectionHeading">QUICK LINKS</div>
+  <button class="quick primary" data-open-panel="map">◉ Live National Map</button>
+  <button class="quick alert" data-open-panel="warnings">⚠ Tornado Warnings <span id="quickCount">—</span></button>
+  <button class="quick" data-open-panel="local">⌖ Local Dashboard ↗</button>
+  <a class="quick" href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer">▧ Official NWS Radar ↗</a>
+  <button class="quick" id="nav-home">⊙ Back to My Location</button>
+  <button class="quick" id="nav-country">◎ National Overview</button>
+  <div class="sideBottom"><div class="sectionHeading">WORKSPACE</div><div>Pop out any dashboard and drag it to another monitor. Window positions are saved.</div><span id="nwClock"></span></div>
+ </aside>
+ <main class="centerPanel">
+  <div class="mapTabs">
+   <div class="tabSet"><button id="style" class="tab current" aria-pressed="true">Satellite map</button>
+   <a class="tab" href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer">NWS Radar ↗</a>
+   <button id="navWarnings" class="tab">Warnings</button>
+   <button id="country" class="tab">U.S. overview</button></div>
+   <div class="mapCaption"><span class="liveDot"></span> OFFICIAL NWS WARNINGS <span class="safetyNote">NO RADAR VELOCITY IN THIS BUILD</span></div>
+  </div>
+  <section class="mapShell" aria-label="Official nationwide tornado-warning map">
+   <div id="map"></div>
+   <div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Warning polygons show issued NWS alert areas, not current tornado positions.</div></div>
+   <div class="mapActions"><button id="home">⌖ My Location</button><button id="resume">⟳ Resume Auto-Fly</button></div>
+  </section>
+  <div class="mapFooter"><div><span class="liveDot"></span><b id="mapFooterState">NWS FEED NOT VERIFIED</b></div><span>Satellite imagery: U.S. Geological Survey · <span id="mapFooterCount">—</span> active tornado warnings</span></div>
+ </main>
+ <aside class="rightPanel">
+  <button id="warningBanner" class="warningBanner unknownStatus" type="button" aria-label="Open tornado warning list">
+   <span class="twister" aria-hidden="true">⚠</span><span><b id="bannerTitle">NWS STATUS UNKNOWN</b><small id="bannerSub">Waiting for official warning feed</small></span>
+  </button>
+  <div class="rightCard localSafety"><div class="sectionHeading">YOUR LOCATION — SAFETY FIRST</div><div id="localStatus" class="unknown" role="status">Set a ZIP or GPS to check local NWS warnings.</div></div>
+  <div class="rightCard selectedCard"><div class="sectionHeading">SELECTED WARNING DETAILS</div>
+   <div id="detail">Select an issued warning to view its affected area, expiration, and official NWS instructions.</div>
+   <a id="official" target="_blank" rel="noopener noreferrer" href="https://www.weather.gov/alerts">Read Official NWS Alert ↗</a>
+  </div>
+  <div class="rightCard countCard"><div class="countHead"><div class="sectionHeading">ACTIVE U.S. TORNADO WARNINGS</div><div class="count" id="count">—</div></div><div id="checked" class="checked">No successful check yet</div></div>
+  <div id="list" aria-label="Active tornado warning list"><div class="empty">Loading official nationwide warning feed…</div></div>
+  <div class="rightNote">Not affiliated with NOAA/NWS. Keep Wireless Emergency Alerts enabled. Maps and data can be delayed.</div>
+ </aside>
+</div>
+<div class="dashboardStrip" aria-label="Additional NewsWire windows">
+ <button class="miniPanel" data-open-panel="map"><div class="miniEyebrow">01 / COMMAND CENTER</div><div class="miniTitle">🌎 Nationwide Map</div><p>Live warning polygons, satellite map and NWS bulletin focus.</p><div class="miniLink">Open national map ↗</div></button>
+ <button class="miniPanel" data-open-panel="warnings"><div class="miniEyebrow">02 / ALERT OPERATIONS</div><div class="miniTitle">⚠ Active Warnings</div><p>Separate live warning list with selected alert details.</p><div class="miniLink">Open warning window ↗</div></button>
+ <button class="miniPanel" data-open-panel="local"><div class="miniEyebrow">03 / LOCAL DESK</div><div class="miniTitle">☁ Local Dashboard</div><p>Local safety status and ZIP controls. Weather/news expanding later.</p><div class="miniLink">Open local window ↗</div></button>
+ <a class="miniPanel miniExternal" href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer"><div class="miniEyebrow">04 / RADAR SOURCES</div><div class="miniTitle">▦ Official NWS Radar</div><p>Open the National Weather Service radar viewer in your browser.</p><div class="miniLink">Open official radar ↗</div></a>
+</div>
+<footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script>
+</body></html>
