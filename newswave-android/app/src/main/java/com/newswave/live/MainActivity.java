@@ -279,7 +279,11 @@ public class MainActivity extends Activity {
   private String newsFeedKey="",newsFeedError="";
   private boolean newsFeedLoading=false;
   private List<LocalNewspapers.Headline> newsHeadlines=new ArrayList<>();
-  private final String[] tabs={"All","Radar","National","Weather","Local","Favorites"};
+  private final String[] tabs={"Local","National","Weather","Radar","Favorites"};
+  private List<LocalNewspapers.Headline> nationalHeadlines=new ArrayList<>();
+  private boolean nationalLoading=false;
+  private long nationalFetchedAt=0;
+  private String nationalFeedError="";
 
   @Override public void onCreate(Bundle b){
     super.onCreate(b);
@@ -502,34 +506,48 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams bp=lp(-2,-2);bp.leftMargin=dp(9);ziprow.addView(save,bp);
     LinearLayout.LayoutParams zr=lp(-1,-2);zr.topMargin=dp(12);locale.addView(ziprow,zr);
     LinearLayout.LayoutParams cp=lp(-1,-2);cp.bottomMargin=dp(20);content.addView(locale,cp);
-    categoryTile(content,"NEWS","Your local headlines, live","◉",0xff2b65c3,()->openSection("News"));
-    categoryTile(content,"WEATHER","Satellite radar & NWS warnings","☁",0xff097e98,()->openSection("Weather"));
-    categoryTile(content,"SPORTS","Friday night scores • nearby teams","★",0xffa15620,this::openFootballBoard);
-    categoryTile(content,"NEWSWIRE DRIVE","Spoken weather • live GPS • storm alerts","↗",
-      0xff135879,this::openDrive);
-    categoryTile(content,"TRAFFIC & ROAD CLOSURES","Official DOT incidents and travel maps","⇢",
-      0xff684124,this::openTraffic);
-    categoryTile(content,"MY NEWS","Follow towns, favorite publishers, save stories","★",
-      0xff235286,this::openPersonalized);
-    categoryTile(content,"GOOD MORNING","Your weather and local news briefing","☀",
-      0xff8a542e,this::openMorning);
-    categoryTile(content,"MY DAY AT A GLANCE","Weather • School notices • Road conditions • Events","◈",
-      0xff146577,()->openDay("day"));
-    categoryTile(content,"NEXT 12 HOURS","Hourly NWS forecast • Rain chances • Wind","☀",
-      0xff235c86,()->openDay("hours"));
-    categoryTile(content,"SCHOOL CLOSINGS","Official Alabama notices • Publisher coverage","⚠",
-      0xff88602a,()->openDay("schools"));
-    categoryTile(content,"AROUND ME","Local festivals • Concerts • Community events","✦",
-      0xff4b3889,()->openDay("events"));
-    categoryTile(content,"LIVE SATELLITE MAP","NWS warning polygons • Nearby stories & roads","◈",
+    // Local first, National second; leave the rest accessible without crowding the home screen.
+    categoryTile(content,"LOCAL NEWS","Headlines following your location","⌖",
+      0xff2b65c3,()->openSection("News"));
+    categoryTile(content,"NATIONAL NEWS","Today's U.S. headlines & broadcasters","▣",
+      0xff215d88,()->openSection("National"));
+    LinearLayout weatherTools=dashboardGroup(content,"WEATHER & WARNINGS",
+      "Forecast • radar • satellite map • emergency center","☁",0xff097e98);
+    categoryTile(weatherTools,"WEATHER","Local NWS forecasts & radar","☀",
+      0xff097e98,()->openSection("Weather"));
+    categoryTile(weatherTools,"LIVE SATELLITE MAP","Warning polygons • roads • radar","◈",
       0xff075f71,()->openLiveCenter("map"));
-    categoryTile(content,"EMERGENCY CENTER","Official warning details • Issued & expiry times","⚠",
+    categoryTile(weatherTools,"EMERGENCY CENTER","Official warnings and expiry times","⚠",
       0xff81414a,()->openLiveCenter("alerts"));
-    categoryTile(content,"LIVE TV","Local stations · national news · watch in-app","▣",
+    LinearLayout roadTools=dashboardGroup(content,"ON THE ROAD",
+      "Driving weather • road closures • GPS storm alerts","↗",0xff135879);
+    categoryTile(roadTools,"NEWSWIRE DRIVE","Spoken weather • GPS • storm alerts","↗",
+      0xff135879,this::openDrive);
+    categoryTile(roadTools,"TRAFFIC & ROAD CLOSURES","DOT incidents and maps","⇢",
+      0xff684124,this::openTraffic);
+    LinearLayout listenTools=dashboardGroup(content,"WATCH & LISTEN",
+      "Live TV • local radio • NOAA Weather Radio","▶",0xff624277);
+    categoryTile(listenTools,"LIVE TV","Local and national TV news","▣",
       0xff2a5281,this::openTV);
-    categoryTile(content,"NEWSWIRE RADIO","Tap to hear local news, weather and sports","▶",
+    categoryTile(listenTools,"NEWSWIRE RADIO","Local radio and NOAA weather broadcasts","▶",
       0xff624277,this::openRadio);
-    categoryTile(content,"HOME SCREEN WIDGET","Weather, NWS alerts and headlines on your phone","▤",
+    LinearLayout dayTools=dashboardGroup(content,"MY DAY & COMMUNITY",
+      "School news • sports • events • personal briefing","★",0xff146577);
+    categoryTile(dayTools,"SPORTS","Friday night scores • nearby teams","★",
+      0xffa15620,this::openFootballBoard);
+    categoryTile(dayTools,"MY NEWS","Follow towns and favorite publishers","★",
+      0xff235286,this::openPersonalized);
+    categoryTile(dayTools,"GOOD MORNING","Weather and local news briefing","☀",
+      0xff8a542e,this::openMorning);
+    categoryTile(dayTools,"MY DAY AT A GLANCE","Weather • notices • roads • events","◈",
+      0xff146577,()->openDay("day"));
+    categoryTile(dayTools,"NEXT 12 HOURS","Hourly NWS forecast • rain • wind","☀",
+      0xff235c86,()->openDay("hours"));
+    categoryTile(dayTools,"SCHOOL CLOSINGS","Official notices and local coverage","⚠",
+      0xff88602a,()->openDay("schools"));
+    categoryTile(dayTools,"AROUND ME","Festivals • concerts • community events","✦",
+      0xff4b3889,()->openDay("events"));
+    categoryTile(dayTools,"HOME SCREEN WIDGET","Weather, alerts and headlines","▤",
       0xff235b55,this::addHomeWidget);
     LinearLayout driveCard=column();
     driveCard.setBackground(radiantCard(0xff58321f,0xff1b2638,0xff91663d));
@@ -777,6 +795,18 @@ public class MainActivity extends Activity {
       }
     },"newswire-area").start();
   }
+  private LinearLayout dashboardGroup(LinearLayout parent,String title,String detail,
+      String icon,int color){
+    LinearLayout children=column();
+    children.setPadding(dp(10),0,0,0);
+    children.setVisibility(View.GONE);
+    categoryTile(parent,title+"  ▾",detail,icon,color,()->
+      children.setVisibility(children.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
+    LinearLayout.LayoutParams holder=lp(-1,-2);
+    holder.bottomMargin=dp(6);
+    parent.addView(children,holder);
+    return children;
+  }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
     LinearLayout tile=row();
     GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{tone,PANEL});
@@ -890,10 +920,12 @@ public class MainActivity extends Activity {
     TextView back=button("‹  MENU",()->dashboard());header.addView(back);
     TextView brand=text("NEWSWIRE  /  "+tab.toUpperCase(Locale.US),24,FG,true);
     LinearLayout.LayoutParams bh=lp(-1,-2);bh.topMargin=dp(13);header.addView(brand,bh);
-    TextView subtitle=text(tab.equals("News")?"Local papers follow your location • saved ZIP is backup":zip.isEmpty()?(tab.equals("Sports")?"Search by ZIP below for local football scores":"Set a ZIP on the home screen for local results"):city+", "+state+"  •  "+zip,13,MUTED,false);
+    TextView subtitle=text(tab.equals("News")?"Local papers follow your location • saved ZIP is backup":
+      tab.equals("National")?"Top U.S. stories from attributed news publishers":zip.isEmpty()?(tab.equals("Sports")?"Search by ZIP below for local football scores":"Set a ZIP on the home screen for local results"):city+", "+state+"  •  "+zip,13,MUTED,false);
     LinearLayout.LayoutParams sl=lp(-1,-2);sl.topMargin=dp(7);header.addView(subtitle,sl);
     root.addView(header);
-    TextView notice=text(tab.equals("News")?"LOCAL HEADLINES  •  NEWSPAPERS  •  NETWORK NEWS":"OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
+    TextView notice=text(tab.equals("News")?"LOCAL HEADLINES  •  NEWSPAPERS":
+      tab.equals("National")?"NATIONAL HEADLINES  •  BROADCASTERS":"OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
     if(tab.equals("Sports")){
       LinearLayout sportZip=column();pad(sportZip,16,12);
@@ -977,6 +1009,7 @@ public class MainActivity extends Activity {
       }
     }
     if(tab.equals("News"))count+=renderLocalNews();
+    if(tab.equals("National"))count+=renderNationalNews();
     if(tab.equals("Sports")){
       TextView live=button("🏈  FRIDAY NIGHT FOOTBALL LIVE",this::openFootballBoard);
       LinearLayout.LayoutParams flp=lp(-1,-2);flp.bottomMargin=dp(13);
@@ -1001,7 +1034,8 @@ public class MainActivity extends Activity {
     for(Channel ch:channels){
       if(tab.equals("Sports"))continue;
       if(tab.equals("Weather")&&!ch.category.equals("Weather"))continue;
-      if(tab.equals("News")&&!ch.category.equals("National")&&!ch.category.equals("Local"))continue;
+      if(tab.equals("News")&&!ch.category.equals("Local"))continue;
+      if(tab.equals("National")&&!ch.category.equals("National"))continue;
       String areaState=tab.equals("News")&&newsGpsActive?newsGpsRegion:state;
       if(ch.category.equals("Local")&&!("AL".equalsIgnoreCase(areaState)||"Alabama".equalsIgnoreCase(areaState)))continue;
       String needle=query.toLowerCase(Locale.US);
@@ -1025,6 +1059,51 @@ public class MainActivity extends Activity {
     TextView header=text(name,12,ACCENT,true);
     LinearLayout.LayoutParams p=lp(-1,-2);p.topMargin=dp(15);p.bottomMargin=dp(12);
     target.addView(header,p);
+  }
+  private int renderNationalNews(){
+    section(list,"TOP STORIES ACROSS THE UNITED STATES");
+    if(!nationalLoading && (nationalFetchedAt==0 ||
+        System.currentTimeMillis()-nationalFetchedAt>10L*60*1000)){
+      nationalLoading=true;
+      nationalFetchedAt=System.currentTimeMillis();
+      nationalFeedError="";
+      new Thread(()->{
+        try{
+          List<LocalNewspapers.Headline> fresh=LocalNewspapers.nationalHeadlines();
+          runOnUiThread(()->{
+            if(isFinishing()||isDestroyed())return;
+            nationalHeadlines=fresh; nationalLoading=false; nationalFeedError="";
+            if(tab.equals("National")&&current==null)render();
+          });
+        }catch(Exception e){
+          runOnUiThread(()->{
+            if(isFinishing()||isDestroyed())return;
+            nationalLoading=false;
+            nationalFeedError="National feed unavailable. Try refresh or use broadcaster links below.";
+            if(tab.equals("National")&&current==null)render();
+          });
+        }
+      },"newswire-national-headlines").start();
+    }
+    TextView refresh=button("↻ REFRESH NATIONAL HEADLINES",()->{
+      nationalFetchedAt=0;render();
+    });
+    LinearLayout.LayoutParams rp=lp(-1,-2);
+    rp.bottomMargin=dp(10);list.addView(refresh,rp);
+    if(nationalLoading)list.addView(text("Loading national headlines…",13,MUTED,false));
+    else if(!nationalFeedError.isEmpty())
+      list.addView(text(nationalFeedError,13,MUTED,false));
+    else if(nationalHeadlines.isEmpty())
+      list.addView(text("No headlines returned. National source links are below.",13,MUTED,false));
+    int count=0;
+    for(LocalNewspapers.Headline item:nationalHeadlines){
+      if(!newsMatch(item.title,item.source))continue;
+      card(localLink("national"+item.url.hashCode(),item.title,"National headline",
+          item.source+" • Opens attributed source",item.url));
+      count++;
+    }
+    section(list,"NATIONAL NEWS CHANNELS");
+    return count;
   }
   private int renderLocalNews(){
     String activeCity=newsGpsActive?newsGpsCity:city;
@@ -1360,7 +1439,7 @@ public class MainActivity extends Activity {
   @Override public void onBackPressed(){
     if(custom!=null){exitFullscreen();return;}
     if(current!=null){if(web!=null&&web.canGoBack()){web.goBack();return;}home();return;}
-    if(tab.equals("News")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
+    if(tab.equals("News")||tab.equals("National")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
     super.onBackPressed();
   }
   @Override protected void onResume(){
