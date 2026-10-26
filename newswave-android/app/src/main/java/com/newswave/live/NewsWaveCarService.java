@@ -130,7 +130,7 @@ public final class NewsWaveCarService extends CarAppService {
         private final List<Station> stations;
         private Station chosen;
         private String mode="SR_BREF";
-        private boolean nationwide=false;
+        private boolean nationwide=true; // Use NOAA national mosaic by default; local products are opt-in.
         private boolean follow=true;
         private volatile Location lastFix;
         private LocationManager locationManager;
@@ -170,17 +170,25 @@ public final class NewsWaveCarService extends CarAppService {
             locationManager=(LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
             locationListener=this::onPosition;
             for(String provider:locationManager.getProviders(true)){
-              locationManager.requestLocationUpdates(provider,12000,35,locationListener,Looper.getMainLooper());
+              locationManager.requestLocationUpdates(provider,1500,3,locationListener,Looper.getMainLooper());
             }
           }catch(Exception ex){Log.w(LOG,"Car GPS unavailable",ex);}
         }
         private void onPosition(Location loc){
           if(loc==null||!loc.hasAccuracy()||loc.getAccuracy()>250f||
              System.currentTimeMillis()-loc.getTime()>120000L)return;
-          lastFix=new Location(loc); // GPS is independent of manual map panning.
+          Location previous=lastFix;
+          lastFix=new Location(loc); // Keep safety alerts tied to the latest GPS fix.
           if(!follow)return;
-          renderer.setPosition(loc.getLatitude(),loc.getLongitude(),
-              loc.hasBearing()?loc.getBearing():Float.NaN);
+          // A parked car's compass/course can drift. Trust direction only while
+          // moving, and keep the last reliable heading when stopped.
+          float course=Float.NaN;
+          boolean moving=loc.hasSpeed() && loc.getSpeed()>=1.5f;
+          if(moving && loc.hasBearing())course=loc.getBearing();
+          else if(moving && previous!=null && previous.distanceTo(loc)>=8f)
+              course=previous.bearingTo(loc);
+          renderer.setPosition(loc.getLatitude(),loc.getLongitude(),course,
+              loc.hasAccuracy()?loc.getAccuracy():20f,!moving);
           Station nearest=chosen;double best=Double.MAX_VALUE;
           for(Station station:stations){
             double d=sqDist(station,loc.getLatitude(),loc.getLongitude());
@@ -209,6 +217,9 @@ public final class NewsWaveCarService extends CarAppService {
             else if("SR_BVEL".equals(mode))mode="BDHC";
             else if("BDHC".equals(mode))mode="BOHA";
             else mode="SR_BREF";
+            // National mosaic supports reflectivity only. Other products
+            // require the selected local NOAA station.
+            if(!"SR_BREF".equals(mode))nationwide=false;
             renderer.change(chosen,mode,nationwide);invalidate();
         }
         private String productName(){
@@ -504,10 +515,27 @@ public final class NewsWaveCarService extends CarAppService {
         private Bitmap finished;
         private Double userLat=null,userLon=null;
         private Float userBearing=null;
-        void setPosition(double latitude,double longitude,float bearing){
+        void setPosition(double latitude,double longitude,float bearing,
+                         float accuracy,boolean stationary){
             synchronized(lock){
+                if(stationary && userLat!=null && userLon!=null){
+                    float[] displacement=new float[1];
+                    Location.distanceBetween(userLat,userLon,latitude,longitude,displacement);
+                    // Avoid creeping/rotating across the road while parked.
+                    if(displacement[0] < Math.max(9f,Math.min(25f,accuracy*.6f))){
+                        latitude=userLat;longitude=userLon;
+                    }
+                }
                 userLat=latitude;userLon=longitude;
-                userBearing=Float.isFinite(bearing)?bearing:null;
+                if(Float.isFinite(bearing)){
+                    float course=(bearing%360f+360f)%360f;
+                    if(userBearing==null)userBearing=course;
+                    else {
+                        float difference=(course-userBearing+540f)%360f-180f;
+                        userBearing=(userBearing+0.55f*difference+360f)%360f;
+                    }
+                }
+                // Invalid or stationary fixes never clear the last good heading.
             }
             refresh();
         }
@@ -561,7 +589,10 @@ public final class NewsWaveCarService extends CarAppService {
                 Canvas canvas=new Canvas(provisional);
                 canvas.drawColor(Color.rgb(13,26,39));
                 android.graphics.Matrix matrix=new android.graphics.Matrix();
-                matrix.setScale((float)scale,(float)scale,w/2f,h/2f);
+                final boolean isFollowing;
+                synchronized(lock){isFollowing=followGps;}
+                matrix.setScale((float)scale,(float)scale,w/2f,
+                                isFollowing?h*.67f:h/2f);
                 canvas.drawBitmap(previous,matrix,new Paint(Paint.FILTER_BITMAP_FLAG));
                 synchronized(lock){finished=provisional;}
                 display();
