@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111e">
+<title>NewsWire — Nationwide Storm Command Center</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#060f1b;--panel:#0c2134;--line:#25465e;--text:#eaf6ff;--muted:#a4bfd2;--aqua:#80eaf3;--red:#ff526f;--gold:#ffca71}*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit}button{cursor:pointer;border:1px solid #356078;background:#16374e;color:var(--text);padding:10px 12px;border-radius:10px;font-weight:700}button:hover{background:#21516b}button:focus-visible,input:focus-visible{outline:2px solid var(--aqua)}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:15px 20px;border-bottom:1px solid var(--line);background:linear-gradient(125deg,#11354b,#061320)}
+.eyebrow{letter-spacing:.17em;color:var(--aqua);font-size:11px;font-weight:900}.headline{font-size:clamp(18px,2vw,27px);font-weight:900;letter-spacing:-.04em;margin:4px 0}.subtitle{font-size:12px;color:var(--muted)}
+.free{background:#123936;border:1px solid #316863;color:#b3fce3;border-radius:100px;padding:8px 12px;font-size:12px;font-weight:800;white-space:nowrap}
+.toolbar{padding:10px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:9px;background:#0a1d2d;border-bottom:1px solid var(--line)}
+.toolbar label{font-size:12px;color:var(--muted)}.toolbar input{width:92px;padding:10px;border-radius:9px;border:1px solid #356078;background:#061b2d;color:white;letter-spacing:.12em}
+.toggle[aria-pressed=true]{background:#13556a;border-color:#35a9b9}.strong{border-color:#c34253;color:#ffd4dd}.signal{font-size:12px;color:var(--muted);margin-left:auto}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(310px,365px);height:calc(100dvh - 151px);min-height:530px}
+.mapShell{min-width:0;position:relative;background:#101b2b}#map{height:100%;width:100%;background:#122032}
+.leaflet-container{background:#142233}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#102739;color:#eef7ff;border:1px solid #5284a2}
+.mapLabel{position:absolute;top:12px;left:12px;z-index:550;background:#091c2fe8;border:1px solid #356078;border-radius:10px;padding:9px 12px;max-width:min(70%,300px);font-size:12px;pointer-events:none}
+.mapLabel b{color:var(--aqua)}.mapActions{position:absolute;bottom:20px;left:12px;z-index:550;display:flex;gap:7px;flex-wrap:wrap}.mapActions button{background:#102b40ec}
+.sidebar{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line);background:#081725}
+.sidebarSection{padding:13px 15px;border-bottom:1px solid var(--line)}.sidebarTitle{font-size:11px;letter-spacing:.11em;font-weight:900;color:var(--aqua)}
+#localStatus{font-size:13px;margin-top:9px;line-height:1.5}.urgent{color:#ffbbc8}.unknown{color:#ffdb8e}
+#detail{font-size:12px;line-height:1.5;color:var(--muted);white-space:pre-wrap;max-height:135px;overflow:auto}#detail strong{color:var(--text)}
+.listHeading{display:flex;align-items:center;justify-content:space-between}.count{color:var(--gold);font-size:13px;font-weight:800}
+#list{overflow-y:auto;flex:1;min-height:75px}.warning{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #23445b;border-left:4px solid var(--red);border-radius:0;background:#0c2334;padding:13px 15px}
+.warning:hover,.warning:focus{background:#153a50}.warning b{display:block;color:#fff;font-size:13px}.warning small{display:block;font-size:11px;color:#afc7d6;margin-top:5px}.new{color:#ffe49b}.empty{padding:18px;color:var(--muted);font-size:13px}
+footer{padding:11px 15px;background:#071622;color:#8ea8b9;font-size:11px;line-height:1.4;border-top:1px solid var(--line)}
+a{color:#8ce6ff}
+@media(max-width:850px){header{padding:12px} .workspace{grid-template-columns:1fr;height:auto;min-height:0}.mapShell{height:52dvh;min-height:280px}.sidebar{height:52dvh;min-height:360px;border-left:0;border-top:1px solid var(--line)}.toolbar{padding:9px}.signal{width:100%;margin-left:0}.free{font-size:10px}}
+</style>
+</head><body>
+<header><div><div class="eyebrow">NEWSWIRE / LIVE WEATHER DESK</div><div class="headline">Nationwide Storm Command Center</div><div class="subtitle">Official NWS warning polygons · US-wide monitoring · no subscription</div></div><div class="free">FREE FOR EVERYONE</div></header>
+<div class="toolbar">
+<label for="zip">Your ZIP</label><input id="zip" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="35950" aria-label="5 digit United States ZIP">
+<button id="setZip">Set location</button>
+<button id="myGps">Use my GPS</button>
+<button id="auto" class="toggle" aria-pressed="true">Auto-fly: ON</button>
+<button id="voice" class="toggle" aria-pressed="false">Voice: OFF</button>
+<button id="style" class="toggle" aria-pressed="true">Satellite map</button>
+<button id="refresh">Refresh warnings</button>
+<span id="status" class="signal" role="status">Waiting for official warning data…</span>
+</div>
+<div class="workspace">
+<section class="mapShell" aria-label="Nationwide tornado warnings map">
+<div id="map"></div><div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Red outlines show issued NWS tornado warnings, not observed tornado positions or predicted paths.</div></div>
+<div class="mapActions"><button id="home">⌖ Back to my location</button><button id="country">US overview</button><button id="resume">Resume auto-fly</button><a href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer"><button type="button">Official NWS radar</button></a></div>
+</section>
+<aside class="sidebar">
+<div class="sidebarSection"><div class="sidebarTitle">YOUR LOCATION — SAFETY FIRST</div><div id="localStatus" class="unknown" role="status">Set a ZIP or GPS to check official warnings for your area. ZIP centroids are approximate.</div></div>
+<div class="sidebarSection"><div class="listHeading"><div class="sidebarTitle">ACTIVE US TORNADO WARNINGS</div><span class="count" id="count">—</span></div><div class="subtitle" id="checked">No successful check yet</div></div>
+<div id="list" aria-label="Tornado warning list"><div class="empty">Loading nationwide warning feed…</div></div>
+<div class="sidebarSection"><div class="sidebarTitle">SELECTED WARNING</div><div id="detail">Select a warning to see the issue area, expiration, official NWS guidance, and mapped boundaries.</div><a id="official" target="_blank" rel="noopener noreferrer" href="https://www.weather.gov/alerts">Open official alert</a></div>
+<footer>Not affiliated with NOAA/NWS. Weather feeds can fail or be delayed. NewsWire is supplemental information; keep Wireless Emergency Alerts enabled and follow local officials. A warning polygon is not the tornado's current position. No radar rotation detection is claimed in this build.</footer>
+</aside></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="engine.js"></script><script src="app.js"></script>
+</body></html>
