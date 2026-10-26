@@ -12,7 +12,7 @@ function launch(){
  const win=new BrowserWindow({
   title:'NewsWire Storm Command Center',width:1520,height:930,minWidth:850,minHeight:630,
   backgroundColor:'#06111d',show:false,autoHideMenuBar:true,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,preload:path.join(__dirname,'preload.cjs')}
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false,preload:path.join(__dirname,'preload.cjs')}
  });
  win.once('ready-to-show',()=>win.show());
  win.webContents.setWindowOpenHandler(({url})=>{external(url);return {action:'deny'}});
