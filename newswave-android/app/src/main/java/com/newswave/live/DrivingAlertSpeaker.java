@@ -48,7 +48,8 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
                 Log.w(TAG,"US English speech data unavailable");
                 return;
             }
-            tts.setSpeechRate(1.02f);
+            tts.setSpeechRate(1.06f);
+            tts.setPitch(1.03f);
             tts.setAudioAttributes(attributes);
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener(){
                 @Override public void onStart(String id){}
@@ -77,10 +78,20 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
         if(audio==null)return;
         focus=new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(attributes)
+            .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(change->{
-                // Notification remains present if another call or app takes audio focus.
-                if(change==AudioManager.AUDIOFOCUS_LOSS){
-                    main.post(()->{if(tts!=null)tts.stop();finish(currentId);});
+                // Do not talk over phone calls, navigation, or media that has
+                // taken focus. The notification remains visible if speech stops.
+                if(change==AudioManager.AUDIOFOCUS_LOSS
+                    ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                    ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+                    main.post(()->{
+                        String interrupted=currentId;
+                        if(interrupted!=null){
+                            if(tts!=null)tts.stop();
+                            finish(interrupted);
+                        }
+                    });
                 }
             }).build();
         if(audio.requestAudioFocus(focus)!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED){
@@ -93,7 +104,10 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
         if(tts.speak(message,TextToSpeech.QUEUE_FLUSH,null,id)!=TextToSpeech.SUCCESS){
             finish(id);return;
         }
-        main.postDelayed(()->finish(id),MAX_SPEECH_MS);
+        main.postDelayed(()->{
+            if(id.equals(currentId) && tts!=null)tts.stop();
+            finish(id);
+        },MAX_SPEECH_MS);
     }
 
     private void finish(String id){
