@@ -34,11 +34,11 @@ function markHome(){
 }
 function setHome(lat,lon,label,type){
  if(!E.validLocation(lat,lon))return;
- home={lat,lon,label,type};
+ home={lat,lon,label,type};localVerified=false;localAlerts=[];pointIds.clear();
  setting('home',JSON.stringify(home));markHome();
  if(map)map.setView([lat,lon],8,{animate:true});
  setText('localStatus','Checking NWS warnings for '+label+'…');
- refresh();
+ if(checking)setTimeout(refresh,1500);else refresh();
 }
 function loadHome(){
  try{const h=JSON.parse(setting('home')||'null');if(h&&E.validLocation(h.lat,h.lon)&&h.type==='zip')home=h;}catch(e){}
@@ -190,6 +190,7 @@ function bind(){
   }catch(e){setText('localStatus','ZIP lookup unavailable: '+e.message+'. You can try GPS.')}finally{clearTimeout(t)}
  });
  $('myGps').addEventListener('click',()=>{
+  if(location.protocol==='file:'&&/Android/i.test(navigator.userAgent)){location.href='newswire://gps';return}
   if(!navigator.geolocation){setText('localStatus','Geolocation not supported; enter ZIP.');return}
   setText('localStatus','Requesting location permission…');
   navigator.geolocation.getCurrentPosition(pos=>setHome(pos.coords.latitude,pos.coords.longitude,'GPS location','gps'),
@@ -205,7 +206,10 @@ function bind(){
  $('style').addEventListener('click',()=>{satellite=!satellite;setting('satellite',String(satellite));mapStyle()});
 }
 // Native Android can forward GPS through this entrypoint while WebView is visible.
-window.updateNewsWirePosition=(lat,lon)=>{if(E.validLocation(lat,lon))setHome(lat,lon,'Device GPS','gps')};
+window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
+ if(home&&home.type==='gps'&&Math.abs(home.lat-lat)<.015&&Math.abs(home.lon-lon)<.015){return;}
+ setHome(lat,lon,'Device GPS','gps')};
+window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
  loadHome();auto=setting('auto')!=='false';satellite=setting('satellite')!=='false';
  setButtons();mapInit();bind();markHome();refresh();
