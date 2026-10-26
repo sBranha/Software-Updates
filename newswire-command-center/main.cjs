@@ -5,7 +5,7 @@ const {createBridge}=require('./deck-bridge.cjs');
 const W=require('./window-layout.cjs');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
 const views=new Map();
-const pageNames={map:'index.html',local:'local.html',warnings:'warnings.html'};
+const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html'};
 let bridge,layoutFile,layout={},latest=null;
 let saveTimer=null;
 function external(url){
