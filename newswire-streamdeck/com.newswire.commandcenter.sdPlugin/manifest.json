@@ -6,7 +6,7 @@
   "Description": "Free offline controls for the NewsWire Storm Command Center. Official NWS warning status and map controls.",
   "Author": "NewsWire",
   "Version": "0.7.1.0",
-  "SDKVersion": 3,
+  "SDKVersion": 2,
   "CodePath": "bin/plugin.js",
   "Nodejs": {
     "Version": "24"
