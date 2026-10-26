@@ -723,23 +723,76 @@ public final class NewsWaveCarService extends CarAppService {
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
         }
+        /**
+         * A valid transparent NOAA radar image can be laid over roads.
+         * Some station WMS responses contain opaque blue rectangular no-data
+         * blocks; these are NOT weather, and must never hide the basemap.
+         */
+        private static boolean suspiciousRadarOverlay(Bitmap image){
+            if(image==null || image.isRecycled())return true;
+            int samples=0,opaqueBlue=0;
+            int sx=Math.max(1,image.getWidth()/44);
+            int sy=Math.max(1,image.getHeight()/28);
+            for(int y=sy/2;y<image.getHeight();y+=sy){
+                for(int x=sx/2;x<image.getWidth();x+=sx){
+                    int pixel=image.getPixel(x,y);
+                    int a=Color.alpha(pixel),r=Color.red(pixel),
+                        g=Color.green(pixel),b=Color.blue(pixel);
+                    samples++;
+                    if(a>=235 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
+                        opaqueBlue++;
+                }
+            }
+            return samples>0 && opaqueBlue>samples*.12f;
+        }
         private void render(Station s,String p,boolean national,int rev,int w,int h,
                             int z,boolean auto,double manualLatitude,double manualLongitude,
                             boolean drawWarnings,String style){
+            Bitmap out=null;
             try{
                 Double gLat,gLon;Float bearing;
                 synchronized(lock){gLat=userLat;gLon=userLon;bearing=userBearing;}
                 double centerLat=auto&&gLat!=null?gLat:!Double.isNaN(manualLatitude)?manualLatitude:(national?39.0:s.lat);
                 double centerLon=auto&&gLon!=null?gLon:!Double.isNaN(manualLongitude)?manualLongitude:(national?-98.0:s.lon);
-                double x0=mx(centerLon,z)-w/2.,y0=my(centerLat,z)-h/2.;
-                Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+                boolean headingUp=auto && gLat!=null && bearing!=null;
+                float degrees=headingUp?bearing:0f;
+                float anchorX=w*.5f,anchorY=auto?h*.67f:h*.5f;
+                double x0=mx(centerLon,z)-anchorX,y0=my(centerLat,z)-anchorY;
+
+                // Rotate the entire weather map (roads, radar and warning boundaries),
+                // not just the position arrow. Cover all corners after rotation.
+                float left=0,top=0,right=w,bottom=h;
+                if(headingUp){
+                    double radians=Math.toRadians(degrees);
+                    double cs=Math.cos(radians),sn=Math.sin(radians);
+                    float minX=Float.MAX_VALUE,minY=Float.MAX_VALUE;
+                    float maxX=-Float.MAX_VALUE,maxY=-Float.MAX_VALUE;
+                    float[] corners={0,0,w,0,w,h,0,h};
+                    for(int i=0;i<corners.length;i+=2){
+                        double dx=corners[i]-anchorX,dy=corners[i+1]-anchorY;
+                        float ux=(float)(anchorX+cs*dx-sn*dy);
+                        float uy=(float)(anchorY+sn*dx+cs*dy);
+                        minX=Math.min(minX,ux);maxX=Math.max(maxX,ux);
+                        minY=Math.min(minY,uy);maxY=Math.max(maxY,uy);
+                    }
+                    left=(float)Math.floor(minX)-3;
+                    top=(float)Math.floor(minY)-3;
+                    right=(float)Math.ceil(maxX)+3;
+                    bottom=(float)Math.ceil(maxY)+3;
+                }
+                int mapWidth=(int)Math.ceil(right-left),mapHeight=(int)Math.ceil(bottom-top);
+                double mapLeft=x0+left,mapTop=y0+top;
+
+                out=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
                 Canvas canvas=new Canvas(out);
                 canvas.drawColor(Color.rgb(13,26,39));
                 Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-                int tx0=(int)Math.floor(x0/256),tx1=(int)Math.ceil((x0+w)/256);
-                int ty0=(int)Math.floor(y0/256),ty1=(int)Math.ceil((y0+h)/256);
-                // Fetch map tiles concurrently: sequential network fetches made
-                // a single zoom gesture appear frozen for many seconds.
+                canvas.save();
+                if(headingUp)canvas.rotate(-degrees,anchorX,anchorY);
+                canvas.translate(left,top);
+
+                int tx0=(int)Math.floor(mapLeft/256),tx1=(int)Math.floor((mapLeft+mapWidth-1)/256);
+                int ty0=(int)Math.floor(mapTop/256),ty1=(int)Math.floor((mapTop+mapHeight-1)/256);
                 ArrayList<Future<Bitmap>> pendingTiles=new ArrayList<>();
                 ArrayList<int[]> grid=new ArrayList<>();
                 for(int ty=ty0;ty<=ty1;ty++){
@@ -759,72 +812,116 @@ public final class NewsWaveCarService extends CarAppService {
                     try{
                         Bitmap t=pendingTiles.get(n).get(15,java.util.concurrent.TimeUnit.SECONDS);
                         int[] txy=grid.get(n);
-                        if(t!=null)canvas.drawBitmap(t,(float)(txy[0]*256-x0),
-                            (float)(txy[1]*256-y0),brush);
+                        if(t!=null)canvas.drawBitmap(t,(float)(txy[0]*256-mapLeft),
+                            (float)(txy[1]*256-mapTop),brush);
                     }catch(Exception err){
                         pendingTiles.get(n).cancel(true);
                         Log.w(LOG,"Map tile unavailable: "+err.getMessage());
                     }
                 }
-                // WMS request overlays the matching NOAA radar image, not a browser website.
-                double west=lon(x0,z),east=lon(x0+w,z),north=lat(y0,z),south=lat(y0+h,z);
+                double west=lon(mapLeft,z),east=lon(mapLeft+mapWidth,z);
+                double north=lat(mapTop,z),south=lat(mapTop+mapHeight,z);
                 String bbox=String.format(Locale.US,"%.6f,%.6f,%.6f,%.6f",west,south,east,north);
                 String url;
                 if(national){
                     url="https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity/MapServer/export"
-                       +"?bbox="+bbox+"&bboxSR=4326&imageSR=4326&size="+w+","+h
+                       +"?bbox="+bbox+"&bboxSR=4326&imageSR=4326&size="+mapWidth+","+mapHeight
                        +"&format=png32&transparent=true&layers=show%3A0&f=image";
                 }else{
                     String id=s.id.toLowerCase(Locale.US);
                     url="https://opengeo.ncep.noaa.gov/geoserver/"+id+"/ows?service=WMS"
                        +"&version=1.1.1&request=GetMap&layers="+id+"_"+p.toLowerCase(Locale.US)
                        +"&styles=&srs=EPSG%3A4326&bbox="+bbox
-                       +"&width="+w+"&height="+h+"&format=image%2Fpng&transparent=true";
+                       +"&width="+mapWidth+"&height="+mapHeight
+                       +"&format=image%2Fpng&transparent=true";
                 }
                 Bitmap radar=download(url);
-                if(radar!=null)canvas.drawBitmap(radar,null,new Rect(0,0,w,h),brush);
+                boolean radarAvailable=radar!=null&&!suspiciousRadarOverlay(radar);
+                if(radarAvailable){
+                    canvas.drawBitmap(radar,null,new Rect(0,0,mapWidth,mapHeight),brush);
+                }else if(radar!=null){
+                    Log.w(LOG,"Skipped invalid NOAA radar overlay (opaque blue no-data blocks)");
+                }
                 int warningsVisible=drawWarnings?
-                    WeatherWarningOverlay.draw(canvas,warnings,z,x0,y0,w,h):-2;
+                    WeatherWarningOverlay.draw(canvas,warnings,z,mapLeft,mapTop,mapWidth,mapHeight):-2;
+                canvas.restore();
+
                 if(gLat!=null){
-                    Paint halo=new Paint(Paint.ANTI_ALIAS_FLAG);halo.setColor(0x99ffffff);
-                    float pinX=(float)(mx(gLon,z)-x0);
-                    float pinY=(float)(my(gLat,z)-y0);
-                    canvas.drawCircle(pinX,pinY,15,halo);
-                    halo.setColor(0xff2389ff);canvas.drawCircle(pinX,pinY,10,halo);
-                    halo.setColor(Color.WHITE);halo.setStyle(Paint.Style.STROKE);halo.setStrokeWidth(3);
-                    canvas.drawCircle(pinX,pinY,10,halo);
-                    if(bearing!=null){
-                        Paint direction=new Paint(Paint.ANTI_ALIAS_FLAG);
-                        direction.setColor(0xff2389ff);
-                        direction.setStyle(Paint.Style.FILL);
-                        android.graphics.Path arrow=new android.graphics.Path();
-                        arrow.moveTo(pinX,pinY-29);
-                        arrow.lineTo(pinX-9,pinY-13);
-                        arrow.lineTo(pinX+9,pinY-13);
-                        arrow.close();
+                    float pinX=headingUp?anchorX:(float)(mx(gLon,z)-x0);
+                    float pinY=headingUp?anchorY:(float)(my(gLat,z)-y0);
+                    Paint pin=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    pin.setColor(0x99ffffff);
+                    canvas.drawCircle(pinX,pinY,18,pin);
+                    pin.setColor(0xff2389ff);
+                    canvas.drawCircle(pinX,pinY,13,pin);
+                    pin.setColor(Color.WHITE);
+                    pin.setStyle(Paint.Style.STROKE);
+                    pin.setStrokeWidth(3);
+                    canvas.drawCircle(pinX,pinY,13,pin);
+                    if(headingUp){
+                        pin.setStyle(Paint.Style.FILL);
+                        pin.setColor(Color.WHITE);
+                        android.graphics.Path pointer=new android.graphics.Path();
+                        pointer.moveTo(pinX,pinY-36);
+                        pointer.lineTo(pinX-12,pinY-9);
+                        pointer.lineTo(pinX+12,pinY-9);
+                        pointer.close();
+                        canvas.drawPath(pointer,pin);
+                    }else if(bearing!=null){
+                        pin.setStyle(Paint.Style.FILL);
+                        pin.setColor(0xff2389ff);
+                        android.graphics.Path pointer=new android.graphics.Path();
+                        pointer.moveTo(pinX,pinY-34);
+                        pointer.lineTo(pinX-9,pinY-15);
+                        pointer.lineTo(pinX+9,pinY-15);
+                        pointer.close();
                         canvas.save();
                         canvas.rotate(bearing,pinX,pinY);
-                        canvas.drawPath(arrow,direction);
+                        canvas.drawPath(pointer,pin);
                         canvas.restore();
                     }
-                }
-                if(!national&&gLat==null){
-                    // Station center marker, white outlined radar reference point.
+                }else if(!national){
                     Paint pin=new Paint(Paint.ANTI_ALIAS_FLAG);
-                    pin.setColor(Color.WHITE);pin.setStyle(Paint.Style.STROKE);pin.setStrokeWidth(2.5f);
+                    pin.setColor(Color.WHITE);pin.setStyle(Paint.Style.STROKE);
+                    pin.setStrokeWidth(2.5f);
                     canvas.drawCircle(w/2f,h/2f,9,pin);
-                    canvas.drawLine(w/2f-15,h/2f,w/2f+15,h/2f,pin);
-                    canvas.drawLine(w/2f,h/2f-15,w/2f,h/2f+15,pin);
                 }
-                // The primary radar view is map-first. Station and layer details
-                // are available under Options instead of obscuring the map.
+                if(headingUp){
+                    // Small upright compass; its north needle indicates orientation
+                    // as the map rotates to keep the driving direction at the top.
+                    float cx=45,cy=h-81;
+                    Paint compass=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    compass.setColor(0xd4152739);
+                    canvas.drawCircle(cx,cy,29,compass);
+                    compass.setColor(Color.WHITE);
+                    compass.setStyle(Paint.Style.STROKE);
+                    compass.setStrokeWidth(2);
+                    canvas.drawCircle(cx,cy,28,compass);
+                    double r=Math.toRadians(degrees);
+                    float nx=cx-(float)Math.sin(r)*19f;
+                    float ny=cy-(float)Math.cos(r)*19f;
+                    compass.setStyle(Paint.Style.FILL);
+                    compass.setStrokeWidth(3f);
+                    canvas.drawLine(cx,cy,nx,ny,compass);
+                    compass.setTextAlign(Paint.Align.CENTER);
+                    compass.setTextSize(11);
+                    canvas.drawText("N",nx,ny-5,compass);
+                }
                 if(warningsVisible>0){
-                    Paint warningBanner=new Paint(Paint.ANTI_ALIAS_FLAG);
-                    warningBanner.setColor(0xd01a2435);
-                    canvas.drawRoundRect(12,10,Math.min(w-12,360),42,8,8,warningBanner);
-                    warningBanner.setColor(Color.WHITE);
-                    warningBanner.setTextSize(16);
-                    canvas.drawText(warningsVisible+" NWS warning areas",22,32,warningBanner);
+                    Paint banner=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    banner.setColor(0xd01a2435);
+                    canvas.drawRoundRect(12,10,Math.min(w-12,360),42,8,8,banner);
+                    banner.setColor(Color.WHITE);
+                    banner.setTextSize(16);
+                    canvas.drawText(warningsVisible+" NWS warning areas",22,32,banner);
+                }
+                if(!radarAvailable){
+                    Paint unavailable=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    unavailable.setColor(0xd01a2435);
+                    canvas.drawRoundRect(12,h-65,Math.min(w-12,410),h-36,5,5,unavailable);
+                    unavailable.setColor(Color.WHITE);
+                    unavailable.setTextSize(14);
+                    canvas.drawText("Radar unavailable · Map and NWS warnings remain",20,h-46,unavailable);
                 }
                 brush.setColor(0xca09111b);
                 canvas.drawRoundRect(8,h-30,Math.min(w-8,490),h-5,5,5,brush);
@@ -838,7 +935,10 @@ public final class NewsWaveCarService extends CarAppService {
                     lastDisplayedLon=centerLon;
                 }
                 display();
-            }catch(Throwable e){Log.e(LOG,"Radar rendering failed",e);}
+            }catch(Throwable e){
+                Log.e(LOG,"Radar rendering failed",e);
+                if(out!=null && out!=finished && !out.isRecycled())out.recycle();
+            }
         }
         private void display(){
             Bitmap bitmap;Surface sf;
