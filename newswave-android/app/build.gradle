@@ -2,7 +2,8 @@ plugins { id 'com.android.application' }
 android {
  namespace 'com.newswave.live'
  compileSdk 36
- defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 34; versionName '0.6.9' }
+ defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 35; versionName '0.7.0' }
+ sourceSets { main { assets.srcDirs += ['../../newswire-command-center'] } }
  buildTypes {
    debug {
      applicationIdSuffix '.test'
