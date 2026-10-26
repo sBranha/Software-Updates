@@ -137,14 +137,14 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
         private boolean warningsEnabled=true;
-        private String mapStyle="road";
+        private String mapStyle="satellite";
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
             mapStyle=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
-                .getString("map_style","road");
+                .getString("map_style","satellite");
             renderer.setMapStyle(mapStyle);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
@@ -511,7 +511,7 @@ public final class NewsWaveCarService extends CarAppService {
             return "Satellite";
         }
         void setMapStyle(String style){
-            if(!"road".equals(style)&&!"terrain".equals(style)&&!"satellite".equals(style))style="road";
+            if(!"road".equals(style)&&!"terrain".equals(style)&&!"satellite".equals(style))style="satellite";
             synchronized(lock){mapStyle=style;}
             refresh();
         }
