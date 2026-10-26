@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NewsWire • Local Dashboard</title><link rel="stylesheet" href="panels.css"></head>
+<body data-view="local">
+<header><div><div class="micro">NEWSWIRE / LOCAL DESK</div><div class="brand">News<span>Wire</span> <small class="muted">v0.7.2</small></div></div><div class="live"><i class="dot"></i> Detached window</div></header>
+<nav class="subnav"><button data-open="map">🌎 National Map</button><button data-open="warnings">⚠ Active Warnings</button><button id="arrange">▣ Arrange 3 Monitors</button></nav>
+<main>
+<section class="card hero"><div class="micro" id="greeting">YOUR LOCAL DESK</div><h1 id="location">Set your local ZIP in the main map</h1>
+<p class="muted">Your local warning status follows the National Weather Service. No simulated forecast values.</p>
+<fieldset><label for="zip">ZIP</label><input id="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" placeholder="35950"><button id="setZip">Set Location</button></fieldset></section>
+<section class="split">
+<div class="card"><h3>Local Safety</h3><h2 id="localStatus" class="unknown">Waiting for main NewsWire map to load official alerts…</h2><div class="muted" id="checked">No successful check yet</div></div>
+<div class="card"><h3>National Tornado Warnings</h3><div class="big" id="count">—</div><p id="feedStatus" class="unknown">NWS status unknown until checked.</p><button data-open="warnings">View Active Warnings</button></div>
+</section>
+<section class="card"><h3>My Weather Desk</h3><h2>NewsWire Local Dashboard</h2><p class="muted">This detachable local window is the first step toward the complete Good Morning, forecast and local news design. Those data modules are not included yet.</p><div class="notice">Always follow official National Weather Service warnings and your phone’s Wireless Emergency Alerts.</div></section>
+</main><footer>NewsWire is not affiliated with NOAA/NWS. This is supplementary weather information, not a certified warning receiver.</footer>
+<script src="panels.js"></script></body></html>
