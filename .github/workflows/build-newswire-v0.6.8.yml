@@ -1,7 +1,7 @@
 name: NewsWire v0.6.8 heading-up radar repair
 on:
   push:
-    branches: [newswire-noaa-radio-v0.6.8]
+    branches: [newswire-car-heading-radar-v0.6.8]
   workflow_dispatch:
 permissions:
   contents: read
