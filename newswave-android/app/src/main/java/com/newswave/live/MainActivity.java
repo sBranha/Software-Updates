@@ -642,6 +642,10 @@ public class MainActivity extends Activity {
             .format(new java.util.Date(data.observationAt));
         TextView observed=text("NWS station observation: "+observedAt,11,MUTED,false);
         myAreaCard.addView(observed);
+      }else if(data.conditionsAvailable){
+        TextView estimated=text("Estimated temperature • not a live station measurement",
+            11,0xffffc373,false);
+        myAreaCard.addView(estimated);
       }
       boolean stale=System.currentTimeMillis()-data.checkedAt>30*60*1000L;
       TextView warning=text(stale?"⚠  Weather alert check is outdated — tap Refresh":
