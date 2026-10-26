@@ -5,10 +5,10 @@
 
 ## Project and current state
 - Repository: `sBranha/Software-Updates`
-- Active development branch: `newswire-live-tv-v0.6.4`
+- Active development branch: `newswire-area-refresh-v0.6.5`
 - Android application source: `newswave-android/`
 - Android applicationId: `com.newswire.live`
-- Current source version: `0.6.4`, versionCode `28`; previous completed feature release: `0.5.7`, code 21
+- Current source version: `0.6.5`, versionCode `29`; previous completed feature release: `0.5.7`, code 21
 - Build workflow: `.github/workflows/build-newswire-car-fix.yml`
 - Current work is **Performance & Reliability**, preserving all features from v0.5.7.
 
@@ -87,3 +87,11 @@ _Last updated for chat continuity, 2026-10-23 local / 2026-10-24 UTC._
 - Fullscreen custom video handling; release player when closed; existing TV station finder remains available.
 - Full radio search/favorites and all other v0.6.3 features retained.
 - Use versionCode 28 and ensure signing certificate is the same as Google Play's accepted key before claiming signed AAB ready.
+
+
+## v0.6.5 — My Area temperature refresh & Play upload issue
+- User observed on phone My Area / Live that temperature refresh gives no feedback and could look stuck. Forced button always dispatches a fresh check with an active busy message and Updated at / last checked timestamps.
+- Each refresh gets a monotonic generation token, so older same-location results cannot replace newer ones; 60-second timeout shows retry prompt.
+- NWS station observation timestamp is displayed separately from fetch time, and station values older than two hours are not shown as current.
+- "No active NWS alerts" only appears when the current check succeeded; unavailable warnings must remain explicitly unknown.
+- Build v0.6.5 versionCode 29 (previous v0.6.4 code 28). An "already used" Play message might be a reused versionCode or a signing rejection, so check exact Play Console wording if rejected; matching signing key certificates alone does not prove Console acceptance.

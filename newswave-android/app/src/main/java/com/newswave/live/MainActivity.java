@@ -174,6 +174,10 @@ public class MainActivity extends Activity {
   private MyAreaData.Snapshot myAreaSnapshot;
   private boolean dashboardActive=false,areaLoading=false;
   private String loadedAreaKey="";
+  private String areaRefreshMessage="";
+  private int areaRequestGeneration=0;
+  private final android.os.Handler areaRefreshHandler=
+      new android.os.Handler(android.os.Looper.getMainLooper());
   private double dashboardLatitude=Double.NaN,dashboardLongitude=Double.NaN;
   private LocationManager dashboardLocationManager;
   private LocationListener dashboardLocationListener;
@@ -623,7 +627,7 @@ public class MainActivity extends Activity {
     TextView placeLabel=text(place,13,0xffbed9e8,false);
     LinearLayout.LayoutParams pp=lp(-1,-2);pp.topMargin=dp(5);myAreaCard.addView(placeLabel,pp);
     if(areaLoading && myAreaSnapshot==null){
-      TextView loading=text("Loading local weather, warnings and headlines…",13,MUTED,false);
+      TextView loading=text("Checking current weather, NWS alerts and headlines…",13,MUTED,false);
       pad(loading,4,12);myAreaCard.addView(loading);
     }else if(myAreaSnapshot!=null){
       MyAreaData.Snapshot data=myAreaSnapshot;
@@ -633,10 +637,19 @@ public class MainActivity extends Activity {
       LinearLayout.LayoutParams tp=lp(-1,-2);tp.topMargin=dp(4);myAreaCard.addView(temperature,tp);
       TextView desc=text(data.condition+"  •  Wind "+data.wind,13,0xffc7dce9,false);
       myAreaCard.addView(desc);
-      TextView warning=text(!data.warningsAvailable?"NWS alerts temporarily unavailable — check official warnings":
-        data.warnings.isEmpty()?"✓  NWS reports no active alerts at this location":
+      if(data.observationAt>0){
+        String observedAt=new java.text.SimpleDateFormat("h:mm a",Locale.US)
+            .format(new java.util.Date(data.observationAt));
+        TextView observed=text("NWS station observation: "+observedAt,11,MUTED,false);
+        myAreaCard.addView(observed);
+      }
+      boolean stale=System.currentTimeMillis()-data.checkedAt>30*60*1000L;
+      TextView warning=text(stale?"⚠  Weather alert check is outdated — tap Refresh":
+        !data.warningsAvailable?"⚠  NWS alerts unavailable — check official warnings":
+        data.warnings.isEmpty()?"✓  No active NWS alerts reported at last check":
         "⚠  "+data.warnings.size()+" ACTIVE NWS ALERT"+(data.warnings.size()==1?"":"S")+" • "+data.warnings.get(0),
-        12,!data.warningsAvailable?0xffffc373:data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
+        12,stale||!data.warningsAvailable?0xffffc373:
+          data.warnings.isEmpty()?0xff77dfb6:0xffffc373,true);
       LinearLayout.LayoutParams wp=lp(-1,-2);wp.topMargin=dp(12);
       myAreaCard.addView(warning,wp);
       TextView emergency=button("⚠  SEE OFFICIAL WARNINGS ON THE MAP",
@@ -659,11 +672,20 @@ public class MainActivity extends Activity {
       TextView hint=text("Enable location for weather and alerts around you, or save a ZIP below.",13,MUTED,false);
       pad(hint,4,12);myAreaCard.addView(hint);
     }
+    String refreshStatus=areaLoading?"↻ Updating weather and alerts…":
+      !areaRefreshMessage.isEmpty()?areaRefreshMessage:
+      myAreaSnapshot==null?"Not checked yet":
+      "Last checked "+new java.text.SimpleDateFormat("MMM d, h:mm a",Locale.US)
+          .format(new java.util.Date(myAreaSnapshot.checkedAt));
+    TextView status=text(refreshStatus,12,areaLoading?ACCENT:MUTED,false);
+    LinearLayout.LayoutParams statusLp=lp(-1,-2);
+    statusLp.topMargin=dp(12);myAreaCard.addView(status,statusLp);
     LinearLayout actions=row();
     TextView radar=button("◎  LIVE RADAR",()->
       startActivity(new Intent(MainActivity.this,RadarActivity.class)));
     actions.addView(radar,new LinearLayout.LayoutParams(0,-2,1));
-    TextView location=button("⌖  "+(gps?"REFRESH":"MY LOCATION"),this::useDashboardLocation);
+    TextView location=button(areaLoading?"↻ CHECKING…":gps?"↻ REFRESH":"⌖ MY LOCATION",
+      this::useDashboardLocation);
     LinearLayout.LayoutParams l=lp(-2,-2);l.leftMargin=dp(8);
     actions.addView(location,l);
     LinearLayout.LayoutParams ctrl=lp(-1,-2);ctrl.topMargin=dp(12);
@@ -673,50 +695,82 @@ public class MainActivity extends Activity {
     if(!dashboardActive)return;
     final double lat=!Double.isNaN(dashboardLatitude)?dashboardLatitude:postalLat;
     final double lon=!Double.isNaN(dashboardLongitude)?dashboardLongitude:postalLon;
-    if(Double.isNaN(lat)||Double.isNaN(lon)){renderMyArea();return;}
+    if(!WidgetAreaResolver.valid(lat,lon)){
+      areaRefreshMessage="Set a ZIP code or allow location to update weather.";
+      areaLoading=false;renderMyArea();return;
+    }
     final boolean isGps=!Double.isNaN(dashboardLatitude);
     final String key=String.format(Locale.US,"%.3f:%.3f:%s:%s",lat,lon,city,state);
-    if(!force && (areaLoading ||
-        key.equals(loadedAreaKey)&&myAreaSnapshot!=null
-            &&System.currentTimeMillis()-myAreaSnapshot.checkedAt<5*60*1000L)){
+    if(!force && areaLoading && key.equals(loadedAreaKey)){
       renderMyArea();return;
     }
-    loadedAreaKey=key;areaLoading=true;
+    if(!force && key.equals(loadedAreaKey) && myAreaSnapshot!=null
+        &&System.currentTimeMillis()-myAreaSnapshot.checkedAt<60*1000L){
+      renderMyArea();return;
+    }
+    // Every press makes a new request. Older responses may never overwrite it,
+    // even when the coordinates or ZIP are unchanged.
+    final int request=++areaRequestGeneration;
+    loadedAreaKey=key;
+    areaLoading=true;
+    areaRefreshMessage="";
     renderMyArea();
+    areaRefreshHandler.postDelayed(()->{
+      if(!dashboardActive||request!=areaRequestGeneration||!areaLoading)return;
+      ++areaRequestGeneration;
+      areaLoading=false;
+      // Keep the old reading only as an explicitly marked last known value.
+      areaRefreshMessage="Refresh timed out. Weather shown may be old; tap Refresh to retry.";
+      renderMyArea();
+    },60_000L);
     final String savedCity=city,savedState=state;
     new Thread(()->{
       String currentCity=savedCity,currentState=savedState;
-      if(isGps){
-        // Reverse-geocode only with location permission; don't keep using
-        // the ZIP's city after the person has travelled somewhere else.
-        currentCity="";currentState="";
-        try{
-          Geocoder geocoder=new Geocoder(this,Locale.US);
-          List<Address> places=geocoder.getFromLocation(lat,lon,1);
-          if(places!=null&&!places.isEmpty()){
-            Address address=places.get(0);
-            currentCity=address.getLocality();
-            if(currentCity==null||currentCity.isEmpty())currentCity=address.getSubAdminArea();
-            currentState=address.getAdminArea();
-          }
-        }catch(Exception error){android.util.Log.w("NewsWireArea","City unavailable",error);}
+      try{
+        if(isGps){
+          currentCity="";currentState="";
+          try{
+            Geocoder geocoder=new Geocoder(this,Locale.US);
+            List<Address> places=geocoder.getFromLocation(lat,lon,1);
+            if(places!=null&&!places.isEmpty()){
+              Address address=places.get(0);
+              currentCity=address.getLocality();
+              if(currentCity==null||currentCity.isEmpty())currentCity=address.getSubAdminArea();
+              currentState=address.getAdminArea();
+            }
+          }catch(Exception error){android.util.Log.w("NewsWireArea","City unavailable",error);}
+        }
+        if(currentCity==null)currentCity="";
+        if(currentState==null)currentState="";
+        MyAreaData.Snapshot result=MyAreaData.load(lat,lon,currentCity,currentState);
+        runOnUiThread(()->{
+          if(!dashboardActive||request!=areaRequestGeneration)return;
+          areaLoading=false;
+          myAreaSnapshot=result;
+          String now=new java.text.SimpleDateFormat("h:mm a",Locale.US)
+              .format(new java.util.Date(result.checkedAt));
+          areaRefreshMessage=result.conditionsAvailable||result.warningsAvailable?
+              "Updated at "+now+
+              (!result.conditionsAvailable?" · Temperature unavailable":
+              !result.warningsAvailable?" · Alert status unavailable":""):
+              "Checked at "+now+" · Weather services unavailable; retry";
+          if(isGps)WidgetAreaResolver.rememberForegroundFix(
+              this,lat,lon,result.area.equals("Current location")?"":result.area.split(",")[0],
+              result.area.contains(",")?result.area.substring(result.area.lastIndexOf(',')+1).trim():"");
+          WidgetAreaResolver.Area widgetArea=WidgetAreaResolver.resolve(this);
+          if(widgetArea!=null&&widgetArea.fromGps==isGps)
+              WidgetRefreshWorker.publish(this,widgetArea,result);
+          renderMyArea();
+        });
+      }catch(Exception error){
+        android.util.Log.w("NewsWireArea","Area refresh failed",error);
+        runOnUiThread(()->{
+          if(!dashboardActive||request!=areaRequestGeneration)return;
+          areaLoading=false;
+          areaRefreshMessage="Weather refresh failed. Check connection and tap Refresh again.";
+          renderMyArea();
+        });
       }
-      if(currentCity==null)currentCity="";
-      if(currentState==null)currentState="";
-      MyAreaData.Snapshot result=MyAreaData.load(lat,lon,currentCity,currentState);
-      runOnUiThread(()->{
-        if(!key.equals(loadedAreaKey))return;
-        areaLoading=false;myAreaSnapshot=result;
-        // Share only a foreground-obtained location with the widget. Never start
-        // background GPS or allow a stale ZIP response to overwrite live GPS.
-        if(isGps)WidgetAreaResolver.rememberForegroundFix(
-            this,lat,lon,result.area.equals("Current location")?"":result.area.split(",")[0],
-            result.area.contains(",")?result.area.substring(result.area.lastIndexOf(',')+1).trim():"");
-        WidgetAreaResolver.Area widgetArea=WidgetAreaResolver.resolve(this);
-        if(widgetArea!=null&&widgetArea.fromGps==isGps)
-            WidgetRefreshWorker.publish(this,widgetArea,result);
-        renderMyArea();
-      });
     },"newswire-area").start();
   }
   private void categoryTile(LinearLayout parent,String title,String detail,String icon,int tone,Runnable click){
@@ -1329,6 +1383,7 @@ public class MainActivity extends Activity {
   @Override protected void onDestroy(){
     if(playUpdates!=null)playUpdates.unregisterListener(playUpdateListener);
     stopDashboardGps();stopNewsGps();respondToLocationRequest(false);
+    areaRefreshHandler.removeCallbacksAndMessages(null);
     if(web!=null)web.destroy();super.onDestroy();
   }
 }

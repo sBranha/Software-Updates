@@ -24,14 +24,16 @@ final class MyAreaData {
         final List<String> warnings;
         final List<LocalNewspapers.Headline> headlines;
         final long checkedAt;
+        final long observationAt;
         final boolean conditionsAvailable;
         final boolean warningsAvailable;
         Snapshot(String area,String condition,String temperature,String feelsLike,String wind,
-                 List<String> warnings,List<LocalNewspapers.Headline> headlines,boolean ok,boolean alertsOk){
+                 List<String> warnings,List<LocalNewspapers.Headline> headlines,boolean ok,boolean alertsOk,long observedAt){
             this.area=area;this.condition=condition;this.temperature=temperature;
             this.feelsLike=feelsLike;this.wind=wind;
             this.warnings=warnings;this.headlines=headlines;
-            this.checkedAt=System.currentTimeMillis();this.conditionsAvailable=ok;
+            this.checkedAt=System.currentTimeMillis();this.observationAt=observedAt;
+            this.conditionsAvailable=ok;
             this.warningsAvailable=alertsOk;
         }
     }
@@ -62,6 +64,7 @@ final class MyAreaData {
         String place=city.isEmpty()?"Current location":city+(region.isEmpty()?"":", "+region);
         String temp="—",feel="—",description="Conditions unavailable",wind="—";
         boolean ok=false,alertsOk=false;
+        long observedAt=0;
         ArrayList<String> warnings=new ArrayList<>();
         List<LocalNewspapers.Headline> headlines=new ArrayList<>();
         String point=String.format(Locale.US,"%.4f,%.4f",lat,lon);
@@ -104,6 +107,11 @@ final class MyAreaData {
                     if(!station.isEmpty()){
                         JSONObject latest=fetch("https://api.weather.gov/stations/"+station+"/observations/latest");
                         JSONObject observation=latest.getJSONObject("properties");
+                        try{
+                          String time=observation.optString("timestamp","");
+                          observedAt=java.time.OffsetDateTime.parse(time)
+                            .toInstant().toEpochMilli();
+                        }catch(Exception ignored){}
                         description=observation.optString("textDescription","Current conditions");
                         if(description.isEmpty())description="Current conditions";
                         double c=observation.optJSONObject("temperature")==null?
@@ -123,10 +131,16 @@ final class MyAreaData {
                 }
             }
         }catch(Exception error){android.util.Log.w("NewsWireArea","NWS conditions unavailable",error);}
+        // Do not present old station measurements as current temperatures.
+        if(observedAt>0 && (observedAt>System.currentTimeMillis()+5*60*1000L ||
+            System.currentTimeMillis()-observedAt>2L*60*60*1000L)){
+            ok=false;temp="—";feel="—";wind="—";
+            description="Weather station reading outdated";
+        }
         if(!city.isEmpty()&&!region.isEmpty()){
             try{headlines=LocalNewspapers.headlines(city,region);}
             catch(Exception error){android.util.Log.w("NewsWireArea","Local headlines unavailable",error);}
         }
-        return new Snapshot(place,description,temp,feel,wind,warnings,headlines,ok,alertsOk);
+        return new Snapshot(place,description,temp,feel,wind,warnings,headlines,ok,alertsOk,observedAt);
     }
 }

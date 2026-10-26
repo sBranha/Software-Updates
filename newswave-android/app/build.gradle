@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
  namespace 'com.newswave.live'
  compileSdk 36
- defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 28; versionName '0.6.4' }
+ defaultConfig { applicationId 'com.newswire.live'; minSdk 26; targetSdk 36; versionCode 29; versionName '0.6.5' }
  buildTypes {
    debug {
      applicationIdSuffix '.test'
