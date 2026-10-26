@@ -30,6 +30,7 @@
         android:resource="@xml/newswire_widget_info"/>
     </receiver>
     <activity android:name=".LiveCenterActivity" android:exported="false"/>
+    <activity android:name=".NationwideCommandCenterActivity" android:exported="false"/>
     <activity android:name=".StationFinderActivity" android:exported="false"/>
     <activity android:name=".LiveTVActivity" android:exported="false" android:hardwareAccelerated="true"/>
     <activity android:name=".NewsRadioActivity" android:exported="false"/>
