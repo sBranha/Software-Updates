@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NewsWire • Active Warnings</title><link rel="stylesheet" href="panels.css"></head>
+<body data-view="warnings">
+<header><div><div class="micro">NEWSWIRE / WARNING OPERATIONS</div><div class="brand">News<span>Wire</span> <small class="muted">v0.7.2</small></div></div><div class="live"><i class="dot"></i> Detached window</div></header>
+<nav class="subnav"><button data-open="map">🌎 National Map</button><button data-open="local">⌖ Local Dashboard</button><button id="arrange">▣ Arrange 3 Monitors</button></nav>
+<main>
+<section class="card hero"><div class="micro">OFFICIAL US TORNADO WARNINGS</div><div class="big" id="count">—</div><p class="muted" id="checked">Waiting for official NWS feed…</p><div id="feedStatus" class="notice">Warning status UNKNOWN until an official check succeeds.</div></section>
+<div class="split">
+<section class="card"><h3>Live Warning List</h3><div id="warningsList"><div class="muted">Waiting for main NewsWire map to fetch warnings…</div></div></section>
+<section class="card"><h3>Selected NWS Warning</h3><h2 id="selectedName">Select a warning on the left</h2><div id="warningDetail" class="muted">Alert details and guidance appear here.</div><p><a id="official" href="https://www.weather.gov/alerts" target="_blank" rel="noopener noreferrer">Open official NWS alert</a></p><button id="focus" disabled>Focus This Warning on Map</button></section>
+</div>
+</main><footer>Based on official NWS alerts, not observed tornado positions. Feed failure or delay means status unknown. Keep Wireless Emergency Alerts enabled.</footer>
+<script src="panels.js"></script></body></html>
