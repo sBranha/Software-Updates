@@ -5,8 +5,8 @@ const crypto=require('node:crypto');
 const os=require('node:os');
 const DIR=path.join(os.homedir(),'.newswire-command-center','streamdeck');
 const UUID='com.newswire.commandcenter.';
-const VALID=new Set(["warning-status","warning-latest","warning-next","home","country","auto","voice","satellite","refresh","resume","zoom-in","zoom-out","display-1","display-2","display-3","nws-radar"]);
-const COMMANDS=new Set(["warning-latest","warning-next","home","country","auto","voice","satellite","refresh","resume","zoom-in","zoom-out","display-1","display-2","display-3","nws-radar"]);
+const VALID=new Set(["warning-status","warning-latest","warning-next","home","country","auto","voice","satellite","refresh","resume","zoom-in","zoom-out","display-1","display-2","display-3","nws-radar","workspace-3"]);
+const COMMANDS=new Set(["warning-latest","warning-next","home","country","auto","voice","satellite","refresh","resume","zoom-in","zoom-out","display-1","display-2","display-3","nws-radar","workspace-3"]);
 const contexts=new Map();
 const opt=(k)=>{const i=process.argv.indexOf(k);return i>=0?process.argv[i+1]:undefined};
 const port=Number(opt('-port')),registerEvent=opt('-registerEvent'),pluginUUID=opt('-pluginUUID');
@@ -51,6 +51,7 @@ function repaint(){
   else if(action==='resume')title='RESUME\nAUTO';
   else if(action.startsWith('display-'))title='MONITOR\n'+action.slice(-1);
   else if(action==='nws-radar')title='NWS\nRADAR';
+  else if(action==='workspace-3')title='ARRANGE\n3 DESKS';
   else if(action==='zoom-in')title='ZOOM\nIN';
   else if(action==='zoom-out')title='ZOOM\nOUT';
   send('setTitle',context,{title,target:0});
