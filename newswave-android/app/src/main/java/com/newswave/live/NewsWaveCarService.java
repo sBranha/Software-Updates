@@ -137,14 +137,14 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
         private boolean warningsEnabled=true;
-        private String mapStyle="satellite";
+        private String mapStyle="road";
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
             mapStyle=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
-                .getString("map_style","satellite");
+                .getString("map_style","road");
             renderer.setMapStyle(mapStyle);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
@@ -179,7 +179,8 @@ public final class NewsWaveCarService extends CarAppService {
              System.currentTimeMillis()-loc.getTime()>120000L)return;
           lastFix=new Location(loc); // GPS is independent of manual map panning.
           if(!follow)return;
-          renderer.setPosition(loc.getLatitude(),loc.getLongitude());
+          renderer.setPosition(loc.getLatitude(),loc.getLongitude(),
+              loc.hasBearing()?loc.getBearing():Float.NaN);
           Station nearest=chosen;double best=Double.MAX_VALUE;
           for(Station station:stations){
             double d=sqDist(station,loc.getLatitude(),loc.getLongitude());
@@ -415,7 +416,7 @@ public final class NewsWaveCarService extends CarAppService {
         MapStyleScreen(CarContext context,RadarScreen radar){super(context);this.radar=radar;}
         @NonNull @Override public Template onGetTemplate(){
             ItemList.Builder list=new ItemList.Builder();
-            for(String style:new String[]{"satellite","terrain","road"}){
+            for(String style:new String[]{"road","satellite","terrain"}){
                 String display=RadarRenderer.styleName(style);
                 list.addItem(new Row.Builder()
                     .setTitle((style.equals(radar.mapStyle)?"✓ ":"")+display)
@@ -479,17 +480,17 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private float scaleAccum=1f;
-        private int zoom=7; // Zoom is independent of GPS-follow status.
-        private int lastDisplayedZoom=7;
+        private int zoom=15; // Default close-up road view; zoom remains adjustable.
+        private int lastDisplayedZoom=15;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
-        private String mapStyle="satellite";
+        private String mapStyle="road";
         static String styleName(String style){
             if("road".equals(style))return "Road Map";
             if("terrain".equals(style))return "Terrain";
             return "Satellite";
         }
         void setMapStyle(String style){
-            if(!"road".equals(style)&&!"terrain".equals(style))style="satellite";
+            if(!"road".equals(style)&&!"terrain".equals(style)&&!"satellite".equals(style))style="road";
             synchronized(lock){mapStyle=style;}
             refresh();
         }
@@ -502,8 +503,12 @@ public final class NewsWaveCarService extends CarAppService {
         private String product="SR_BREF";private boolean usa=false;
         private Bitmap finished;
         private Double userLat=null,userLon=null;
-        void setPosition(double latitude,double longitude){
-            synchronized(lock){userLat=latitude;userLon=longitude;}
+        private Float userBearing=null;
+        void setPosition(double latitude,double longitude,float bearing){
+            synchronized(lock){
+                userLat=latitude;userLon=longitude;
+                userBearing=Float.isFinite(bearing)?bearing:null;
+            }
             refresh();
         }
         void disableFollow(){synchronized(lock){followGps=false;}}
@@ -517,6 +522,8 @@ public final class NewsWaveCarService extends CarAppService {
         void recenter(){
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
+                // Return to close-up navigation view after regional radar browsing.
+                if(zoom<14)zoom=15;
             }
             refresh();
         }
@@ -525,7 +532,7 @@ public final class NewsWaveCarService extends CarAppService {
         private void setZoom(int delta){
             final int next;
             synchronized(lock){
-                next=Math.max(3,Math.min(13,zoom+delta));
+                next=Math.max(3,Math.min(17,zoom+delta));
                 if(next==zoom)return;
                 zoom=next;
             }
@@ -610,8 +617,9 @@ public final class NewsWaveCarService extends CarAppService {
         void change(Station s,String p,boolean national){
             synchronized(lock){
                 station=s;product=p;usa=national;
-                if(national && zoom>5)zoom=4;
-                if(!national && zoom<5)zoom=7;
+                // Switching nearest radar stations must not zoom a moving map out.
+                if(!followGps && national && zoom>5)zoom=4;
+                if(!followGps && !national && zoom<5)zoom=7;
                 revision++;
             }
             refresh();
@@ -688,7 +696,8 @@ public final class NewsWaveCarService extends CarAppService {
                             int z,boolean auto,double manualLatitude,double manualLongitude,
                             boolean drawWarnings,String style){
             try{
-                Double gLat,gLon; synchronized(lock){gLat=userLat;gLon=userLon;}
+                Double gLat,gLon;Float bearing;
+                synchronized(lock){gLat=userLat;gLon=userLon;bearing=userBearing;}
                 double centerLat=auto&&gLat!=null?gLat:!Double.isNaN(manualLatitude)?manualLatitude:(national?39.0:s.lat);
                 double centerLon=auto&&gLon!=null?gLon:!Double.isNaN(manualLongitude)?manualLongitude:(national?-98.0:s.lon);
                 double x0=mx(centerLon,z)-w/2.,y0=my(centerLat,z)-h/2.;
@@ -753,6 +762,20 @@ public final class NewsWaveCarService extends CarAppService {
                     halo.setColor(0xff2389ff);canvas.drawCircle(pinX,pinY,10,halo);
                     halo.setColor(Color.WHITE);halo.setStyle(Paint.Style.STROKE);halo.setStrokeWidth(3);
                     canvas.drawCircle(pinX,pinY,10,halo);
+                    if(bearing!=null){
+                        Paint direction=new Paint(Paint.ANTI_ALIAS_FLAG);
+                        direction.setColor(0xff2389ff);
+                        direction.setStyle(Paint.Style.FILL);
+                        android.graphics.Path arrow=new android.graphics.Path();
+                        arrow.moveTo(pinX,pinY-29);
+                        arrow.lineTo(pinX-9,pinY-13);
+                        arrow.lineTo(pinX+9,pinY-13);
+                        arrow.close();
+                        canvas.save();
+                        canvas.rotate(bearing,pinX,pinY);
+                        canvas.drawPath(arrow,direction);
+                        canvas.restore();
+                    }
                 }
                 if(!national&&gLat==null){
                     // Station center marker, white outlined radar reference point.
