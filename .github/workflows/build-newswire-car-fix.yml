@@ -258,7 +258,7 @@ jobs:
               assert event in s, event + ' missing from Storm Ahead'
           assert 'severeWarnings(fix)' in s and 'severeWarnings(point)' in s
           assert 'future.removeAll(current)' in s
-          assert 'This is not a route or arrival-time prediction' in s
+          assert 'This is not a route or storm-track prediction' in s
           assert 'private void inspect(Location fix)' in s
           print('Storm Ahead coverage assertions passed')
           PY
