@@ -47,7 +47,7 @@ public final class DriveWarningService extends Service implements LocationListen
     private static final String WARNING_CHANNEL="newswire_tornado_warning";
     private static final int ONGOING_ID=840;
     private static final int WARNING_ID=841;
-    private static final long POLL_MS=2L*60*1000;
+    private static final long POLL_MS=90L*1000; // More timely NWS checks while explicitly driving
     private static final long REPEAT_MS=20L*60*1000;
     private final ExecutorService network=Executors.newSingleThreadExecutor();
     private final Handler main=new Handler(Looper.getMainLooper());
@@ -113,7 +113,7 @@ public final class DriveWarningService extends Service implements LocationListen
             active=true;
             locationManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
             for(String provider:locationManager.getProviders(true)){
-                try{locationManager.requestLocationUpdates(provider,15000,150f,this,Looper.getMainLooper());}
+                try{locationManager.requestLocationUpdates(provider,5000,25f,this,Looper.getMainLooper());}
                 catch(Exception e){Log.w(TAG,"Location provider unavailable",e);}
             }
             Location best=null;
@@ -140,7 +140,7 @@ public final class DriveWarningService extends Service implements LocationListen
     }
     @Override public void onLocationChanged(Location location){
         if(!active||location==null||!location.hasAccuracy()
-            ||location.getAccuracy()>250f)return;
+            ||location.getAccuracy()>150f || System.currentTimeMillis()-location.getTime()>90000L)return;
         long now=System.currentTimeMillis();
         if(now-lastPoll<POLL_MS||requesting)return;
         lastPoll=now;requesting=true;
@@ -154,9 +154,11 @@ public final class DriveWarningService extends Service implements LocationListen
         });
     }
     private static Location projected(Location origin,double meters){
-        // Project from true north in the location's reported bearing,
-        // not from a guessed destination or a route we don't have.
-        double radius=6371000.0, bearing=Math.toRadians(origin.getBearing());
+        return projected(origin,meters,origin.getBearing());
+    }
+    private static Location projected(Location origin,double meters,float heading){
+        // Spherical great-circle projection from GPS course, NOT a road route.
+        double radius=6371000.0, bearing=Math.toRadians(heading);
         double a=Math.toRadians(origin.getLatitude()),o=Math.toRadians(origin.getLongitude());
         double d=meters/radius;
         double destLat=Math.asin(Math.sin(a)*Math.cos(d)+Math.cos(a)*Math.sin(d)*Math.cos(bearing));
@@ -166,6 +168,11 @@ public final class DriveWarningService extends Service implements LocationListen
         point.setLatitude(Math.toDegrees(destLat));
         point.setLongitude(Math.toDegrees(destLon));
         return point;
+    }
+    private static Location sideSample(Location origin,double aheadMeters,double offsetMeters,boolean left){
+        Location ahead=projected(origin,aheadMeters);
+        float sideAngle=origin.getBearing()+(left?-90f:90f);
+        return projected(ahead,offsetMeters,sideAngle);
     }
     private Set<String> severeWarnings(Location location) throws Exception{
         String coord=String.format(Locale.US,"%.5f,%.5f",
@@ -241,7 +248,7 @@ public final class DriveWarningService extends Service implements LocationListen
         // Straight-line heading is not a navigation route or storm-motion forecast.
         if(fix.hasBearing()&&fix.hasSpeed()&&fix.getSpeed()>=5f
             &&fix.getAccuracy()<=100f){
-            for(double meters:new double[]{3200,8000}){
+            for(double meters:new double[]{1609,4828,9656}){
                 Location point=projected(fix,meters);
                 Set<String> future=severeWarnings(point);
                 if(!active)return;
@@ -259,6 +266,42 @@ public final class DriveWarningService extends Service implements LocationListen
                         "This describes a warning area, not the tornado's exact location.");
                     return;
                 }
+            }
+            // Only describe the warning *area* to the left or right of the
+            // straight GPS course. Side samples cannot locate the tornado
+            // itself or predict an actual road crossing.
+            for(double meters:new double[]{4828,9656}){
+                Set<String> left=severeWarnings(sideSample(fix,meters,1200,true));
+                Set<String> right=severeWarnings(sideSample(fix,meters,1200,false));
+                if(!active)return;
+                left.removeAll(current);right.removeAll(current);
+                String onLeft=mostUrgent(left),onRight=mostUrgent(right);
+                String miles=String.format(Locale.US,"%.0f",meters/1609.344);
+                if(onLeft==null && onRight==null)continue;
+                if(onLeft!=null && onRight!=null){
+                    // If both sides are within warning polygons, avoid giving
+                    // a misleading left-versus-right claim.
+                    String event=warningType(onLeft);
+                    emit("BOTH_SIDES",onLeft,event+" areas near your heading",
+                         "Official NWS "+event+" areas detected on both sides of your straight-ahead heading, "+
+                         "approximately "+miles+" miles ahead. Not a road-route or storm-track prediction.",
+                         "Use extreme caution. NWS "+event+
+                         " areas are near both sides of your direction of travel, approximately "+
+                         miles+" miles ahead. This is not the exact storm location.");
+                    return;
+                }
+                boolean isLeft=onLeft!=null;
+                String key=isLeft?onLeft:onRight,side=isLeft?"left":"right";
+                String event=warningType(key);
+                emit("SIDE_"+side.toUpperCase(Locale.US),key,
+                     event+" area to your "+side+" ahead",
+                     "Official NWS "+event+" area sampled to the "+side+" of your "+
+                     "current straight-ahead heading, about "+miles+
+                     " miles ahead. This is not a road route or tornado location.",
+                     "Use extreme caution. "+event+" area to your "+side+
+                     " of the direction you're traveling, approximately "+
+                     miles+" miles ahead. The actual storm location may differ.");
+                return;
             }
         }
         if(active)main.post(()->setMonitoringStatus(
