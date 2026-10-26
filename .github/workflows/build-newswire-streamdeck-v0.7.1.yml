@@ -1,11 +1,11 @@
-name: NewsWire v0.7.1 desktop and Stream Deck XL preview
+name: NewsWire v0.7.2 desktop and Detachable Desktop Workspace preview
 on:
   push:
-    branches: [newswire-streamdeck-xl-v0.7.1]
+    branches: [newswire-detachable-workspace-v0.7.2]
     paths:
       - 'newswire-command-center/**'
       - 'newswire-streamdeck/**'
-      - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
+      - '.github/workflows/build-newswire-streamdeck-v0.7.2.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,8 +20,11 @@ jobs:
           node-version: '24'
       - name: Run bridge and shared weather engine tests
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs
           node --check newswire-command-center/main.cjs
+          node --check newswire-command-center/window-layout.cjs
+          node --check newswire-command-center/panels.js
+          node --check newswire-command-center/workspace-ui.js
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/deck-bridge.cjs
           node --check newswire-command-center/app.js
@@ -35,7 +38,7 @@ jobs:
           ls -la newswire-streamdeck/dist
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.1-StreamDeck-PLUGIN-PREVIEW
+          name: NewsWire-v0.7.2-StreamDeck-PLUGIN-PREVIEW
           path: newswire-streamdeck/dist/*.streamDeckPlugin
           if-no-files-found: error
           retention-days: 30
@@ -73,7 +76,7 @@ jobs:
         run: npm run package:${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.1-${{ matrix.target }}-UNSIGNED-PREVIEW
+          name: NewsWire-v0.7.2-${{ matrix.target }}-UNSIGNED-PREVIEW
           path: newswire-command-center/dist/*.${{ matrix.ext }}
           if-no-files-found: error
           retention-days: 30
@@ -81,7 +84,7 @@ jobs:
   release-preview:
     name: Publish clearly labeled preview files
     concurrency:
-      group: newswire-v071-streamdeck-release
+      group: newswire-v072-streamdeck-release
       cancel-in-progress: true
     needs: [test-and-pack-plugin, desktop]
     runs-on: ubuntu-latest
@@ -90,7 +93,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: NewsWire-v0.7.1-*
+          pattern: NewsWire-v0.7.2-*
           path: release-assets
           merge-multiple: true
       - name: Publish tested development preview
@@ -98,16 +101,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='newswire-v0.7.1-streamdeck-preview'
+          TAG='newswire-v0.7.2-streamdeck-preview'
           test -f release-assets/com.newswire.commandcenter.streamDeckPlugin
           ls -lh release-assets/
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire 0.7.1 — Stream Deck XL desktop preview' \
-              --notes 'Development preview only; not validated on a physical Stream Deck XL or Windows/Mac computer. The Windows/Mac installers are unsigned. Includes a separate optional Stream Deck plugin; does not change your existing Stream Deck profile. Use official NWS and WEA alerts for emergencies. No Google Play Android update is included.'
+              --title 'NewsWire 0.7.2 — Detachable desktop command center preview' \
+              --notes 'Development preview only; not physically validated on Windows/Mac or Stream Deck XL. Detach NewsWire local dashboard and active warnings into their own operating-system windows; drag freely across monitors. Use Arrange 3 Monitors or Stream Deck XL Arrange 3 Desks. Saved window positions, synchronized official warning counts and alert focus, polished national map navigation. No real radar velocity or local news feed yet. Windows/Mac installers are unsigned. Follow official NWS and WEA warnings. No Android update.'
           fi
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-streamdeck-xl-v0.7.1" --jq '.object.sha')
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-detachable-workspace-v0.7.2" --jq '.object.sha')
           if [ "$GITHUB_SHA" != "$LATEST" ]; then
             echo "Skipping superseded build $GITHUB_SHA, latest is $LATEST"
             exit 0
