@@ -136,7 +136,7 @@ app.whenReady().then(()=>{
   win?.webContents.send('newswire:workspace-focus',id);
  });
  ipcMain.on('newswire:set-zip',(event,zip)=>{
-  if(!isTrusted(event.sender)||!/^\\d{5}$/.test(String(zip)))return;
+  if(!isTrusted(event.sender)||!/^\d{5}$/.test(String(zip)))return;
   const map=views.get('map');if(map&&!map.isDestroyed())map.webContents.send('newswire:workspace-zip',zip);
  });
  bridge=createBridge(deliver);
