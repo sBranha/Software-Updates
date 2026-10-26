@@ -1,0 +1,28 @@
+{
+  "name": "newswire-command-center",
+  "version": "0.7.0",
+  "private": true,
+  "description": "Free nationwide storm warning command center using official NWS alert data",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test.js",
+    "package:windows": "electron-builder --win nsis --x64 --publish never",
+    "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "net.newswire.commandcenter",
+    "productName": "NewsWire Command Center",
+    "copyright": "NewsWire",
+    "directories": {"output": "dist"},
+    "files": ["index.html", "engine.js", "app.js", "main.cjs"],
+    "asar": true,
+    "win": {"target": [{"target": "nsis", "arch": ["x64"]}], "artifactName": "NewsWire-Command-Center-0.7.0-Windows-Setup.${ext}"},
+    "mac": {"target": [{"target": "dmg", "arch": ["x64", "arm64"]}], "artifactName": "NewsWire-Command-Center-0.7.0-Mac-${arch}.${ext}", "category": "public.app-category.weather"},
+    "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "createDesktopShortcut": true}
+  }
+}
