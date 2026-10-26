@@ -77,3 +77,31 @@ jobs:
           path: newswire-command-center/dist/*.${{ matrix.ext }}
           if-no-files-found: error
           retention-days: 30
+
+  release-preview:
+    name: Publish clearly labeled preview files
+    needs: [test-and-pack-plugin, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: NewsWire-v0.7.1-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish tested development preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG='newswire-v0.7.1-streamdeck-preview'
+          test -f release-assets/com.newswire.commandcenter.streamDeckPlugin
+          ls -lh release-assets/
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title 'NewsWire 0.7.1 — Stream Deck XL desktop preview' \
+              --notes 'Development preview only; not validated on a physical Stream Deck XL or Windows/Mac computer. The Windows/Mac installers are unsigned. Includes a separate optional Stream Deck plugin; does not change your existing Stream Deck profile. Use official NWS and WEA alerts for emergencies. No Google Play Android update is included.'
+          fi
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" release-assets/* --clobber
