@@ -1,58 +1,156 @@
 'use strict';
-const {app,BrowserWindow,shell,session,dialog,ipcMain,screen}=require('electron');
-const {createBridge}=require('./deck-bridge.cjs');
-let bridge;
-
+const {app,BrowserWindow,shell,session,dialog,ipcMain,screen,Menu}=require('electron');
 const path=require('node:path');
+const {createBridge}=require('./deck-bridge.cjs');
+const W=require('./window-layout.cjs');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
+const views=new Map();
+const pageNames={map:'index.html',local:'local.html',warnings:'warnings.html'};
+let bridge,layoutFile,layout={},latest=null;
+let saveTimer=null;
 function external(url){
- try{const u=new URL(url);if(u.protocol==='https:'&&SAFE_LINKS.has(u.hostname))shell.openExternal(u.toString());}catch(e){}
+ try{const u=new URL(url);if(u.protocol==='https:'&&SAFE_LINKS.has(u.hostname))shell.openExternal(u.toString())}catch(_){}
 }
-function launch(){
+function isTrusted(sender){return [...views.values()].some(win=>!win.isDestroyed()&&win.webContents===sender)}
+function savePositions(){
+ if(!layoutFile)return;
+ try{W.saveLayout(layoutFile,layout)}catch(e){console.error('Failed to save window layout:',e.message)}
+}
+function remember(type,win){
+ if(win.isDestroyed()||win.isMaximized()||win.isMinimized())return;
+ layout[type]=win.getBounds();
+ clearTimeout(saveTimer);saveTimer=setTimeout(savePositions,550);
+}
+function newWindow(type,options={}){
+ if(!W.validType(type))return null;
+ const existing=views.get(type);
+ if(existing&&!existing.isDestroyed()){
+  if(existing.isMinimized())existing.restore();
+  existing.show();existing.focus();return existing;
+ }
+ const work=screen.getPrimaryDisplay().workArea;
+ const defaults=type==='map'?{width:1480,height:900}:type==='local'?{width:780,height:740}:{width:920,height:800};
+ const initial=options.bounds||layout[type]||{x:work.x+55,y:work.y+50,...defaults};
+ const bounds=W.clampBounds(initial,screen.getAllDisplays(),defaults);
  const win=new BrowserWindow({
-  title:'NewsWire Storm Command Center',width:1520,height:930,minWidth:850,minHeight:630,
-  backgroundColor:'#06111d',show:false,autoHideMenuBar:true,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,backgroundThrottling:false,preload:path.join(__dirname,'preload.cjs')}
+  title:type==='map'?'NewsWire — National Command Center':type==='local'?'NewsWire — Local Dashboard':'NewsWire — Active Warnings',
+  ...bounds,minWidth:490,minHeight:400,show:false,autoHideMenuBar:true,
+  backgroundColor:'#06111d',
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,
+   backgroundThrottling:false,preload:path.join(__dirname,'preload.cjs')}
  });
- win.once('ready-to-show',()=>win.show());
+ views.set(type,win);
+ win.once('ready-to-show',()=>{if(!win.isDestroyed()){win.show();if(latest&&type!=='map')win.webContents.send('newswire:workspace-state',latest)}});
+ win.on('move',()=>remember(type,win));
+ win.on('resize',()=>remember(type,win));
+ win.on('close',()=>{remember(type,win);savePositions()});
+ win.on('closed',()=>views.delete(type));
  win.webContents.setWindowOpenHandler(({url})=>{external(url);return {action:'deny'}});
  win.webContents.on('will-navigate',(e,url)=>{
   if(url!==win.webContents.getURL()){e.preventDefault();external(url)}
  });
- win.loadFile(path.join(__dirname,'index.html'));
+ win.loadFile(path.join(__dirname,pageNames[type]));
+ return win;
 }
-function moveToDisplay(number){
- const displays=screen.getAllDisplays().sort((a,b)=>a.bounds.x-b.bounds.x||a.bounds.y-b.bounds.y);
- const selected=displays[number-1],win=BrowserWindow.getAllWindows()[0];
- if(!selected||!win)return;
- const {x,y,width,height}=selected.workArea;
- win.setBounds({x:x+20,y:y+20,width:Math.max(850,width-40),height:Math.max(630,height-40)});
- if(win.isMinimized())win.restore();win.show();
+function setDisplay(type,index){
+ const win=newWindow(type);
+ const list=W.sortedDisplays(screen.getAllDisplays());
+ const d=list[index-1];
+ if(!win||!d)return;
+ const area=d.workArea;
+ const w=Math.min(area.width,type==='map'?1480:850),h=Math.min(area.height,type==='map'?920:800);
+ win.setBounds(W.clampBounds({x:area.x+Math.round((area.width-w)/2),y:area.y+Math.round((area.height-h)/2),width:w,height:h},[d]));
+ win.show();win.focus();
+}
+function arrange(){
+ const displays=W.sortedDisplays(screen.getAllDisplays());
+ if(!displays.length)return;
+ const order=['local','map','warnings'];
+ order.forEach((type,i)=>{
+  const d=displays[Math.min(i,displays.length-1)],a=d.workArea;
+  const allSingle=displays.length===1;
+  const w=allSingle?Math.round(a.width/3):(type==='map'?Math.min(a.width,1500):Math.min(a.width,860));
+  const h=allSingle?a.height-85:Math.min(a.height-50,880);
+  const x=allSingle?a.x+Math.round(a.width*i/3):a.x+Math.round((a.width-w)/2);
+  const y=allSingle?a.y+45:a.y+30;
+  const win=newWindow(type);
+  if(win){win.setBounds(W.clampBounds({x,y,width:w,height:h},[d]));win.show()}
+ });
+ views.get('map')?.focus();
+}
+function deliver(action){
+ if(/^display-[123]$/.test(action)){setDisplay('map',Number(action.at(-1)));return}
+ if(action==='nws-radar'){external('https://radar.weather.gov/');return}
+ if(action==='workspace-3'){arrange();return}
+ const win=views.get('map');
+ if(!win||win.isDestroyed())return;
+ win.webContents.send('newswire:deck-action',action);
+}
+function menu(){
+ const template=[
+  {label:'NewsWire',submenu:[{role:'about'},{type:'separator'},{role:'quit'}]},
+  {label:'Windows',submenu:[
+   {label:'National Command Center',accelerator:'CmdOrCtrl+1',click:()=>newWindow('map')},
+   {label:'Local Dashboard',accelerator:'CmdOrCtrl+2',click:()=>newWindow('local')},
+   {label:'Active Warnings',accelerator:'CmdOrCtrl+3',click:()=>newWindow('warnings')},
+   {type:'separator'},{label:'Arrange on All Monitors',accelerator:'CmdOrCtrl+Shift+M',click:arrange}
+  ]},
+  {label:'View',submenu:[{role:'reload'},{role:'togglefullscreen'},{role:'toggleDevTools'}]}
+ ];
+ Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 app.whenReady().then(()=>{
+ layoutFile=path.join(app.getPath('userData'),'newswire-window-layout.json');
+ layout=W.readLayout(layoutFile);
  ipcMain.on('newswire:deck-state',(event,s)=>{
-  if(!BrowserWindow.getAllWindows().some(w=>w.webContents===event.sender))return;
+  if(!isTrusted(event.sender))return;
   try{bridge?.publish(s)}catch(error){console.error('Stream Deck status:',error.message)}
  });
- bridge=createBridge(action=>{
-  if(/^display-[123]$/.test(action)){moveToDisplay(Number(action.slice(-1)));return;}
-  if(action==='nws-radar'){external('https://radar.weather.gov/');return;}
-  const win=BrowserWindow.getAllWindows()[0];
-  if(!win||win.webContents.isLoading())return;
-  win.webContents.send('newswire:deck-action',action);
+ ipcMain.on('newswire:open-panel',(event,type)=>{
+  if(isTrusted(event.sender)&&W.validType(type))newWindow(type);
  });
-
- // Do not silently grant device location permissions; ZIP entry remains available.
+ ipcMain.on('newswire:arrange-panels',event=>{
+  if(isTrusted(event.sender))arrange();
+ });
+ ipcMain.on('newswire:workspace-state',(event,s)=>{
+  if(!isTrusted(event.sender)||views.get('map')?.webContents!==event.sender||!s||typeof s!=='object')return;
+  // Send bounded display data only; never broadcast exact GPS coordinates.
+  latest={
+   feedOk:s.feedOk===true,
+   warningCount:Number.isSafeInteger(s.warningCount)?Math.max(0,s.warningCount):0,
+   localStatus:String(s.localStatus||'Local warning status unknown').slice(0,1200),
+   location:String(s.location||'Select a ZIP or GPS').slice(0,120),
+   checked:String(s.checked||'No successful check').slice(0,180),
+   warnings:Array.isArray(s.warnings)?s.warnings.slice(0,300).map(a=>({
+    id:String(a.id||'').slice(0,350),area:String(a.area||'').slice(0,320),
+    expires:String(a.expires||'').slice(0,80),headline:String(a.headline||'').slice(0,450),
+    instruction:String(a.instruction||'').slice(0,1000),url:String(a.url||'').slice(0,350)
+   })):[]
+  };
+  for(const [type,win] of views)if(type!=='map'&&!win.isDestroyed())
+   win.webContents.send('newswire:workspace-state',latest);
+ });
+ ipcMain.on('newswire:focus-warning',(event,id)=>{
+  if(!isTrusted(event.sender)||typeof id!=='string'||id.length>350)return;
+  const win=newWindow('map');
+  win?.webContents.send('newswire:workspace-focus',id);
+ });
+ ipcMain.on('newswire:set-zip',(event,zip)=>{
+  if(!isTrusted(event.sender)||!/^\\d{5}$/.test(String(zip)))return;
+  const map=views.get('map');if(map&&!map.isDestroyed())map.webContents.send('newswire:workspace-zip',zip);
+ });
+ bridge=createBridge(deliver);
  session.defaultSession.setPermissionRequestHandler((webContents,permission,callback)=>{
-  if(permission!=='geolocation'||!webContents.getURL().startsWith('file://')){callback(false);return;}
+  if(permission!=='geolocation'||!isTrusted(webContents)||!webContents.getURL().startsWith('file://')){callback(false);return}
   const owner=BrowserWindow.fromWebContents(webContents);
   dialog.showMessageBox(owner,{type:'question',title:'NewsWire location permission',
-    message:'Use this computer\'s location to check nearby NWS warnings?',
-    detail:'Location is requested only when you press Use my GPS. You can use a ZIP instead.',
-    buttons:['Deny','Allow once'],defaultId:0,cancelId:0,noLink:true
-  }).then(result=>callback(result.response===1)).catch(()=>callback(false));
+   message:"Use this computer's location to check nearby NWS warnings?",
+   detail:'Location is requested only when you press Use my GPS. You can use a ZIP instead.',
+   buttons:['Deny','Allow once'],defaultId:0,cancelId:0,noLink:true
+  }).then(r=>callback(r.response===1)).catch(()=>callback(false));
  });
- launch();app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)launch()});
+ menu();newWindow('map');
+ app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)newWindow('map')});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
-app.on('before-quit',()=>bridge?.close());
+app.on('before-quit',()=>{clearTimeout(saveTimer);savePositions();bridge?.close()});
