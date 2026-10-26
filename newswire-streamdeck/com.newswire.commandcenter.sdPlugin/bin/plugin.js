@@ -69,6 +69,7 @@ ws.addEventListener('message',e=>{
  else if(m.event==='keyDown'){
   const action=contexts.get(m.context)||String(m.action||'').replace(UUID,'');
   if(action==='warning-status')return;
+  if(!status()){send('showAlert',m.context,{});return;}
   try{if(writeCommand(action))send('showOk',m.context,{});}catch(_){send('showAlert',m.context,{});}
  }
 });
