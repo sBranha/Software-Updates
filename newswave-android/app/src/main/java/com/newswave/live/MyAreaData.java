@@ -95,47 +95,113 @@ final class MyAreaData {
                 return Integer.compare(priorityA,priorityB);
             });
         }catch(Exception error){android.util.Log.w("NewsWireArea","NWS alerts unavailable",error);}
+        // Nearby station timestamps may be stale or ahead of the phone's clock.
+        // Try up to five official station observations before a labeled fallback.
+        boolean stationOutdated=false;
+        String hourlyForecastUrl="";
         try {
             JSONObject points=fetch("https://api.weather.gov/points/"+point);
             JSONObject props=points.getJSONObject("properties");
+            hourlyForecastUrl=props.optString("forecastHourly","");
             String stationUrl=props.optString("observationStations","");
-            if(stationUrl.startsWith("https://")){
+            if(stationUrl.startsWith("https://api.weather.gov/")){
                 JSONObject stationData=fetch(stationUrl);
                 JSONArray features=stationData.optJSONArray("features");
-                if(features!=null&&features.length()>0){
-                    String station=features.getJSONObject(0).getJSONObject("properties").optString("stationIdentifier","");
-                    if(!station.isEmpty()){
+                if(features!=null)for(int n=0;n<Math.min(5,features.length());n++){
+                    JSONObject feature=features.optJSONObject(n);
+                    JSONObject stationProps=feature==null?null:feature.optJSONObject("properties");
+                    String station=stationProps==null?"":stationProps.optString("stationIdentifier","");
+                    if(station.isEmpty())continue;
+                    try {
                         JSONObject latest=fetch("https://api.weather.gov/stations/"+station+"/observations/latest");
                         JSONObject observation=latest.getJSONObject("properties");
+                        long candidateAt=0;
                         try{
-                          String time=observation.optString("timestamp","");
-                          observedAt=java.time.OffsetDateTime.parse(time)
-                            .toInstant().toEpochMilli();
-                        }catch(Exception ignored){}
+                            candidateAt=java.time.OffsetDateTime.parse(
+                                observation.optString("timestamp","")).toInstant().toEpochMilli();
+                        }catch(Exception ignored){stationOutdated=true;continue;}
+                        long age=System.currentTimeMillis()-candidateAt;
+                        if(candidateAt<=0||age< -5*60*1000L||age>2L*60*60*1000L){
+                            stationOutdated=true;
+                            continue;
+                        }
+                        JSONObject value=observation.optJSONObject("temperature");
+                        double c=value==null?Double.NaN:value.optDouble("value",Double.NaN);
+                        if(!Double.isFinite(c))continue;
+                        observedAt=candidateAt;
+                        temp=f(c*1.8+32)+"°F";
                         description=observation.optString("textDescription","Current conditions");
                         if(description.isEmpty())description="Current conditions";
-                        double c=observation.optJSONObject("temperature")==null?
-                            Double.NaN:observation.getJSONObject("temperature").optDouble("value",Double.NaN);
-                        if(!Double.isNaN(c)){temp=f(c*1.8+32)+"°F";ok=true;}
-                        JSONObject chill=observation.optJSONObject("heatIndex");
-                        double apparent=chill==null?Double.NaN:chill.optDouble("value",Double.NaN);
-                        if(Double.isNaN(apparent)){
-                            chill=observation.optJSONObject("windChill");
-                            apparent=chill==null?Double.NaN:chill.optDouble("value",Double.NaN);
+                        JSONObject apparentValue=observation.optJSONObject("heatIndex");
+                        double apparent=apparentValue==null?Double.NaN:
+                            apparentValue.optDouble("value",Double.NaN);
+                        if(!Double.isFinite(apparent)){
+                            apparentValue=observation.optJSONObject("windChill");
+                            apparent=apparentValue==null?Double.NaN:
+                                apparentValue.optDouble("value",Double.NaN);
                         }
-                        if(!Double.isNaN(apparent))feel=f(apparent*1.8+32)+"°F";
+                        if(Double.isFinite(apparent))feel=f(apparent*1.8+32)+"°F";
                         JSONObject speed=observation.optJSONObject("windSpeed");
                         double kph=speed==null?Double.NaN:speed.optDouble("value",Double.NaN);
-                        if(!Double.isNaN(kph))wind=f(kph*.621371)+" mph";
+                        if(Double.isFinite(kph))wind=f(kph*.621371)+" mph";
+                        ok=true;
+                        break;
+                    }catch(Exception stationError){
+                        android.util.Log.w("NewsWireArea","Skipping unavailable NWS station",stationError);
                     }
                 }
             }
         }catch(Exception error){android.util.Log.w("NewsWireArea","NWS conditions unavailable",error);}
-        // Do not present old station measurements as current temperatures.
-        if(observedAt>0 && (observedAt>System.currentTimeMillis()+5*60*1000L ||
-            System.currentTimeMillis()-observedAt>2L*60*60*1000L)){
-            ok=false;temp="—";feel="—";wind="—";
+        // Official NWS forecast: an estimate, not a measured station reading.
+        if(!ok && hourlyForecastUrl.startsWith("https://api.weather.gov/")){
+            try {
+                JSONObject hourly=fetch(hourlyForecastUrl);
+                JSONObject forecastProps=hourly.optJSONObject("properties");
+                JSONArray periods=forecastProps==null?null:forecastProps.optJSONArray("periods");
+                if(periods!=null&&periods.length()>0){
+                    JSONObject period=periods.optJSONObject(0);
+                    if(period!=null&&period.has("temperature")&&!period.isNull("temperature")){
+                        int degrees=period.optInt("temperature",Integer.MIN_VALUE);
+                        if(degrees> -150&&degrees<160){
+                            temp=f("C".equalsIgnoreCase(period.optString("temperatureUnit","F"))?
+                                degrees*1.8+32:degrees)+"°F";
+                            description="NWS hourly forecast estimate · "+
+                                period.optString("shortForecast","Local conditions");
+                            wind=period.optString("windSpeed","—");
+                            observedAt=0;
+                            ok=true;
+                        }
+                    }
+                }
+            }catch(Exception forecastError){
+                android.util.Log.w("NewsWireArea","Hourly forecast unavailable",forecastError);
+            }
+        }
+        // Backup is modeled weather, explicitly labeled rather than called a station reading.
+        if(!ok){
+            try{
+                String url=String.format(Locale.US,
+                    "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"+
+                    "&current=temperature_2m,wind_speed_10m&temperature_unit=fahrenheit"+
+                    "&wind_speed_unit=mph",lat,lon);
+                JSONObject current=fetch(url).optJSONObject("current");
+                double degrees=current==null?Double.NaN:
+                    current.optDouble("temperature_2m",Double.NaN);
+                if(Double.isFinite(degrees)){
+                    temp=f(degrees)+"°F";
+                    double mph=current.optDouble("wind_speed_10m",Double.NaN);
+                    if(Double.isFinite(mph))wind=f(mph)+" mph";
+                    description="Open-Meteo temperature estimate · station unavailable";
+                    observedAt=0;
+                    ok=true;
+                }
+            }catch(Exception backupError){
+                android.util.Log.w("NewsWireArea","Backup temperature unavailable",backupError);
+            }
+        }
+        if(!ok && stationOutdated){
             description="Weather station reading outdated";
+            temp="—";feel="—";wind="—";observedAt=0;
         }
         if(!city.isEmpty()&&!region.isEmpty()){
             try{headlines=LocalNewspapers.headlines(city,region);}
