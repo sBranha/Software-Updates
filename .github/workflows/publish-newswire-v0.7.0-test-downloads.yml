@@ -1,0 +1,52 @@
+name: NewsWire v0.7.0 public test download links
+on:
+  push:
+    branches: [newswire-command-center-v0.7.0]
+    paths:
+      - '.github/workflows/publish-newswire-v0.7.0-test-downloads.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download checked Android build
+        run: gh run download 40385580675 --repo "$GITHUB_REPOSITORY" --name NewsWire-v0.7.0-APK-and-UNSIGNED-AAB --dir /tmp/nw/android
+      - name: Download checked Windows build
+        run: gh run download 40385580529 --repo "$GITHUB_REPOSITORY" --name NewsWire-0.7.0-windows-UNSIGNED-TEST --dir /tmp/nw/windows
+      - name: Download checked Mac builds
+        run: gh run download 40385580529 --repo "$GITHUB_REPOSITORY" --name NewsWire-0.7.0-mac-UNSIGNED-TEST --dir /tmp/nw/mac
+      - name: Verify hashes and prepare download files
+        run: |
+          set -euo pipefail
+          (cd /tmp/nw/android && sha256sum -c SHA256SUMS.txt)
+          (cd /tmp/nw/windows && sha256sum -c SHA256SUMS.txt)
+          (cd /tmp/nw/mac && sha256sum -c SHA256SUMS.txt)
+          mkdir -p releases
+          cp /tmp/nw/android/NewsWire-v0.7.0-TEST.apk releases/NewsWire-v0.7.0-TEST.apk
+          cp /tmp/nw/android/NewsWire-Command-Center-v0.7.0-BROWSER-PREVIEW.zip releases/NewsWire-v0.7.0-Browser-Preview.zip
+          cp /tmp/nw/windows/NewsWire-Command-Center-0.7.0-Windows-Setup.exe releases/NewsWire-v0.7.0-Windows-Setup.exe
+          cp /tmp/nw/mac/NewsWire-Command-Center-0.7.0-Mac-arm64.dmg releases/NewsWire-v0.7.0-Mac-Apple-Silicon.dmg
+          cp /tmp/nw/mac/NewsWire-Command-Center-0.7.0-Mac-x64.dmg releases/NewsWire-v0.7.0-Mac-Intel.dmg
+          (cd releases && sha256sum * > SHA256SUMS.txt)
+          ls -lh releases
+      - name: Publish public prerelease with directly downloadable installers
+        run: |
+          set -euo pipefail
+          if gh release view newswire-v0.7.0-test --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload newswire-v0.7.0-test releases/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create newswire-v0.7.0-test releases/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "NewsWire v0.7.0 — Windows, Mac & Android Test Downloads" \
+              --prerelease \
+              --notes "TEST BUILD ONLY. Not validated for live emergency decisions. Do not replace official NWS warnings, Wireless Emergency Alerts or local guidance. Nationwide tornado warning desk with auto-fly, local priority, USGS satellite basemap and a free unified desktop/Android codebase. Windows EXE and Mac DMGs are unsigned, and Android APK has a distinct test package ID; macOS Gatekeeper or Windows SmartScreen may warn. NWS data access, GPS, warnings, and safety features require further live validation. Not a production or Google Play release."
+          fi
+          gh release view newswire-v0.7.0-test --repo "$GITHUB_REPOSITORY" --json url,assets
