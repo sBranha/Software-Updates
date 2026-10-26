@@ -21,6 +21,7 @@ function sendIcon(context,urgent){
 function status(){
  try{const s=JSON.parse(fs.readFileSync(path.join(DIR,'state.json'),'utf8'));
   if(!Number.isSafeInteger(s.updatedAt)||Math.abs(Date.now()-s.updatedAt)>15000)return null;
+  if(s.lastChecked&&Date.now()-s.lastChecked>180000)s.feedOk=false;
   return s;
  }catch(_){return null;}
 }
