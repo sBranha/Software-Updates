@@ -80,6 +80,9 @@ jobs:
 
   release-preview:
     name: Publish clearly labeled preview files
+    concurrency:
+      group: newswire-v071-streamdeck-release
+      cancel-in-progress: true
     needs: [test-and-pack-plugin, desktop]
     runs-on: ubuntu-latest
     permissions:
@@ -104,4 +107,19 @@ jobs:
               --title 'NewsWire 0.7.1 — Stream Deck XL desktop preview' \
               --notes 'Development preview only; not validated on a physical Stream Deck XL or Windows/Mac computer. The Windows/Mac installers are unsigned. Includes a separate optional Stream Deck plugin; does not change your existing Stream Deck profile. Use official NWS and WEA alerts for emergencies. No Google Play Android update is included.'
           fi
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" release-assets/* --clobber
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-streamdeck-xl-v0.7.1" --jq '.object.sha')
+          if [ "$GITHUB_SHA" != "$LATEST" ]; then
+            echo "Skipping superseded build $GITHUB_SHA, latest is $LATEST"
+            exit 0
+          fi
+          for asset in release-assets/*; do
+            ok=0
+            for attempt in 1 2 3 4 5; do
+              if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$asset" --clobber; then
+                ok=1
+                break
+              fi
+              sleep $((attempt * 3))
+            done
+            test "$ok" = 1
+          done
