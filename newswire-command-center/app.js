@@ -242,7 +242,8 @@ window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GP
 function start(){
  loadHome();auto=setting('auto')!=='false';satellite=setting('satellite')!=='false';
  setButtons();mapInit();bind();deckBind();markHome();deckReport();refresh();
- setInterval(()=>{if(!document.hidden)refresh()},EVERY_MS);
+ setInterval(()=>{if(!document.hidden||window.NewsWireDesktopBridge)refresh()},EVERY_MS);
+ if(window.NewsWireDesktopBridge)setInterval(deckReport,5000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!lastChecked||Date.now()-lastChecked.getTime()>EVERY_MS))refresh()});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
