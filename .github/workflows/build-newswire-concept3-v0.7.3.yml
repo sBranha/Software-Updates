@@ -1,0 +1,129 @@
+name: NewsWire v0.7.3 desktop and Image 3 Desktop Dashboard preview
+on:
+  push:
+    branches: [newswire-concept3-ui-v0.7.3]
+    paths:
+      - 'newswire-command-center/**'
+      - 'newswire-streamdeck/**'
+      - '.github/workflows/build-newswire-streamdeck-v0.7.3.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-pack-plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run bridge and shared weather engine tests
+        run: |
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs
+          node --check newswire-command-center/main.cjs
+          node --check newswire-command-center/window-layout.cjs
+          node --check newswire-command-center/panels.js
+          node --check newswire-command-center/workspace-ui.js
+          node --check newswire-command-center/concept3-ui.js
+          node --check newswire-command-center/preload.cjs
+          node --check newswire-command-center/deck-bridge.cjs
+          node --check newswire-command-center/app.js
+          node --check newswire-streamdeck/com.newswire.commandcenter.sdPlugin/bin/plugin.js
+      - name: Install Stream Deck CLI
+        run: npm install -g @elgato/cli@latest --no-audit --no-fund
+      - name: Validate and pack plugin
+        run: |
+          mkdir -p newswire-streamdeck/dist
+          streamdeck pack newswire-streamdeck/com.newswire.commandcenter.sdPlugin --output newswire-streamdeck/dist --no-update-check
+          ls -la newswire-streamdeck/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-v0.7.3-StreamDeck-PLUGIN-PREVIEW
+          path: newswire-streamdeck/dist/*.streamDeckPlugin
+          if-no-files-found: error
+          retention-days: 30
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+            ext: exe
+          - os: macos-latest
+            target: mac
+            ext: dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run desktop tests
+        shell: bash
+        run: |
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs
+          node --check newswire-command-center/main.cjs
+          node --check newswire-command-center/preload.cjs
+      - name: Install dependencies
+        working-directory: newswire-command-center
+        run: npm install --no-audit --no-fund
+      - name: Build desktop installer
+        working-directory: newswire-command-center
+        run: npm run package:${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-v0.7.3-${{ matrix.target }}-UNSIGNED-PREVIEW
+          path: newswire-command-center/dist/*.${{ matrix.ext }}
+          if-no-files-found: error
+          retention-days: 30
+
+  release-preview:
+    name: Publish clearly labeled preview files
+    concurrency:
+      group: newswire-v073-streamdeck-release
+      cancel-in-progress: true
+    needs: [test-and-pack-plugin, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: NewsWire-v0.7.3-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish tested development preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG='newswire-v0.7.3-streamdeck-preview'
+          test -f release-assets/com.newswire.commandcenter.streamDeckPlugin
+          ls -lh release-assets/
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title 'NewsWire 0.7.3 — Image 3 command center preview' \
+              --notes 'NewsWire v0.7.3 desktop preview follows user-approved screenshot 3: top NewsWire navigation; local panel; dominant USGS satellite map; right official NWS warning status/details; four interactive dashboard cards. Detachable local dashboard and warnings windows remain draggable to multiple monitors and are Stream Deck XL compatible. This version does NOT claim live radar velocity, measured temperature or live local news. Windows/Mac installers are unsigned and not physically verified. Keep Wireless Emergency Alerts active. Android Google Play bundle remains unchanged.'
+          fi
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-concept3-ui-v0.7.3" --jq '.object.sha')
+          if [ "$GITHUB_SHA" != "$LATEST" ]; then
+            echo "Skipping superseded build $GITHUB_SHA, latest is $LATEST"
+            exit 0
+          fi
+          for asset in release-assets/*; do
+            ok=0
+            for attempt in 1 2 3 4 5; do
+              if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$asset" --clobber; then
+                ok=1
+                break
+              fi
+              sleep $((attempt * 3))
+            done
+            test "$ok" = 1
+          done
