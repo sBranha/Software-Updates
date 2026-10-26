@@ -175,17 +175,27 @@ public final class NewsWaveCarService extends CarAppService {
           }catch(Exception ex){Log.w(LOG,"Car GPS unavailable",ex);}
         }
         private void onPosition(Location loc){
-          if(loc==null||!loc.hasAccuracy()||loc.getAccuracy()>250f||
-             System.currentTimeMillis()-loc.getTime()>120000L)return;
+          if(loc==null||!loc.hasAccuracy()||loc.getAccuracy()>120f||
+             System.currentTimeMillis()-loc.getTime()>45000L)return;
           Location previous=lastFix;
-          lastFix=new Location(loc); // Keep safety alerts tied to the latest GPS fix.
+          if(previous!=null){
+            // Reject older network fixes, or coarse fixes that would yank the
+            // vehicle marker away from a fresh accurate GPS measurement.
+            if(loc.getElapsedRealtimeNanos()<=previous.getElapsedRealtimeNanos())return;
+            if(loc.getAccuracy()>previous.getAccuracy()*3f &&
+               loc.getTime()-previous.getTime()<10000L)return;
+          }
+          lastFix=new Location(loc);
           if(!follow)return;
-          // A parked car's compass/course can drift. Trust direction only while
-          // moving, and keep the last reliable heading when stopped.
           float course=Float.NaN;
-          boolean moving=loc.hasSpeed() && loc.getSpeed()>=1.5f;
-          if(moving && loc.hasBearing())course=loc.getBearing();
-          else if(moving && previous!=null && previous.distanceTo(loc)>=8f)
+          float traveled=previous==null?0f:previous.distanceTo(loc);
+          float elapsed=previous==null?0f:(loc.getTime()-previous.getTime())/1000f;
+          float displacementSpeed=elapsed>0f && elapsed<30f ? traveled/elapsed:0f;
+          boolean moving=(loc.hasSpeed() && loc.getSpeed()>=1.5f)
+              ||(traveled>=12f && displacementSpeed>=1.8f && loc.getAccuracy()<35f);
+          if(moving && loc.hasBearing() && loc.hasSpeed() && loc.getSpeed()>=1.5f)
+              course=loc.getBearing();
+          else if(moving && previous!=null && traveled>=8f)
               course=previous.bearingTo(loc);
           renderer.setPosition(loc.getLatitude(),loc.getLongitude(),course,
               loc.hasAccuracy()?loc.getAccuracy():20f,!moving);
@@ -481,7 +491,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.5.0 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.6.9 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
@@ -517,7 +527,11 @@ public final class NewsWaveCarService extends CarAppService {
         private Float userBearing=null;
         void setPosition(double latitude,double longitude,float bearing,
                          float accuracy,boolean stationary){
+            boolean redraw=true;
             synchronized(lock){
+                double oldLat=userLat==null?Double.NaN:userLat;
+                double oldLon=userLon==null?Double.NaN:userLon;
+                Float oldBearing=userBearing;
                 if(stationary && userLat!=null && userLon!=null){
                     float[] displacement=new float[1];
                     Location.distanceBetween(userLat,userLon,latitude,longitude,displacement);
@@ -532,12 +546,23 @@ public final class NewsWaveCarService extends CarAppService {
                     if(userBearing==null)userBearing=course;
                     else {
                         float difference=(course-userBearing+540f)%360f-180f;
-                        userBearing=(userBearing+0.55f*difference+360f)%360f;
+                        // Smooth ordinary GPS noise but turn quickly on real bends.
+                        float alpha=Math.abs(difference)>50f?0.85f:0.45f;
+                        userBearing=(userBearing+alpha*difference+360f)%360f;
                     }
                 }
                 // Invalid or stationary fixes never clear the last good heading.
+                if(!Double.isNaN(oldLat) && !Double.isNaN(oldLon)){
+                    float[] drift=new float[1];
+                    Location.distanceBetween(oldLat,oldLon,userLat,userLon,drift);
+                    float angular=oldBearing==null || userBearing==null ? 0f :
+                         Math.abs((userBearing-oldBearing+540f)%360f-180f);
+                    // Avoid re-downloading imagery for sub-pixel GPS movement
+                    // when the driver is stopped or cruising straight.
+                    redraw=drift[0]>=5f || angular>=2f;
+                }
             }
-            refresh();
+            if(redraw)refresh();
         }
         void disableFollow(){synchronized(lock){followGps=false;}}
         void focusStation(Station s){
@@ -616,8 +641,16 @@ public final class NewsWaveCarService extends CarAppService {
                     Double.isNaN(manualLat)?station.lat:manualLat;
                 double centerLon=followGps&&userLon!=null?userLon:
                     Double.isNaN(manualLon)?station.lon:manualLon;
-                double px=mx(centerLon,z)+dx;
-                double py=my(centerLat,z)+dy;
+                // Pan gestures are in screen coordinates. Convert back to
+                // geographic coordinates when the driving map is heading-up.
+                float worldX=dx,worldY=dy;
+                if(followGps&&userBearing!=null){
+                    double rad=Math.toRadians(userBearing);
+                    worldX=(float)(Math.cos(rad)*dx-Math.sin(rad)*dy);
+                    worldY=(float)(Math.sin(rad)*dx+Math.cos(rad)*dy);
+                }
+                double px=mx(centerLon,z)+worldX;
+                double py=my(centerLat,z)+worldY;
                 px=Math.max(0,Math.min(256*(1<<z),px));
                 py=Math.max(0,Math.min(256*(1<<z),py));
                 manualLat=lat(py,z);manualLon=lon(px,z);
