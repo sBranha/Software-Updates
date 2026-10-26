@@ -37,7 +37,7 @@ import java.util.concurrent.Executors;
  * Checks active NWS tornado, severe thunderstorm and flash flood warnings at the present location and at
  * points projected along the device's current course. It does not know
  * the navigation route and MUST NOT imply that no warning means safety.
- * No driving-map blocking dialogs and no automated car audio.
+ * No driving-map blocking dialogs. Optional phone speech requests audio focus.
  */
 public final class DriveWarningService extends Service implements LocationListener {
     public static final String ACTION_STOP="com.newswire.live.STOP_DRIVE_MONITOR";
@@ -56,9 +56,11 @@ public final class DriveWarningService extends Service implements LocationListen
     private long lastPoll=0,lastNotice=0;
     private String lastNoticeKey="";
     private NotificationManager notifications;
+    private DrivingAlertSpeaker voice;
     @Override public void onCreate(){
         super.onCreate();
         notifications=(NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+        voice=new DrivingAlertSpeaker(this);
         notifications.createNotificationChannel(new NotificationChannel(MONITOR_CHANNEL,
             "NewsWire driving weather monitoring",NotificationManager.IMPORTANCE_LOW));
         NotificationChannel danger=new NotificationChannel(WARNING_CHANNEL,
@@ -132,6 +134,7 @@ public final class DriveWarningService extends Service implements LocationListen
     private void end(){
         active=false;
         if(locationManager!=null)try{locationManager.removeUpdates(this);}catch(Exception ignored){}
+        if(voice!=null){voice.shutdown();voice=null;}
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
@@ -228,7 +231,11 @@ public final class DriveWarningService extends Service implements LocationListen
                 "Official NWS "+event+" covers your current position. "+
                 ("Tornado Warning".equals(event)?"Seek sturdy shelter immediately.":
                 "Flash Flood Warning".equals(event)?"Never drive through flooded roads.":
-                "Monitor official guidance and seek shelter if threatened."));
+                "Monitor official guidance and seek shelter if threatened."),
+                "Use extreme caution. "+event+" at your current location. "+
+                ("Tornado Warning".equals(event)?"Seek sturdy shelter immediately.":
+                "Flash Flood Warning".equals(event)?"Never drive into floodwater.":
+                "Follow official warnings and find safe shelter if needed."));
             return;
         }
         // Straight-line heading is not a navigation route or storm-motion forecast.
@@ -243,10 +250,13 @@ public final class DriveWarningService extends Service implements LocationListen
                 if(ahead!=null){
                     String event=warningType(ahead);
                     String miles=String.format(Locale.US,"%.0f",meters/1609.344);
-                    emit("AHEAD",ahead,event+" ahead on your heading",
-                        "Your current heading may enter an official NWS "+event+
+                    emit("AHEAD",ahead,event+" area ahead on your heading",
+                        "Your current direction of travel may enter an official NWS "+event+
                         " area in approximately "+miles+
-                        " miles. This is not a route or arrival-time prediction. Check official guidance.");
+                        " miles. This is not a route or storm-track prediction. Check official guidance.",
+                        "Use extreme caution. "+event+" area ahead, approximately "+
+                        miles+" miles in your direction of travel. "+
+                        "This describes a warning area, not the tornado's exact location.");
                     return;
                 }
             }
@@ -254,7 +264,7 @@ public final class DriveWarningService extends Service implements LocationListen
         if(active)main.post(()->setMonitoringStatus(
             "Monitoring NWS · last check completed; alerts can change"));
     }
-    private void emit(String kind,String alertId,String title,String description){
+    private void emit(String kind,String alertId,String title,String description,String spoken){
         long now=System.currentTimeMillis();
         String key=kind+"|"+alertId;
         if(key.equals(lastNoticeKey)&&now-lastNotice<REPEAT_MS)return;
@@ -272,6 +282,7 @@ public final class DriveWarningService extends Service implements LocationListen
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true).build();
             notifications.notify(WARNING_ID,notice);
+            if(voice!=null)voice.announce(spoken);
             setMonitoringStatus(title);
         });
     }
@@ -279,6 +290,8 @@ public final class DriveWarningService extends Service implements LocationListen
     @Override public void onDestroy(){
         active=false;
         if(locationManager!=null)try{locationManager.removeUpdates(this);}catch(Exception ignored){}
-        network.shutdownNow();super.onDestroy();
+        network.shutdownNow();
+        if(voice!=null){voice.shutdown();voice=null;}
+        super.onDestroy();
     }
 }
