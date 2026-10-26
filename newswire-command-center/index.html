@@ -31,6 +31,7 @@ footer{padding:11px 15px;background:#071622;color:#8ea8b9;font-size:11px;line-he
 a{color:#8ce6ff}
 @media(max-width:850px){header{padding:12px} .workspace{grid-template-columns:1fr;height:auto;min-height:0}.mapShell{height:52dvh;min-height:280px}.sidebar{height:52dvh;min-height:360px;border-left:0;border-top:1px solid var(--line)}.toolbar{padding:9px}.signal{width:100%;margin-left:0}.free{font-size:10px}}
 </style>
+<link rel="stylesheet" href="desktop.css">
 </head><body>
 <header><div><div class="eyebrow">NEWSWIRE / LIVE WEATHER DESK</div><div class="headline">Nationwide Storm Command Center</div><div class="subtitle">Official NWS warning polygons · US-wide monitoring · no subscription</div></div><div class="free">FREE FOR EVERYONE</div></header>
 <div class="toolbar">
@@ -43,6 +44,18 @@ a{color:#8ce6ff}
 <button id="refresh">Refresh warnings</button>
 <span id="status" class="signal" role="status">Waiting for official warning data…</span>
 </div>
+<div class="full-workspace">
+<nav class="rail" aria-label="Desktop views">
+ <div class="railTitle">NEWSWIRE / DESK</div>
+ <button class="primary" type="button">🌎 National Map</button>
+ <button data-open-panel="local" type="button">⌖ Local Dashboard ↗</button>
+ <button data-open-panel="warnings" type="button">⚠ Active Warnings ↗</button>
+ <button data-open-panel="map" type="button">▣ Bring Map Forward</button>
+ <div class="divider"></div>
+ <button id="arrange-workspace" type="button">▦ Arrange 3 Monitors</button>
+ <div class="railTitle">WINDOWS / MAC</div>
+ <div class="foot"><b>Detachable views</b><p>Open any panel in its own window. Drag to another monitor. Positions are saved.</p><span id="nwClock"></span></div>
+</nav>
 <div class="workspace">
 <section class="mapShell" aria-label="Nationwide tornado warnings map">
 <div id="map"></div><div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Red outlines show issued NWS tornado warnings, not observed tornado positions or predicted paths.</div></div>
@@ -54,7 +67,7 @@ a{color:#8ce6ff}
 <div id="list" aria-label="Tornado warning list"><div class="empty">Loading nationwide warning feed…</div></div>
 <div class="sidebarSection"><div class="sidebarTitle">SELECTED WARNING</div><div id="detail">Select a warning to see the issue area, expiration, official NWS guidance, and mapped boundaries.</div><a id="official" target="_blank" rel="noopener noreferrer" href="https://www.weather.gov/alerts">Open official alert</a></div>
 <footer>Not affiliated with NOAA/NWS. Weather feeds can fail or be delayed. NewsWire is supplemental information; keep Wireless Emergency Alerts enabled and follow local officials. A warning polygon is not the tornado's current position. No radar rotation detection is claimed in this build.</footer>
-</aside></div>
+</aside></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="engine.js"></script><script src="app.js"></script>
+<script src="engine.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script>
 </body></html>
