@@ -35,3 +35,10 @@
 #satellite[aria-pressed="true"],#streets[aria-pressed="true"],#terrain[aria-pressed="true"]{background:#0864ac;border-color:#86dfff}
 #streetView[aria-pressed="true"]{background:#665622;color:#fff6c6;border-color:#ffcd45}
 @media(max-width:800px){.stormMapCol #map{min-height:43vh}}
+/* An independent, uncluttered radar-only display on each Windows monitor. */
+body.radarOnly .layout{grid-template-columns:minmax(0,1fr)}
+body.radarOnly aside,body.radarOnly .notice,body.radarOnly footer{display:none}
+body.radarOnly .stormMapCol{min-height:0}
+#autoFocus[aria-pressed="true"],#warningOverlay[aria-pressed="true"]{background:#075e88;border-color:#7bdcff}
+#radarOnly[aria-pressed="true"]{background:#654d25;border-color:#f5bd53}
+
