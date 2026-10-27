@@ -4,6 +4,16 @@
 <body>
 <header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / LIVE RADAR + USER-DRAWN STORM AREAS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="loop" aria-pressed="true">▶ Radar Loop</button><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite</button><button id="streets" aria-pressed="false">Streets</button><button id="terrain" aria-pressed="false">Terrain</button><button id="streetView" aria-pressed="false">Street View ↗</button><button id="googleMaps">Google Maps ↗</button><button id="focus">⌖ Focus Warning</button><button id="main">Open Main Desk</button></div></header>
 <section class="notice"><strong>Official NWS warning tracking, not a detected tornado.</strong> The shaded polygon is the issued warning area; it does not mark the storm's precise position or predicted path.</section>
+<div class="studioRadarBar" role="group" aria-label="Independent radar site and product controls">
+ <label for="radarSource">RADAR SOURCE</label>
+ <select id="radarSource" title="Choose nationwide mosaic or a single NEXRAD station"><option value="mosaic">Nationwide composite loop</option><option value="site">Single NWS radar station</option></select>
+ <label for="radarSite">RADAR SITE</label>
+ <select id="radarSite" title="Choose a radar site independently for this window"></select>
+ <button id="centerSite" type="button" title="Center this radar window on the selected NEXRAD station">⌖ Go To Site</button>
+ <label for="radarProduct">PRODUCT</label>
+ <select id="radarProduct" title="Select single-site reflectivity or Doppler velocity product"></select>
+ <span id="siteProductStatus" class="studioRadarInfo" role="status">Select a radar site marker or a site from the menu to see its products.</span>
+</div>
 <div class="layout"><section class="stormMapCol"><div id="map" aria-label="Tracked warning boundary with live NEXRAD radar mosaic"></div><div class="streetViewHint" id="streetViewHint">Pan or zoom to a location, then choose Street View and click the map.</div></section><aside>
 <div class="status" id="status">Waiting for a warning to be assigned…</div>
 <div id="communitySummary" class="communitySummary" role="status">NO DRAWN AREA</div>
@@ -11,7 +21,7 @@
 <div class="data"><span>WARNING EXPIRES</span><b id="expires">—</b></div>
 <div class="data"><span>NWS-MENTIONED MOTION</span><b id="motion">Not available</b></div>
 <div class="data"><span>RADAR SOURCE</span><b id="radarState">Connecting to IEM / NWS NEXRAD…</b></div>
-<div class="description" id="description">In the main NewsWire warning list, choose Track 1–4, or pin a map position, to assign a viewing area here.</div>
+<div class="description" id="description">Each monitor has its own radar site, product and polygon drawing. Choose KHTX (Hytop) or click a radar marker on the map.</div>
 <div class="polygonTools">
 <h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to find mapped cities, towns, and neighborhoods inside the polygon. Built-in Census towns show immediately, with blue map markers. For additional local neighborhoods, use More Communities (Online); this service may be unavailable.</p>
 <div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button><button id="focusArea" type="button" disabled>◎ Focus My Polygon</button><button id="retry" type="button" disabled>↻ More Communities (Online)</button></div>
@@ -24,5 +34,5 @@
 <a id="official" href="https://www.weather.gov/alerts" rel="noopener noreferrer" target="_blank">View official NWS alert ↗</a>
 </aside></div>
 <footer>Official NWS alert data may be delayed or unavailable. Tracking follows a warning area, not a live radar-derived storm cell. Movement is shown only when stated in the NWS bulletin. Keep Wireless Emergency Alerts enabled.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="drawn-tracks.js"></script><script src="storm.js"></script><script src="polygon-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="site-radar.js"></script><script src="tracking-engine.js"></script><script src="drawn-tracks.js"></script><script src="storm.js"></script><script src="polygon-ui.js"></script>
 </body></html>
