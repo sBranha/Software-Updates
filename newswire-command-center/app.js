@@ -312,6 +312,10 @@ function start(){
  setButtons();mapInit();bind();deckBind();markHome();
  if(window.NewsWireDesktopBridge){
   const bridge=window.NewsWireDesktopBridge;
+  if(typeof bridge.onRequestTrack==='function')bridge.onRequestTrack((slot,id)=>{
+   const item=alerts.find(a=>a.id===id);
+   if(item)trackSelected(slot,item);
+  });
   if(typeof bridge.onFocusWarning==='function')bridge.onFocusWarning(id=>{
    const item=alerts.find(a=>a.id===id);
    if(item)select(item,true);else sayStatus('Selected warning is no longer in the active feed.');
