@@ -315,10 +315,13 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
  const refreshTimer=setInterval(()=>{if(mode==='site'&&radarOn)loadScans()},120000);
  window.addEventListener('beforeunload',()=>{clearInterval(refreshTimer);stopSite();siteRadar.dispose?.()});
  function analyzeWarning(warning){
+  // engine.geometryCenter() returns [latitude, longitude], not an object.
   const center=warning?.center;
-  if(!center||!Number.isFinite(center.lat)||!Number.isFinite(center.lon))return;
+  const lat=Array.isArray(center)?center[0]:center?.lat;
+  const lng=Array.isArray(center)?center[1]:center?.lon;
+  if(!Number.isFinite(lat)||!Number.isFinite(lng))return;
   const sites=R().SITES.map(entry=>({entry,
-   meters:V().distanceMeters({lat:center.lat,lng:center.lon},{lat:entry.lat,lng:entry.lng})
+   meters:V().distanceMeters({lat,lng},{lat:entry.lat,lng:entry.lng})
   })).sort((a,b)=>a.meters-b.meters);
   if(sites.length&&sites[0].meters<=300000){
    activate('site',sites[0].entry.id,product);
