@@ -20,12 +20,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run application tests
-        working-directory: newswire-command-center
-        run: npm test
       - name: Install dependencies
         working-directory: newswire-command-center
         run: npm install --no-audit --no-fund
+      - name: Run application tests
+        working-directory: newswire-command-center
+        run: npm test
       - name: Package Windows EXE
         working-directory: newswire-command-center
         run: npm run package:windows
