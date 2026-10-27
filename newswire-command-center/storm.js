@@ -17,7 +17,7 @@ try{
  if(v&&Number.isFinite(v.lat)&&Number.isFinite(v.lng)&&Number.isInteger(v.zoom)&&v.zoom>=3&&v.zoom<=17&&
     Math.abs(v.lat)<=90&&Math.abs(v.lng)<=180)savedView=v;
 }catch(_){}
-const map=L.map('map',{zoomControl:true}).setView(savedView?[savedView.lat,savedView.lng]:[39,-97],savedView?savedView.zoom:5);
+const map=L.map('map',{zoomControl:true}).setView(savedView?[savedView.lat,savedView.lng]:[34.930556,-86.083611],savedView?savedView.zoom:8);
 let viewportTimer=null;
 map.on('moveend zoomend',()=>{
  clearTimeout(viewportTimer);
@@ -77,7 +77,7 @@ const radarComposite=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map
 const radarLocal=R.createSiteRadar(L,map,s=>{
  if(radarMode==='site')$('radarState').textContent=s;
 });
-let radarMode='mosaic',radar=radarComposite,selectedSite='KHTX',selectedProduct='N0B';
+let radarMode='site',radar=radarLocal,selectedSite='KHTX',selectedProduct='N0B';
 let siteFrames=[],siteFrameIndex=-1,sitePlaying=false,siteTimer=null,scanRequest=0,lastMetadataCheck=0;
 function stopSite(){sitePlaying=false;if(siteTimer){clearInterval(siteTimer);siteTimer=null}}
 function displayScan(){
