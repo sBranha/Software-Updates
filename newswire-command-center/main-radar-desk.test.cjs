@@ -122,7 +122,7 @@ test('main html, Electron IPC and package include every full-workstation control
  assert.match(html,/src="main-radar-desk\.js"/);
  const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
  assert.match(app,/NewsWireMainRadarDesk\.init/);
- assert.match(app,/mainRadarDesk\.consumeClick/);
+ assert.match(app,/mainRadarDesk\?\.consumeClick/);
  const ipc=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
  assert.match(ipc,/owner===views\.get\('map'\)/);
  const pkg=require('./package.json');
