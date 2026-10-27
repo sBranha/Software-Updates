@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NewsWire — Storm Tracker</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="storm.css"></head>
 <body>
-<header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / DUAL-STORM OPERATIONS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite: ON</button><button id="focus">⌖ Focus Warning</button><button id="main">Open Main Desk</button></div></header>
+<header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / LIVE RADAR + USER-DRAWN STORM AREAS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="loop" aria-pressed="true">▶ Radar Loop</button><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite: ON</button><button id="focus">⌖ Focus Warning</button><button id="main">Open Main Desk</button></div></header>
 <section class="notice"><strong>Official NWS warning tracking, not a detected tornado.</strong> The shaded polygon is the issued warning area; it does not mark the storm's precise position or predicted path.</section>
 <div class="layout"><section id="map" aria-label="Tracked warning boundary with live NEXRAD radar mosaic"></section><aside>
 <div class="status" id="status">Waiting for a warning to be assigned…</div>
@@ -11,8 +11,16 @@
 <div class="data"><span>NWS-MENTIONED MOTION</span><b id="motion">Not available</b></div>
 <div class="data"><span>RADAR SOURCE</span><b id="radarState">Connecting to IEM / NWS NEXRAD…</b></div>
 <div class="description" id="description">In the main NewsWire warning list, choose Track 1 or Track 2 to assign a warning here.</div>
+<div class="polygonTools">
+<h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to list communities whose mapped points lie inside.</p>
+<div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button></div>
+<div id="drawStatus" class="drawStatus" role="status">No user-drawn area.</div>
+<h3>Communities Inside Your Polygon</h3><div id="placesStatus" class="placesStatus">Draw a polygon to look up mapped cities, towns, villages and neighborhoods.</div>
+<ul id="places"></ul>
+<div class="advisory">Drawn areas are your own estimates, NOT official NWS warnings or computer-generated storm paths. Community locations are approximate. Arrival times are not calculated.</div>
+</div>
 <a id="official" href="https://www.weather.gov/alerts" rel="noopener noreferrer" target="_blank">View official NWS alert ↗</a>
 </aside></div>
 <footer>Official NWS alert data may be delayed or unavailable. Tracking follows a warning area, not a live radar-derived storm cell. Movement is shown only when stated in the NWS bulletin. Keep Wireless Emergency Alerts enabled.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="radar.js"></script><script src="tracking-engine.js"></script><script src="storm.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="drawn-tracks.js"></script><script src="storm.js"></script><script src="polygon-ui.js"></script>
 </body></html>
