@@ -5,7 +5,22 @@ const $=id=>document.getElementById(id);
 const bridge=window.NewsWireDesktopBridge;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 $('title').textContent='Storm Tracker '+(String(slot));
+const setting=name=>'nwcc-storm-'+slot+'-'+name;
+const savedBool=(name,fallback)=>{try{const value=localStorage.getItem(setting(name));return value===null?fallback:value==='true'}catch(_){return fallback}};
+const saveBool=(name,value)=>{try{localStorage.setItem(setting(name),String(Boolean(value)))}catch(_){}};
+let autoFocus=savedBool('auto-focus',true);
+let showWarnings=savedBool('warning-outline',true);
+let radarOnly=savedBool('radar-only',false);
 const map=L.map('map',{zoomControl:true}).setView([39,-97],5);
+try{
+ const view=JSON.parse(localStorage.getItem(setting('viewport'))||'null');
+ if(view&&Number.isFinite(view.lat)&&Math.abs(view.lat)<=90&&Number.isFinite(view.lng)&&Math.abs(view.lng)<=180&&Number.isInteger(view.zoom)&&view.zoom>=2&&view.zoom<=18)
+  map.setView([view.lat,view.lng],view.zoom);
+}catch(_){}
+map.on('moveend',()=>{
+ const p=map.getCenter();
+ try{localStorage.setItem(setting('viewport'),JSON.stringify({lat:p.lat,lng:p.lng,zoom:map.getZoom()}))}catch(_){}
+});
 window.NewsWireStormMap=map;
 const MV=window.NewsWireMapViews;
 const settingKey='nwcc-storm-map-mode-'+slot;
@@ -49,7 +64,26 @@ map.on('click',event=>{
  }catch(error){$('streetViewHint').textContent='Street View unavailable: '+error.message}
 });
 const radar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,s=>$('radarState').textContent=s);
-radar.show(true);
+radar.show(savedBool('radar-on',true));
+if(radar.isShown())radar.play(savedBool('loop-on',true));
+function radarButtons(){
+ const on=radar.isShown(),playing=on&&radar.isPlaying();
+ $('radar').setAttribute('aria-pressed',String(on));
+ $('radar').textContent='Radar: '+(on?'ON':'OFF');
+ $('loop').setAttribute('aria-pressed',String(playing));
+ $('loop').textContent=playing?'⏸ Pause Loop':'▶ Play Loop';
+}
+function deskButtons(){
+ $('autoFocus').setAttribute('aria-pressed',String(autoFocus));
+ $('autoFocus').textContent='Auto-Focus: '+(autoFocus?'ON':'OFF');
+ $('warningOverlay').setAttribute('aria-pressed',String(showWarnings));
+ $('warningOverlay').textContent='NWS Outline: '+(showWarnings?'ON':'OFF');
+ $('radarOnly').setAttribute('aria-pressed',String(radarOnly));
+ $('radarOnly').textContent=radarOnly?'Show Analysis':'Radar Only';
+ document.body.classList.toggle('radarOnly',radarOnly);
+ setTimeout(()=>map.invalidateSize(),80);
+}
+radarButtons();deskButtons();
 map.createPane('warning');
 map.getPane('warning').style.zIndex=500;
 let warningLayer=null,selection=null,feedOk=false;
@@ -57,7 +91,6 @@ let fixedMarker=null;
 function paint(item,feed){
  feedOk=Boolean(feed);
  const changed=!selection||selection.id!==item?.id;
- if(changed&&selection&&selection.id!==item?.id)window.dispatchEvent(new CustomEvent('newswire:slot-changed'));
  selection=item;
  if(warningLayer){map.removeLayer(warningLayer);warningLayer=null}
  if(fixedMarker){map.removeLayer(fixedMarker);fixedMarker=null}
@@ -77,7 +110,7 @@ function paint(item,feed){
   $('description').textContent='Manually selected radar viewing point at '+item.point.lat.toFixed(3)+', '+item.point.lon.toFixed(3)+'. Radar images refresh; this marker stays fixed and must be repositioned manually as the storm moves.';
   $('official').href='https://radar.weather.gov/';
   fixedMarker=L.circleMarker([item.point.lat,item.point.lon],{radius:8,color:slot===1?'#ff3455':'#56dbff',weight:3,fillOpacity:.8}).addTo(map);
-  if(changed)map.setView([item.point.lat,item.point.lon],9);
+  if(changed&&autoFocus)map.setView([item.point.lat,item.point.lon],9);
   return;
  }
  $('area').textContent=item.area;
@@ -92,21 +125,35 @@ function paint(item,feed){
  try{const u=new URL(item.url);$('official').href=u.protocol==='https:'&&['api.weather.gov','www.weather.gov'].includes(u.hostname)?u.toString():'https://www.weather.gov/alerts'}catch(_){$('official').href='https://www.weather.gov/alerts'}
  if(NewsWireTracking.validGeometry(item.geometry)){
   const geo={type:'Feature',geometry:item.geometry,properties:{}};
-  warningLayer=L.geoJSON(geo,{pane:'warning',style:{color:slot===1?'#ff3b5c':'#50d9ff',weight:4,fillOpacity:.12,fillColor:slot===1?'#ff2944':'#38a9ff'}}).addTo(map);
-  const bounds=warningLayer.getBounds();if(changed&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
+  if(showWarnings){
+   warningLayer=L.geoJSON(geo,{pane:'warning',style:{color:slot===1?'#ff3b5c':'#50d9ff',weight:4,fillOpacity:.12,fillColor:slot===1?'#ff2944':'#38a9ff'}}).addTo(map);
+   const bounds=warningLayer.getBounds();if(changed&&autoFocus&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
+  }
  }else $('description').textContent+='\n\nNo NWS polygon supplied: location not guessed.';
 }
 $('radar').addEventListener('click',()=>{
  const on=radar.show(!radar.isShown());
- $('radar').setAttribute('aria-pressed',String(on));$('radar').textContent='Radar: '+(on?'ON':'OFF');
- $('loop').setAttribute('aria-pressed',String(on&&radar.isPlaying?.()));
+ saveBool('radar-on',on);
+ if(on)radar.play(savedBool('loop-on',true));
+ radarButtons();
 });
 $('loop').addEventListener('click',()=>{
- if(!radar.isShown()){radar.show(true);$('radar').setAttribute('aria-pressed','true');$('radar').textContent='Radar: ON'}
- const playing=radar.play?radar.play(!radar.isPlaying()):false;
- $('loop').setAttribute('aria-pressed',String(playing));
- $('loop').textContent=playing?'⏸ Pause Loop':'▶ Play Loop';
+ if(!radar.isShown()){radar.show(true);saveBool('radar-on',true)}
+ const playing=radar.play(!radar.isPlaying());
+ saveBool('loop-on',playing);radarButtons();
 });
+$('autoFocus').addEventListener('click',()=>{
+ autoFocus=!autoFocus;saveBool('auto-focus',autoFocus);deskButtons();
+});
+$('warningOverlay').addEventListener('click',()=>{
+ showWarnings=!showWarnings;saveBool('warning-outline',showWarnings);
+ // Repaint only this slot's official outline. User drawings remain independent.
+ paint(selection,feedOk);deskButtons();
+});
+$('radarOnly').addEventListener('click',()=>{
+ radarOnly=!radarOnly;saveBool('radar-only',radarOnly);deskButtons();
+});
+$('fullScreen').addEventListener('click',()=>bridge?.toggleFullscreen?.());
 $('satellite').addEventListener('click',()=>mapStyle('satellite'));
 $('streets').addEventListener('click',()=>mapStyle('streets'));
 $('terrain').addEventListener('click',()=>mapStyle('terrain'));
