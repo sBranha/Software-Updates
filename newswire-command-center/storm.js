@@ -6,6 +6,11 @@ const bridge=window.NewsWireDesktopBridge;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 $('title').textContent='Storm Tracker '+(String(slot));
 const viewKey='nwcc-storm-viewport-'+slot;
+const setting=name=>'nwcc-storm-'+slot+'-'+name;
+const savedBool=(name,fallback)=>{try{const v=localStorage.getItem(setting(name));return v===null?fallback:v==='true'}catch(_){return fallback}};
+const saveBool=(name,value)=>{try{localStorage.setItem(setting(name),String(Boolean(value)))}catch(_){}};
+let autoFocus=savedBool('auto-focus',true),showWarnings=savedBool('warning-outline',true),radarOnly=savedBool('radar-only',false);
+
 let savedView=null;
 try{
  const v=JSON.parse(localStorage.getItem(viewKey)||'null');
@@ -73,6 +78,59 @@ const radarLocal=R.createSiteRadar(L,map,s=>{
  if(radarMode==='site')$('radarState').textContent=s;
 });
 let radarMode='mosaic',radar=radarComposite,selectedSite='KHTX',selectedProduct='N0B';
+let siteFrames=[],siteFrameIndex=-1,sitePlaying=false,siteTimer=null,scanRequest=0,lastMetadataCheck=0;
+function stopSite(){sitePlaying=false;if(siteTimer){clearInterval(siteTimer);siteTimer=null}}
+function displayScan(){
+ const t=siteFrames[siteFrameIndex];
+ if(!t)return;
+ radarLocal.showScan(t);
+ const age=Math.round((Date.now()-Date.parse(t))/60000);
+ $('siteScanTime').textContent='Observed '+t+' UTC'+(age>20?' — STALE ('+age+' min old)':'');
+ $('sitePrev').disabled=false;$('siteNext').disabled=false;
+}
+function stepSite(direction){
+ if(!siteFrames.length)return;
+ siteFrameIndex=(siteFrameIndex+direction+siteFrames.length)%siteFrames.length;
+ displayScan();
+}
+function startSite(){
+ if(siteFrames.length<2){sitePlaying=false;return}
+ stopSite();sitePlaying=true;
+ siteTimer=setInterval(()=>{if(radarMode==='site'&&radarLocal.isShown())stepSite(1)},1300);
+}
+async function loadSiteScans(){
+ if(radarMode!=='site'||!bridge?.requestRadarScans)return;
+ const token=++scanRequest,site=selectedSite,product=selectedProduct;
+ $('siteScanTime').textContent='Loading actual '+site+' '+product+' scan times…';
+ lastMetadataCheck=Date.now();
+ try{
+  const data=await bridge.requestRadarScans(site,product);
+  if(token!==scanRequest||radarMode!=='site')return;
+  if(!data?.ok)throw Error(data?.error||'radar time listing failed');
+  const list=Array.isArray(data.scans)?data.scans.filter(x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(x)):[];
+  if(!list.length)throw Error('No observed scans returned in the last 95 minutes');
+  const lastBefore=siteFrames[siteFrameIndex];
+  siteFrames=list;
+  siteFrameIndex=Math.max(0,list.indexOf(lastBefore));
+  if(!lastBefore||!list.includes(lastBefore))siteFrameIndex=list.length-1;
+  displayScan();
+  if(sitePlaying)startSite();
+  else if(list.length>=2){startSite();$('loop').textContent='⏸ Pause Site Loop'}
+  $('siteProductStatus').textContent=site+' '+R.productFor(product).name+
+   ' · '+list.length+' verified scan times · latest '+list.at(-1)+' UTC';
+ }catch(err){
+  if(token!==scanRequest)return;
+  stopSite();
+  $('siteScanTime').textContent='Scan time unverified — '+String(err?.message||err).slice(0,145);
+  $('siteProductStatus').textContent=site+' '+product+' latest image only (archive unavailable)';
+  radarLocal.showLatest();
+  $('loop').textContent='Site Loop Unavailable';
+ }
+}
+function refreshLatestSite(){
+ if(radarMode==='site')loadSiteScans();
+}
+
 const radarSettingKey='nwcc-radar-config-'+slot;
 try{
  const pref=JSON.parse(localStorage.getItem(radarSettingKey)||'null');
@@ -97,8 +155,10 @@ function statusProduct(){
  $('radarSite').disabled=radarMode!=='site';
  $('radarProduct').disabled=radarMode!=='site';
  $('centerSite').disabled=radarMode!=='site';
- $('loop').disabled=radarMode==='site';
- $('loop').textContent=radarMode==='site'?'Latest single scan':'⏸ Pause Loop';
+ $('loop').disabled=false;
+ $('loop').textContent=radarMode==='site'?(siteFrames.length<2?'Loading Site Scans…':sitePlaying?'⏸ Pause Site Loop':'▶ Play Site Loop'):
+  (radarComposite.isPlaying?.()?'⏸ Pause Loop':'▶ Play Loop');
+ for(const id of ['sitePrev','siteNext','siteLatest'])$(id).disabled=radarMode!=='site'||(id!=='siteLatest'&&!siteFrames.length);
  $('loop').setAttribute('aria-pressed',String(radarMode==='mosaic'&&radarComposite.isPlaying?.()));
  $('siteProductStatus').textContent=radarMode==='mosaic'?
   'Nationwide NEXRAD reflectivity mosaic loop. Choose Single NWS radar to inspect Doppler velocity.' :
@@ -108,12 +168,13 @@ function statusProduct(){
 function chooseRadar(mode,site=selectedSite,product=selectedProduct){
  if(!R.siteFor(site)||!R.productFor(product))return;
  const on=radar.isShown();
- radar.show(false);
+ radar.show(false);stopSite();scanRequest++;siteFrames=[];siteFrameIndex=-1;
  radarMode=mode==='site'?'site':'mosaic';
  selectedSite=site;selectedProduct=product;
  radar=radarMode==='site'?radarLocal:radarComposite;
  if(radarMode==='site')radarLocal.select(site,product);
  if(on)radar.show(true);
+ if(radarMode==='site')loadSiteScans();
  $('radarSite').value=site;$('radarProduct').value=product;
  $('radar').textContent='Radar: '+(radar.isShown()?'ON':'OFF');
  $('radar').setAttribute('aria-pressed',String(radar.isShown()));
@@ -139,6 +200,7 @@ radar=radarMode==='site'?radarLocal:radarComposite;
 if(radarMode==='site')radarLocal.select(selectedSite,selectedProduct);
 radar.show(true);
 statusProduct();
+if(radarMode==='site')loadSiteScans();
 $('radarSource').addEventListener('change',()=>{
  chooseRadar($('radarSource').value);
  if(radarMode==='site')zoomToSite(selectedSite);
@@ -149,6 +211,9 @@ $('radarSite').addEventListener('change',()=>{
 });
 $('radarProduct').addEventListener('change',()=>chooseRadar('site',selectedSite,$('radarProduct').value));
 $('centerSite').addEventListener('click',()=>zoomToSite(selectedSite));
+$('sitePrev').addEventListener('click',()=>{stopSite();stepSite(-1);statusProduct()});
+$('siteNext').addEventListener('click',()=>{stopSite();stepSite(1);statusProduct()});
+$('siteLatest').addEventListener('click',()=>{stopSite();loadSiteScans();statusProduct()});
 
 map.createPane('warning');
 map.getPane('warning').style.zIndex=500;
@@ -157,7 +222,7 @@ let fixedMarker=null;
 function paint(item,feed){
  feedOk=Boolean(feed);
  const changed=!selection||selection.id!==item?.id;
- if(changed&&selection&&selection.id!==item?.id)window.dispatchEvent(new CustomEvent('newswire:slot-changed'));
+ // Warning changes never erase independent user-drawn polygon areas.
  selection=item;
  if(warningLayer){map.removeLayer(warningLayer);warningLayer=null}
  if(fixedMarker){map.removeLayer(fixedMarker);fixedMarker=null}
@@ -177,7 +242,7 @@ function paint(item,feed){
   $('description').textContent='Manually selected radar viewing point at '+item.point.lat.toFixed(3)+', '+item.point.lon.toFixed(3)+'. Radar images refresh; this marker stays fixed and must be repositioned manually as the storm moves.';
   $('official').href='https://radar.weather.gov/';
   fixedMarker=L.circleMarker([item.point.lat,item.point.lon],{radius:8,color:slot===1?'#ff3455':'#56dbff',weight:3,fillOpacity:.8}).addTo(map);
-  if(changed&&!savedView)map.setView([item.point.lat,item.point.lon],9);
+  if(changed&&autoFocus&&!savedView)map.setView([item.point.lat,item.point.lon],9);
   return;
  }
  $('area').textContent=item.area;
@@ -192,8 +257,10 @@ function paint(item,feed){
  try{const u=new URL(item.url);$('official').href=u.protocol==='https:'&&['api.weather.gov','www.weather.gov'].includes(u.hostname)?u.toString():'https://www.weather.gov/alerts'}catch(_){$('official').href='https://www.weather.gov/alerts'}
  if(NewsWireTracking.validGeometry(item.geometry)){
   const geo={type:'Feature',geometry:item.geometry,properties:{}};
-  warningLayer=L.geoJSON(geo,{pane:'warning',style:{color:slot===1?'#ff3b5c':'#50d9ff',weight:4,fillOpacity:.12,fillColor:slot===1?'#ff2944':'#38a9ff'}}).addTo(map);
-  const bounds=warningLayer.getBounds();if(changed&&!savedView&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
+  if(showWarnings){
+   warningLayer=L.geoJSON(geo,{pane:'warning',style:{color:slot===1?'#ff3b5c':'#50d9ff',weight:4,fillOpacity:.12,fillColor:slot===1?'#ff2944':'#38a9ff'}}).addTo(map);
+   const bounds=warningLayer.getBounds();if(changed&&autoFocus&&!savedView&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
+  }
  }else $('description').textContent+='\n\nNo NWS polygon supplied: location not guessed.';
 }
 $('radar').addEventListener('click',()=>{
@@ -202,7 +269,11 @@ $('radar').addEventListener('click',()=>{
  $('loop').setAttribute('aria-pressed',String(on&&radarMode==='mosaic'&&radar.isPlaying?.()));
 });
 $('loop').addEventListener('click',()=>{
- if(radarMode!=='mosaic')return;
+ if(radarMode==='site'){
+  if(sitePlaying)stopSite();
+  else startSite();
+  statusProduct();return;
+ }
  if(!radar.isShown()){radar.show(true);$('radar').setAttribute('aria-pressed','true');$('radar').textContent='Radar: ON'}
  const playing=radar.play?radar.play(!radar.isPlaying()):false;
  $('loop').setAttribute('aria-pressed',String(playing));
@@ -223,12 +294,29 @@ $('focus').addEventListener('click',()=>{
  if(selection?.manual&&selection.point)map.flyTo([selection.point.lat,selection.point.lon],9);
  else if(warningLayer&&warningLayer.getBounds().isValid())map.fitBounds(warningLayer.getBounds().pad(.6),{maxZoom:9});
 });
+function deskButtons(){
+ $('autoFocus').setAttribute('aria-pressed',String(autoFocus));
+ $('autoFocus').textContent='Auto-Focus: '+(autoFocus?'ON':'OFF');
+ $('warningOverlay').setAttribute('aria-pressed',String(showWarnings));
+ $('warningOverlay').textContent='NWS Outline: '+(showWarnings?'ON':'OFF');
+ $('radarOnly').setAttribute('aria-pressed',String(radarOnly));
+ $('radarOnly').textContent=radarOnly?'Show Analysis':'Radar Only';
+ document.body.classList.toggle('radarOnly',radarOnly);
+ setTimeout(()=>map.invalidateSize(),80);
+}
+deskButtons();
+$('autoFocus').addEventListener('click',()=>{autoFocus=!autoFocus;saveBool('auto-focus',autoFocus);deskButtons()});
+$('warningOverlay').addEventListener('click',()=>{showWarnings=!showWarnings;saveBool('warning-outline',showWarnings);paint(selection,feedOk);deskButtons()});
+$('radarOnly').addEventListener('click',()=>{radarOnly=!radarOnly;saveBool('radar-only',radarOnly);deskButtons()});
+$('fullScreen').addEventListener('click',()=>bridge?.toggleFullscreen?.());
 $('main').addEventListener('click',()=>bridge?.openPanel?.('map'));
 if(bridge?.onTrackedWarning)bridge.onTrackedWarning((n,item,feed)=>{if(n===slot)paint(item,feed)});
-setInterval(()=>{if(!document.hidden&&radar.isShown())radar.refresh()},300000);
+setInterval(()=>{if(!document.hidden&&radar.isShown()){
+ if(radarMode==='site')refreshLatestSite();else radar.refresh();
+}},120000);
 setInterval(()=>{if(selection&&NewsWireTracking.hasExpired(selection))paint(selection,feedOk)},60000);
 window.addEventListener('beforeunload',()=>{
- clearTimeout(viewportTimer);
+ clearTimeout(viewportTimer);stopSite();scanRequest++;
  radarComposite.dispose?.();
  radarLocal.dispose?.();
 });
