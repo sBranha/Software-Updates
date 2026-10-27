@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
   return ipcRenderer.invoke('newswire:radar-scans',site,product);
  },
  toggleFullscreen:()=>ipcRenderer.send('newswire:toggle-window-fullscreen'),
+ exitFullscreen:()=>ipcRenderer.send('newswire:exit-window-fullscreen'),
  requestTrack:(slot,id)=>{if([1,2,3,4].includes(slot)&&typeof id==='string')ipcRenderer.send('newswire:request-track',slot,id)},
  onRequestTrack:listener=>{if(typeof listener==='function')ipcRenderer.on('newswire:workspace-track-request',(_e,slot,id)=>listener(slot,id))},
  trackWarning:(slot,data)=>{if([1,2,3,4].includes(slot)&&data&&typeof data==='object')ipcRenderer.send('newswire:track-warning',slot,data)},
