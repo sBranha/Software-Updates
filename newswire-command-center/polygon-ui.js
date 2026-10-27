@@ -151,6 +151,7 @@ map.on('click',event=>{
  points.push(p);paint();buttons();
  setStatus('drawStatus',points.length+' corners selected. '+(points.length>=3?'Press Finish Shape to look up communities.':'Add more corners.'));
 });
-window.addEventListener('newswire:slot-changed',()=>{if(!drawing)clear()});
+// Keep a user's independently drawn polygon when the assigned NWS warning changes.
+// Clear only from the explicit Clear action, never when another monitor changes.
 buttons();restore();
 })();
