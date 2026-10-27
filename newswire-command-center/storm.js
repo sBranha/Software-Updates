@@ -111,6 +111,13 @@ $('satellite').addEventListener('click',()=>mapStyle('satellite'));
 $('streets').addEventListener('click',()=>mapStyle('streets'));
 $('terrain').addEventListener('click',()=>mapStyle('terrain'));
 $('streetView').addEventListener('click',toggleStreetPicking);
+$('googleMaps').addEventListener('click',()=>{
+ try{
+  const p=MV.mapCoordinates(map);
+  window.open(MV.googleMapUrl(p.lat,p.lng,map.getZoom(),mapMode),'_blank','noopener,noreferrer');
+  $('streetViewHint').textContent='Opened Google Maps at the current radar location in your browser. Radar remains visible in NewsWire.';
+ }catch(error){$('streetViewHint').textContent='Google Maps unavailable: '+error.message}
+});
 $('focus').addEventListener('click',()=>{
  if(selection?.manual&&selection.point)map.flyTo([selection.point.lat,selection.point.lon],9);
  else if(warningLayer&&warningLayer.getBounds().isValid())map.fitBounds(warningLayer.getBounds().pad(.6),{maxZoom:9});
