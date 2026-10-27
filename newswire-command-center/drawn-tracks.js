@@ -60,10 +60,8 @@ async function fetchPlaces(points,{fetchImpl,timeoutMs=23000}={}){
  for(const server of HOSTS){
   const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),timeoutMs);
   try{
-   // POST is supported by Overpass. Explicit content-type simplifies API responses.
-   const response=await fetcher(server,{method:'POST',body:'data='+encodeURIComponent(query),
-    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-    signal:ctl.signal,cache:'no-store'});
+   // Simple CORS GET avoids the file-origin preflight sometimes blocked in Electron.
+   const response=await fetcher(server+'?data='+encodeURIComponent(query),{signal:ctl.signal,cache:'no-store'});
    if(!response.ok)throw Error('Overpass HTTP '+response.status);
    return placeList(await response.json(),points);
   }catch(e){lastError=e}finally{clearTimeout(timer)}
