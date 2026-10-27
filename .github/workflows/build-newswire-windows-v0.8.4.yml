@@ -2,7 +2,7 @@ name: NewsWire v0.8.4 Windows EXE
 on:
   push:
     branches:
-      - newswire-radar-first-studio-v0.8.4
+      - newswire-storm-motion-v0.8.4
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-windows-v0.8.4.yml'
@@ -30,7 +30,7 @@ jobs:
         working-directory: newswire-command-center
         shell: bash
         run: |
-          for src in main.cjs preload.cjs storm.js app.js main-radar-desk.js studio-ui.js storm-motion.js site-radar.js radar-data/level2-volume.cjs; do
+          for src in main.cjs preload.cjs storm.js app.js main-radar-desk.js studio-ui.js storm-motion.js main-motion-ui.js site-radar.js radar-data/level2-volume.cjs; do
             node --check "$src"
           done
       - name: Run application tests
