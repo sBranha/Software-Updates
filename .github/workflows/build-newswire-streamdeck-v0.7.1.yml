@@ -1,7 +1,7 @@
-name: NewsWire v0.7.6 WINDOWS ONLY - Polygon Communities Lookup Fix
+name: NewsWire v0.7.7 WINDOWS ONLY - Polygon Communities Lookup Fix
 on:
   push:
-    branches: [newswire-windows-community-lookup-v0.7.6]
+    branches: [newswire-offline-communities-v0.7.7]
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
@@ -20,15 +20,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Prepare verified offline Census-based place database
+        shell: bash
+        run: node newswire-command-center/prepare-cities.cjs
+      - name: Verify bundled national city data
+        shell: bash
+        run: |
+          node -e "const d=require('./newswire-command-center/data/census-places-2025.json');if(d.length<17500||!d.some(x=>x.name==='Guntersville'&&x.state==='AL'))process.exit(1);console.log(d.length+' offline cities ready')"
       - name: Test polygon services and desktop modules
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/polygon-ui.js
           node --check newswire-command-center/communities-service.cjs
           node --check newswire-command-center/drawn-tracks.js
+          node --check newswire-command-center/offline-cities.cjs
+          node --check newswire-command-center/prepare-cities.cjs
       - name: Install desktop dependencies
         working-directory: newswire-command-center
         run: npm install --no-audit --no-fund
@@ -38,7 +47,7 @@ jobs:
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.6-Windows-only
+          name: NewsWire-v0.7.7-Windows-only
           path: newswire-command-center/dist/NewsWire-Command-Center-0.7.6-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 30
@@ -50,27 +59,27 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: newswire-v076-win-release
+      group: newswire-v077-win-release
       cancel-in-progress: true
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: NewsWire-v0.7.6-Windows-only
+          name: NewsWire-v0.7.7-Windows-only
           path: release-assets
       - name: Publish Windows installer (no Mac build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="newswire-v0.7.6-windows-preview"
+          TAG="newswire-v0.7.7-windows-preview"
           FILE="release-assets/NewsWire-Command-Center-0.7.6-Windows-Setup.exe"
           test -s "$FILE"
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-windows-community-lookup-v0.7.6" --jq '.object.sha')
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-offline-communities-v0.7.7" --jq '.object.sha')
           test "$GITHUB_SHA" = "$LATEST" || { echo "Superseded by a newer build; skipping publish"; exit 0; }
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire v0.7.6 - Windows ONLY - Community Polygon Lookup Repair' \
-              --notes 'Windows-only preview. Fixes drawn-polygon community lookup by making Overpass calls in the Electron main process rather than restricted file-origin JavaScript. Displays status near the top of the tracker and places as blue dots on the radar map; adds Retry Communities and clear error states. Free OpenStreetMap names are approximate and can be incomplete, and the source may be unreachable. Polygon is user-drawn, not an official warning or storm-arrival forecast. Automated source tests passed, but real API responses and the physical Windows UI have not been verified. UNSIGNED installer. Mac is on hold at user request; signed Android Play version unchanged.'
+              --title 'NewsWire v0.7.7 - Windows ONLY - Community Polygon Lookup Repair' \
+              --notes 'Windows-only v0.7.7 preview. Includes a built-in checksum-verified 2025 U.S. Census-based nationwide city-center dataset. Drawn polygons show towns whose representative centers fall inside the area even with NO network or Overpass servers. Nearby towns outside the polygon are labeled OUTSIDE and NOT assumed affected. More Communities (Online) optionally augments with OSM names but cannot erase offline results on HTTP 406 or DNS failure. Four radar tracker windows and animated radar maintained. Automated tests and Windows packaging passed; real interactive UI and live service behavior require on-machine validation. UNSIGNED installer. Mac development on hold; signed Android Play version unchanged.'
           fi
           for attempt in 1 2 3 4 5; do
             if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$FILE" --clobber; then break; fi
