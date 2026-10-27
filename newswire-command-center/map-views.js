@@ -50,10 +50,18 @@ function streetViewUrl(lat,lng){
  return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
   lat.toFixed(6)+'%2C'+lng.toFixed(6);
 }
+function googleMapUrl(lat,lng,zoom=12,mode='streets'){
+ if(!validPoint(lat,lng))throw Error('Google Maps needs a valid map location');
+ const z=Math.round(Number(zoom));
+ const safeZoom=Number.isFinite(z)?Math.min(21,Math.max(0,z)):12;
+ const basemap=mode==='satellite'?'satellite':mode==='terrain'?'terrain':'roadmap';
+ return 'https://www.google.com/maps/@?api=1&map_action=map&center='+
+  lat.toFixed(6)+'%2C'+lng.toFixed(6)+'&zoom='+safeZoom+'&basemap='+basemap;
+}
 function mapCoordinates(map){
  const p=map?.getCenter?.();
  if(!p||!validPoint(p.lat,p.lng))throw Error('Map coordinates unavailable');
  return {lat:p.lat,lng:p.lng};
 }
-return {STYLES,normalize,createLayer,validPoint,streetViewUrl,mapCoordinates};
+return {STYLES,normalize,createLayer,validPoint,streetViewUrl,googleMapUrl,mapCoordinates};
 });
