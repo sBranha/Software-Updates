@@ -218,10 +218,12 @@ $('siteLatest').addEventListener('click',()=>{stopSite();loadSiteScans();statusP
 map.createPane('warning');
 map.getPane('warning').style.zIndex=500;
 let warningLayer=null,selection=null,feedOk=false;
+let motionVisible=savedBool('motion-guide',false),motionLayer=L.layerGroup().addTo(map);
 let fixedMarker=null;
 function paint(item,feed){
  feedOk=Boolean(feed);
  const changed=!selection||selection.id!==item?.id;
+ motionLayer.clearLayers();
  // Warning changes never erase independent user-drawn polygon areas.
  selection=item;
  if(warningLayer){map.removeLayer(warningLayer);warningLayer=null}
@@ -252,6 +254,14 @@ function paint(item,feed){
   expired?'WARNING EXPIRED — select another active warning':'Monitoring selected official NWS warning area';
  $('expires').textContent=item.expires?new Date(item.expires).toLocaleString():'Not stated';
  const motion=NewsWireTracking.parseMotion(item.description);
+ const guide=window.NewsWireStormMotion?.bulletinGuide(item);
+ if(motionVisible&&guide&&feedOk&&!expired){
+  L.polyline([[guide.start.lat,guide.start.lng],[guide.end.lat,guide.end.lng]],{
+   color:'#c99bff',weight:3,dashArray:'8 7'}).addTo(motionLayer)
+   .bindTooltip('NWS bulletin direction FROM WARNING CENTROID · NOT a radar-tracked storm');
+  L.circleMarker([guide.start.lat,guide.start.lng],{radius:5,color:'#d5adff',fillOpacity:.7})
+   .addTo(motionLayer).bindTooltip('Warning centroid, NOT a tornado position');
+ }
  $('motion').textContent=motion?motion.direction+' at '+motion.mph+' mph (NWS bulletin)':'Not reported in bulletin; no track projected';
  $('description').textContent=item.headline+'\n\n'+(item.instruction||'Consult the official NWS bulletin for safety directions.');
  try{const u=new URL(item.url);$('official').href=u.protocol==='https:'&&['api.weather.gov','www.weather.gov'].includes(u.hostname)?u.toString():'https://www.weather.gov/alerts'}catch(_){$('official').href='https://www.weather.gov/alerts'}
@@ -298,6 +308,8 @@ function deskButtons(){
  $('autoFocus').setAttribute('aria-pressed',String(autoFocus));
  $('autoFocus').textContent='Auto-Focus: '+(autoFocus?'ON':'OFF');
  $('warningOverlay').setAttribute('aria-pressed',String(showWarnings));
+ $('motionGuideToggle').setAttribute('aria-pressed',String(motionVisible));
+ $('motionGuideToggle').textContent='NWS Direction Guide: '+(motionVisible?'ON':'OFF');
  $('warningOverlay').textContent='NWS Outline: '+(showWarnings?'ON':'OFF');
  $('radarOnly').setAttribute('aria-pressed',String(radarOnly));
  $('radarOnly').textContent=radarOnly?'Show Analysis':'Radar Only';
@@ -307,6 +319,7 @@ function deskButtons(){
 deskButtons();
 $('autoFocus').addEventListener('click',()=>{autoFocus=!autoFocus;saveBool('auto-focus',autoFocus);deskButtons()});
 $('warningOverlay').addEventListener('click',()=>{showWarnings=!showWarnings;saveBool('warning-outline',showWarnings);paint(selection,feedOk);deskButtons()});
+$('motionGuideToggle').addEventListener('click',()=>{motionVisible=!motionVisible;saveBool('motion-guide',motionVisible);paint(selection,feedOk);deskButtons()});
 $('radarOnly').addEventListener('click',()=>{radarOnly=!radarOnly;saveBool('radar-only',radarOnly);deskButtons()});
 $('fullScreen').addEventListener('click',()=>bridge?.toggleFullscreen?.());
 $('main').addEventListener('click',()=>bridge?.openPanel?.('map'));
