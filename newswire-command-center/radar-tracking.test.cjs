@@ -44,8 +44,8 @@ test('four independent warning windows, separate position persistence and all IP
  assert.match(source['main.cjs'],/newswire-window-layout.json/);
  assert.match(source['preload.cjs'],/onTrackedWarning/);
  assert.match(source['app.js'],/Track '\+slot/);
- assert.match(source['app.js'],/NewsWireRadar\.createRadar/);
- assert.match(source['storm.js'],/NewsWireRadar\.createRadar/);
+ assert.match(source['app.js'],/NewsWireRadarLoop\|\|NewsWireRadar/);
+ assert.match(source['storm.js'],/NewsWireRadarLoop\|\|NewsWireRadar/);
  assert.match(source['storm.js'],/NewsWireTracking\.parseMotion/);
  assert.match(source['desktop-concept3.html'],/id="radarToggle"/);
  assert.match(source['desktop-concept3.html'],/data-open-panel="storm-1"/);
