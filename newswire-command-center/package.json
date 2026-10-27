@@ -6,7 +6,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs",
+    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs radar-data/scan-service.test.cjs",
     "package:windows": "electron-builder --win nsis --x64 --publish never",
     "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
@@ -51,7 +51,8 @@
       "data/census-places-2025.json",
       "map-views.js",
       "site-radar.js",
-      "radar-data/level2-volume.cjs"
+      "radar-data/level2-volume.cjs",
+      "radar-data/scan-service.cjs"
     ],
     "asar": true,
     "win": {
