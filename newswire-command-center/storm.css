@@ -43,3 +43,13 @@
 .studioRadarBar select:disabled,.studioRadarBar button:disabled{opacity:.48}
 .studioRadarInfo{font-size:11px;color:#d3e7f4;flex:1 1 220px;text-align:right}
 @media(max-width:850px){.studioRadarBar{gap:4px}.studioRadarBar select{max-width:150px}.studioRadarInfo{flex-basis:100%;text-align:left}}
+
+/* Meteorologist workstation: per-window fullscreen and scan timeline. */
+body.radarOnly .layout{grid-template-columns:minmax(0,1fr)}
+body.radarOnly aside,body.radarOnly .notice,body.radarOnly footer{display:none}
+body.radarOnly .stormMapCol{min-height:0}
+#autoFocus[aria-pressed="true"],#warningOverlay[aria-pressed="true"]{background:#075e88;border-color:#7bdcff}
+#radarOnly[aria-pressed="true"]{background:#654d25;border-color:#f5bd53}
+#siteScanTime{font-size:11px;color:#eddb9e;min-width:195px}
+#sitePrev,#siteNext,#siteLatest{border-color:#6890aa;background:#1a4966}
+#sitePrev:disabled,#siteNext:disabled{opacity:.35}
