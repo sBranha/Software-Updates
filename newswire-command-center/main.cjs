@@ -62,8 +62,8 @@ function sendTracked(slot){
  const win=views.get('storm-'+slot);
  if(!win||win.isDestroyed()||win.webContents.isLoading())return;
  // Feed errors and disappeared warnings are not shown as live tracked storms.
- const found=tracked[slot]&&latest?.warnings?.some(a=>a.id===tracked[slot].id);
- win.webContents.send('newswire:tracked-warning',slot,tracked[slot],Boolean(latest?.feedOk&&found));
+ const found=tracked[slot]?.manual===true || (tracked[slot]&&latest?.warnings?.some(a=>a.id===tracked[slot].id));
+ win.webContents.send('newswire:tracked-warning',slot,tracked[slot],Boolean(tracked[slot]?.manual||latest?.feedOk&&found));
 }
 function setDisplay(type,index){
  const win=newWindow(type);
@@ -158,7 +158,7 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:track-warning',(event,slot,raw)=>{
   if(event.sender!==views.get('map')?.webContents||![1,2].includes(slot))return;
   const item=T.safeWarning(raw);
-  if(!item||!latest?.feedOk||!latest.warnings.some(x=>x.id===item.id)||T.hasExpired(item))return;
+  if(!item||(!item.manual&&(!latest?.feedOk||!latest.warnings.some(x=>x.id===item.id)||T.hasExpired(item))))return;
   tracked[slot]=item;
   newWindow('storm-'+slot);
   sendTracked(slot);
