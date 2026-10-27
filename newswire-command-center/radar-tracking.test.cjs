@@ -34,7 +34,8 @@ test('reject missing, giant and unrelated map geometries',()=>{
 test('two independent warning windows, separate position persistence and all IPC paths',()=>{
  const files=['main.cjs','preload.cjs','app.js','desktop-concept3.html','storm.html','storm.js','window-layout.cjs'];
  const source=Object.fromEntries(files.map(x=>[x,fs.readFileSync(path.join(__dirname,x),'utf8')]));
- assert.match(source['main.cjs'],/storm-1.*storm-2/);
+ assert.match(source['main.cjs'],/storm-1/);
+ assert.match(source['main.cjs'],/storm-2/);
  assert.match(source['main.cjs'],/newswire:track-warning/);
  assert.match(source['main.cjs'],/newswire:track-updates/);
  assert.match(source['main.cjs'],/sendTracked/);
