@@ -152,6 +152,12 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:arrange-panels',event=>{
   if(isTrusted(event.sender))arrange();
  });
+ ipcMain.on('newswire:toggle-window-fullscreen',event=>{
+  if(!isTrusted(event.sender))return;
+  const owner=BrowserWindow.fromWebContents(event.sender);
+  if(!owner||owner.isDestroyed()||![1,2,3,4].some(slot=>views.get('storm-'+slot)===owner))return;
+  owner.setFullScreen(!owner.isFullScreen());
+ });
  ipcMain.on('newswire:workspace-state',(event,s)=>{
   if(!isTrusted(event.sender)||views.get('map')?.webContents!==event.sender||!s||typeof s!=='object')return;
   // Send bounded display data only; never broadcast exact GPS coordinates.
