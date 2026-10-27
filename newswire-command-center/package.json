@@ -57,7 +57,8 @@
       "velocity-couplet.js",
       "main-radar-desk.js",
       "studio-ui.js",
-      "storm-motion.js"
+      "storm-motion.js",
+      "main-motion-ui.js"
     ],
     "asar": true,
     "win": {
