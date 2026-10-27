@@ -32,6 +32,11 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
  let radarOn=safeGet('radar')!=='false';
  let drawing=false,points=[],area=null,pointsLayer=null,communityLayer=null,lookupToken=0,lookupWorking=false;
  let picking=false,gates=[],gateLayer=null;
+ const motionUI=window.NewsWireMotionUI?.init({L,map,
+  snapshot:()=>({mode,site,product,frames:siteFrames,index:frameIndex}),
+  stopLoop:cancelTimer,
+  onInteraction:()=>{drawing=false;picking=false;onInteraction?.();buttons()}
+ });
  const siteRadar=R().createSiteRadar(L,map,s=>{
   if(mode==='site'){const feed=$('radarFeed');if(feed)feed.textContent=s;
    const state=$('mainRadarState');if(state)state.textContent=s}
@@ -114,6 +119,7 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
   if(!R().siteFor(radarID)||!R().productFor(productID))return;
   const keepOn=radarOn;
   active.show(false);stopSite();siteFrames=[];frameIndex=-1;
+  motionUI?.reset();
   mode=next==='site'?'site':'mosaic';site=radarID;product=productID;
   active=mode==='site'?siteRadar:composite;
   if(mode==='site')siteRadar.select(site,product);
@@ -234,6 +240,7 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
   }catch(error){update('mainVelocityResult',String(error.message||error))}
  }
  function consumeClick(event){
+  if(motionUI?.consumeClick(event))return true;
   if(drawing){
    const p={lat:event.latlng.lat,lng:event.latlng.lng};
    if(points.length<40&&D().validPoint(p)){points.push(p);paintPolygon();buttons();
