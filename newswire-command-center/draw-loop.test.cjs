@@ -57,6 +57,6 @@ test('desktop resources include documented polygons and extra tracking windows',
  assert.match(storm,/polygon-ui.js/);assert.match(storm,/radar-loop.js/);
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
  for(const n of [1,2,3,4])assert.match(main,new RegExp("storm-"+n));
- assert.equal(pkg.version,'0.8.0');
+ assert.equal(pkg.version,'0.8.1');
  for(const file of ['polygon-ui.js','radar-loop.js','drawn-tracks.js','storm.js','app.js'])new Function(fs.readFileSync(path.join(__dirname,file),'utf8'));
 });
