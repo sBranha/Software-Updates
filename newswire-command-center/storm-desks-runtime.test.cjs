@@ -59,7 +59,7 @@ function createDesk(slot,sharedStorage){
  };
  vm.runInNewContext(source('storm.js'),context,{filename:'storm.js'});
  vm.runInNewContext(source('polygon-ui.js'),context,{filename:'polygon-ui.js'});
- return {slot,map,el,click:id=>{assert.ok(listeners[id+':click'],'Missing '+id);listeners[id+':click]()},
+ return {slot,map,el,click:id=>{assert.ok(listeners[id+':click'],'Missing '+id);listeners[id+':click']()},
   drawPolygon(points){
    listeners['draw:click']();
    for(const p of points)map.emit('click',{latlng:p});
