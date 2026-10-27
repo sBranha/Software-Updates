@@ -86,7 +86,7 @@ test('clicking Georgia/NWS site pin enables radar velocity in the same map',asyn
 });
 test('main warning selection uses nearby site and never opens storm 1-4',async()=>{
  const t=launch();
- t.desk.analyzeWarning({center:{lat:33.5,lon:-84.5}});
+ t.desk.analyzeWarning({center:[33.5,-84.5]});
  await new Promise(r=>setImmediate(r));
  assert.equal(t.desk.getSite(),'KFFC');
  t.click('mainWarningToggle');
