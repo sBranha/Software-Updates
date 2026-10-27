@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const TYPES = Object.freeze(['map','local','warnings']);
+const TYPES = Object.freeze(['map','local','warnings','storm-1','storm-2']);
 function validType(type) { return TYPES.includes(type); }
 function sortedDisplays(displays) {
   return [...displays].sort((a,b)=>a.workArea.x-b.workArea.x || a.workArea.y-b.workArea.y);
