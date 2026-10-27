@@ -12,7 +12,21 @@ const tracked={1:null,2:null,3:null,4:null};
 let bridge,layoutFile,layout={},latest=null;
 let saveTimer=null;
 function external(url){
- try{const u=new URL(url);if(u.protocol==='https:'&&SAFE_LINKS.has(u.hostname))shell.openExternal(u.toString())}catch(_){}
+ try{
+  const u=new URL(url);
+  if(u.protocol!=='https:')return;
+  if(SAFE_LINKS.has(u.hostname)){shell.openExternal(u.toString());return}
+  // Google Street View outbound links only; no arbitrary external Google URLs.
+  if(u.hostname==='www.google.com'&&u.pathname==='/maps/@'&&
+      u.searchParams.get('api')==='1'&&u.searchParams.get('map_action')==='pano'){
+   const p=u.searchParams.get('viewpoint')||'';
+   const coords=p.split(',').map(Number);
+   if(coords.length===2&&Number.isFinite(coords[0])&&Number.isFinite(coords[1])&&
+      Math.abs(coords[0])<=90&&Math.abs(coords[1])<=180){
+    shell.openExternal(u.toString());
+   }
+  }
+ }catch(_){}
 }
 function isTrusted(sender){return [...views.values()].some(win=>!win.isDestroyed()&&win.webContents===sender)}
 function savePositions(){
