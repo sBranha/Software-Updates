@@ -6,7 +6,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs radar-data/scan-service.test.cjs",
+    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs radar-data/scan-service.test.cjs velocity-couplet.test.cjs",
     "package:windows": "electron-builder --win nsis --x64 --publish never",
     "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
@@ -52,7 +52,9 @@
       "map-views.js",
       "site-radar.js",
       "radar-data/level2-volume.cjs",
-      "radar-data/scan-service.cjs"
+      "radar-data/scan-service.cjs",
+      "rotation-tool.js",
+      "velocity-couplet.js"
     ],
     "asar": true,
     "win": {
