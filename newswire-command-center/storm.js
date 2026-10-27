@@ -14,15 +14,30 @@ radar.show(true);
 map.createPane('warning');
 map.getPane('warning').style.zIndex=500;
 let warningLayer=null,selection=null,feedOk=false;
+let fixedMarker=null;
 function paint(item,feed){
  feedOk=Boolean(feed);
+ const changed=!selection||selection.id!==item?.id;
  selection=item;
  if(warningLayer){map.removeLayer(warningLayer);warningLayer=null}
+ if(fixedMarker){map.removeLayer(fixedMarker);fixedMarker=null}
  if(!item){
   $('status').className='status';
   $('status').textContent='No warning assigned. Choose Track 1 or Track 2 from the main command center warning list.';
   $('area').textContent='No storm selected';
   $('expires').textContent='—';$('motion').textContent='Not available';$('description').textContent='Waiting for an official NWS warning selection.';
+  return;
+ }
+ if(item.manual&&item.point){
+  $('area').textContent='Manual Radar Watch '+slot;
+  $('status').className='status live';
+  $('status').textContent='FIXED RADAR WATCH — NOT AUTOMATIC STORM MOVEMENT TRACKING';
+  $('expires').textContent='Not applicable';
+  $('motion').textContent='No movement inferred from radar';
+  $('description').textContent='Manually selected radar viewing point at '+item.point.lat.toFixed(3)+', '+item.point.lon.toFixed(3)+'. Radar images refresh; this marker stays fixed and must be repositioned manually as the storm moves.';
+  $('official').href='https://radar.weather.gov/';
+  fixedMarker=L.circleMarker([item.point.lat,item.point.lon],{radius:8,color:slot===1?'#ff3455':'#56dbff',weight:3,fillOpacity:.8}).addTo(map);
+  if(changed)map.setView([item.point.lat,item.point.lon],9);
   return;
  }
  $('area').textContent=item.area;
@@ -38,7 +53,7 @@ function paint(item,feed){
  if(NewsWireTracking.validGeometry(item.geometry)){
   const geo={type:'Feature',geometry:item.geometry,properties:{}};
   warningLayer=L.geoJSON(geo,{pane:'warning',style:{color:slot===1?'#ff3b5c':'#50d9ff',weight:4,fillOpacity:.12,fillColor:slot===1?'#ff2944':'#38a9ff'}}).addTo(map);
-  const bounds=warningLayer.getBounds();if(bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
+  const bounds=warningLayer.getBounds();if(changed&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
  }else $('description').textContent+='\n\nNo NWS polygon supplied: location not guessed.';
 }
 $('radar').addEventListener('click',()=>{$('radar').setAttribute('aria-pressed',String(radar.show(!radar.isShown())));$('radar').textContent='Radar: '+(radar.isShown()?'ON':'OFF')});
@@ -46,7 +61,10 @@ $('satellite').addEventListener('click',()=>{
  const on=map.hasLayer(base);if(on)map.removeLayer(base);else base.addTo(map).bringToBack();
  $('satellite').setAttribute('aria-pressed',String(!on));$('satellite').textContent='Satellite: '+(!on?'ON':'OFF');
 });
-$('focus').addEventListener('click',()=>{if(warningLayer&&warningLayer.getBounds().isValid())map.fitBounds(warningLayer.getBounds().pad(.6),{maxZoom:9})});
+$('focus').addEventListener('click',()=>{
+ if(selection?.manual&&selection.point)map.flyTo([selection.point.lat,selection.point.lon],9);
+ else if(warningLayer&&warningLayer.getBounds().isValid())map.fitBounds(warningLayer.getBounds().pad(.6),{maxZoom:9});
+});
 $('main').addEventListener('click',()=>bridge?.openPanel?.('map'));
 if(bridge?.onTrackedWarning)bridge.onTrackedWarning((n,item,feed)=>{if(n===slot)paint(item,feed)});
 setInterval(()=>{if(!document.hidden)radar.refresh()},300000);
