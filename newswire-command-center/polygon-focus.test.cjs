@@ -52,10 +52,10 @@ test('offline results remain while optional online expansion is pending',()=>{
  assert.doesNotMatch(js,/setStatus\('drawStatus','Offline data loaded\. Optional online expansion failed:/);
  assert.match(js,/Extra online neighborhoods are unavailable right now/);
 });
-test('Windows-only release includes new focus control and v0.8.3 artifact',()=>{
+test('Windows-only release includes new focus control and v0.8.4 artifact',()=>{
  const html=fs.readFileSync(path.join(__dirname,'storm.html'),'utf8');
  assert.match(html,/id="focusArea"/);
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.3');
+ assert.equal(pkg.version,'0.8.4');
  assert.match(pkg.build.win.artifactName,/0\.8\.3/);
 });
