@@ -20,6 +20,7 @@ function redraw(){
  $('rotationPick').textContent=picking?'Cancel Selection':'Select Two Radar Points';
  $('rotationPicked').textContent=positions.length+' of 2 points selected in Storm Desk '+slot;
 }
+window.NWVelocityCancel=()=>{picking=false;redraw()};
 function persist(){
  try{localStorage.setItem(saveKey,JSON.stringify({positions,a:$('rotationA').value,b:$('rotationB').value}))}catch(_){}
 }
