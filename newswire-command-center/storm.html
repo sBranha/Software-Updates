@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NewsWire — Radar Watch & Polygon Track</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="storm.css"></head>
 <body>
-<header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / LIVE RADAR + USER-DRAWN STORM AREAS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="loop" aria-pressed="true">▶ Radar Loop</button><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite</button><button id="streets" aria-pressed="false">Streets</button><button id="terrain" aria-pressed="false">Terrain</button><button id="streetView" aria-pressed="false">Street View ↗</button><button id="googleMaps">Google Maps ↗</button><button id="focus">⌖ Focus Warning</button><button id="main">Open Main Desk</button></div></header>
-<section class="notice"><strong>Official NWS warning tracking, not a detected tornado.</strong> The shaded polygon is the issued warning area; it does not mark the storm's precise position or predicted path.</section>
+<header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / LIVE RADAR + USER-DRAWN STORM AREAS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="loop" aria-pressed="true">▶ Radar Loop</button><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite</button><button id="streets" aria-pressed="false">Streets</button><button id="terrain" aria-pressed="false">Terrain</button><button id="streetView" aria-pressed="false">Street View ↗</button><button id="googleMaps">Google Maps ↗</button><button id="focus">⌖ Focus Warning</button><button id="warningOverlay" aria-pressed="true">NWS Outline: ON</button><button id="autoFocus" aria-pressed="true">Auto-Focus: ON</button><button id="radarOnly" aria-pressed="false">Radar Only</button><button id="fullScreen">⛶ Full Screen</button><button id="main">Open Main Desk</button></div></header>
+<section class="notice"><strong>Each window has its own radar site, product, animation, saved storm area and monitor layout.</strong> Official NWS warning tracking, not a detected tornado. The shaded polygon is the issued warning area; it does not mark the storm's precise position or predicted path.</section>
 <div class="studioRadarBar" role="group" aria-label="Independent radar site and product controls">
  <label for="radarSource">RADAR SOURCE</label>
  <select id="radarSource" title="Choose nationwide mosaic or a single NEXRAD station"><option value="mosaic">Nationwide composite loop</option><option value="site">Single NWS radar station</option></select>
@@ -12,6 +12,10 @@
  <button id="centerSite" type="button" title="Center this radar window on the selected NEXRAD station">⌖ Go To Site</button>
  <label for="radarProduct">PRODUCT</label>
  <select id="radarProduct" title="Select single-site reflectivity or Doppler velocity product"></select>
+ <button id="sitePrev" type="button" title="Previous observed radar scan" disabled>◀ Prev</button>
+ <button id="siteNext" type="button" title="Next observed radar scan" disabled>Next ▶</button>
+ <button id="siteLatest" type="button" title="Fetch the latest radar scan">↻ Latest</button>
+ <span id="siteScanTime" role="status">Scan UTC: waiting for feed</span>
  <span id="siteProductStatus" class="studioRadarInfo" role="status">Select a radar site marker or a site from the menu to see its products.</span>
 </div>
 <div class="layout"><section class="stormMapCol"><div id="map" aria-label="Tracked warning boundary with live NEXRAD radar mosaic"></div><div class="streetViewHint" id="streetViewHint">Pan or zoom to a location, then choose Street View and click the map.</div></section><aside>
