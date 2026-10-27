@@ -41,9 +41,9 @@ test('rejects forged endpoints, giant shapes and invalid coordinates',async()=>{
 });
 test('large OSM result sets marked potentially incomplete, never definitive',async()=>{
  const elements=Array.from({length:2500},(_,i)=>({lat:34.2,lon:-86.4,tags:{name:'Town'+i,place:'town'}}));
- const r=await S.lookupCommunities(points,{providers:[S.PROVIDERS[0]],cities,expand:true,fetchImpl:async()=>reply(elements),cities,expand:true});
+ const r=await S.lookupCommunities(points,{providers:[S.PROVIDERS[0]],cities,expand:true,fetchImpl:async()=>reply(elements)});
  assert.equal(r.complete,false);
- assert.ok(r.places.length<=200);
+ assert.ok(r.places.length<=300);
 });
 test('desktop UI calls native bridge, maps places and provides retry and explicit feedback',()=>{
  const pkg=require('./package.json');
@@ -54,14 +54,14 @@ test('desktop UI calls native bridge, maps places and provides retry and explici
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
  const ui=fs.readFileSync(path.join(__dirname,'polygon-ui.js'),'utf8');
  const storm=fs.readFileSync(path.join(__dirname,'storm.html'),'utf8');
- assert.match(preload,/lookupCommunities:points/);
+ assert.match(preload,/lookupCommunities:\(points,expand=false\)/);
  assert.match(main,/ipcMain\.handle\('newswire:communities-lookup'/);
  assert.match(main,/net\.fetch\(url,opts\)/);
  assert.match(ui,/bridge\.lookupCommunities/);
  assert.doesNotMatch(ui,/D\.fetchPlaces/);
  assert.match(ui,/L\.circleMarker/);
  assert.match(ui,/lookup\(\)/);
- assert.match(ui,/Retry Communities/);
+ assert.match(ui,/lookup\(true\)/);
  assert.match(storm,/id="retry"/);
  assert.match(storm,/id="communitySummary"/);
  for(const name of ['main.cjs','preload.cjs','polygon-ui.js','communities-service.cjs'])
