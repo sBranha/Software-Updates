@@ -50,7 +50,7 @@ test('package includes offline database and source generation script; Windows re
  assert.ok(pkg.build.files.includes('data/census-places-2025.json'));
  assert.ok(pkg.build.files.includes('offline-cities.cjs'));
  const workflow=fs.readFileSync(path.join(__dirname,'..','.github','workflows','build-newswire-streamdeck-v0.7.1.yml'),'utf8');
- assert.match(workflow,/node prepare-cities\.cjs/);
+ assert.match(workflow,/node newswire-command-center\/prepare-cities\.cjs/);
  assert.match(workflow,/windows-latest/);
  assert.doesNotMatch(workflow,/macos-latest/);
  const ui=fs.readFileSync(path.join(__dirname,'polygon-ui.js'),'utf8');
