@@ -66,3 +66,15 @@ a.tab:hover{text-decoration:none;background:#195681}.tab.current,.tab[aria-press
 @media(max-width:900px){body{overflow:auto;height:auto;min-height:100%}.masthead{height:auto;min-height:68px;flex-wrap:wrap}.brand{width:auto}.primaryNav{order:3;width:100%;flex:none;overflow:auto}.controlStrip{flex-wrap:wrap}.shell{display:grid;grid-template-columns:1fr}.leftPanel{display:none}.centerPanel{height:57vh;min-height:400px}.rightPanel{height:55vh}.dashboardStrip{grid-template-columns:repeat(2,minmax(0,1fr));height:auto}.miniPanel{min-height:105px}.disclaimer{white-space:normal;height:auto}}
 
 .controlStrip.emphasis{box-shadow:inset 0 0 0 2px #51c9ff,0 0 20px #1b95d877}
+
+/* Live radar + independent storm-tracker controls, matching screenshot #3 */
+#radarToggle[aria-pressed="true"]{background:#0965b1;border-color:#70d4ff;box-shadow:0 0 12px #006ed86e}
+.trackControls{display:flex;gap:5px;padding:0 7px 8px;background:#102a42}
+.trackControls button{flex:1;font-size:10px;border-radius:5px;background:#11517c;border-color:#286c9d;padding:5px 6px}
+.trackControls button:last-child{background:#17425c;border-color:#3da7d8}
+.warningGroup{background:#102a42;border:1px solid #265474;border-radius:6px;margin-bottom:6px}
+.warningGroup .warning{margin:0!important;border:0!important;border-left:3px solid #ff3a5b!important;border-radius:0!important}
+.dualPanel{cursor:default}.dualButtons{display:flex;gap:5px;margin-top:auto}
+.dualButtons button{flex:1;padding:5px 9px;font-size:11px;border-radius:5px;border:1px solid #3f94ca;background:#15507b}
+#radarFeed{color:#7bcaff;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%}
+@media(max-width:1200px){#radarFeed{max-width:30%}.dualButtons button{font-size:10px}}
