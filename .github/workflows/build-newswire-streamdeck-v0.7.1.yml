@@ -30,7 +30,7 @@ jobs:
       - name: Test polygon services and desktop modules
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs newswire-command-center/studio-map.test.cjs newswire-command-center/independent-desks.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs newswire-command-center/studio-map.test.cjs newswire-command-center/independent-desks.test.cjs newswire-command-center/storm-desks-runtime.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/polygon-ui.js
