@@ -6,10 +6,10 @@
  function click(id){const button=$(id);if(button)button.click()}
  function openPanel(view){if(bridge&&typeof bridge.openPanel==='function')bridge.openPanel(view);}
  $('nav-map')?.addEventListener('click',()=>click('country'));
- $('navWarnings')?.addEventListener('click',()=>openPanel('warnings'));
+ $('navWarnings')?.addEventListener('click',()=>{$('list')?.scrollIntoView?.({block:'nearest',behavior:'smooth'});$('list')?.focus?.()});
  $('nav-home')?.addEventListener('click',()=>click('home'));
  $('nav-country')?.addEventListener('click',()=>click('country'));
- $('warningBanner')?.addEventListener('click',()=>openPanel('warnings'));
+ $('warningBanner')?.addEventListener('click',()=>{$('list')?.scrollIntoView?.({block:'nearest',behavior:'smooth'});$('list')?.focus?.()});
  $('settings')?.addEventListener('click',()=>{
   const bar=$('controls');bar?.classList.add('emphasis');
   bar?.scrollIntoView?.({block:'nearest',behavior:'smooth'});
