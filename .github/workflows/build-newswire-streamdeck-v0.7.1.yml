@@ -1,7 +1,7 @@
-name: NewsWire v0.7.8 WINDOWS ONLY - Focus Drawn Polygon + Clean Optional Lookup
+name: NewsWire v0.7.9 WINDOWS ONLY - Meteorologist Studio Map Modes and Google Maps Links
 on:
   push:
-    branches: [newswire-windows-polygon-focus-v0.7.8]
+    branches: [newswire-windows-studio-maps-v0.7.9]
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
@@ -30,7 +30,7 @@ jobs:
       - name: Test polygon services and desktop modules
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs newswire-command-center/studio-map.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/polygon-ui.js
@@ -38,6 +38,9 @@ jobs:
           node --check newswire-command-center/drawn-tracks.js
           node --check newswire-command-center/offline-cities.cjs
           node --check newswire-command-center/prepare-cities.cjs
+          node --check newswire-command-center/map-views.js
+          node --check newswire-command-center/storm.js
+          node --check newswire-command-center/app.js
           node --check newswire-command-center/polygon-ui.js
       - name: Install desktop dependencies
         working-directory: newswire-command-center
@@ -48,8 +51,8 @@ jobs:
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.8-Windows-only
-          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.8-Windows-Setup.exe
+          name: NewsWire-v0.7.9-Windows-only
+          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.9-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 30
   release-windows:
@@ -60,27 +63,27 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: newswire-v078-win-release
+      group: newswire-v079-win-release
       cancel-in-progress: true
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: NewsWire-v0.7.8-Windows-only
+          name: NewsWire-v0.7.9-Windows-only
           path: release-assets
       - name: Publish Windows installer (no Mac build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="newswire-v0.7.8-windows-preview"
-          FILE="release-assets/NewsWire-Command-Center-0.7.8-Windows-Setup.exe"
+          TAG="newswire-v0.7.9-windows-preview"
+          FILE="release-assets/NewsWire-Command-Center-0.7.9-Windows-Setup.exe"
           test -s "$FILE"
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-windows-polygon-focus-v0.7.8" --jq '.object.sha')
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-windows-studio-maps-v0.7.9" --jq '.object.sha')
           test "$GITHUB_SHA" = "$LATEST" || { echo "Superseded by a newer build; skipping publish"; exit 0; }
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire v0.7.8 - WINDOWS ONLY - Focus My Polygon and Community Display' \
-              --notes 'Windows-only v0.7.8 preview. Preserves existing confirmed offline 2025 Census-based towns and blue markers. User polygons are auto-focused when drawn or restored; added Focus My Polygon button. Optional online neighborhood lookup retains offline markers and shows a concise status when Overpass providers fail. Automated code tests and Windows CI packaging are required before release; physical Windows UI and live API behavior remain unverified. These polygon outlines are user estimates, not official NWS storm paths. UNSIGNED Windows installer. Mac builds remain paused and signed Android Play version unchanged.'
+              --title 'NewsWire v0.7.9 - WINDOWS ONLY - Studio Maps, Google Maps and Street View' \
+              --notes 'Windows-only v0.7.9 preview. Added Satellite, Streets and Terrain base-map controls to the main desktop and all four popout radar trackers. Satellite remains the default. Radar and NWS warning outlines remain independent of the base map. Added Google Maps link at current map center and click-to-open Google Street View panorama in external browser via official no-key Maps URLs. Fully embedded Google Maps is NOT provided and would require a Google Maps Platform API key and billing; no billable Google key is distributed. Offline U.S. Census city list and user polygons remain intact. Builds and automated tests pass; physical Windows UI and live tile delivery remain unverified. UNSIGNED Windows installer. Mac builds paused at user request; Android Play build unchanged.'
           fi
           for attempt in 1 2 3 4 5; do
             if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$FILE" --clobber; then break; fi
