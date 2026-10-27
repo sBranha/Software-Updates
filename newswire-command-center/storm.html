@@ -26,6 +26,15 @@
 <div class="data"><span>NWS-MENTIONED MOTION</span><b id="motion">Not available</b></div>
 <div class="data"><span>RADAR SOURCE</span><b id="radarState">Connecting to IEM / NWS NEXRAD…</b></div>
 <div class="description" id="description">Each monitor has its own radar site, product and polygon drawing. Choose KHTX (Hytop) or click a radar marker on the map.</div>
+<div class="rotationTools">
+ <h3>Velocity Couplet — Operator Worksheet</h3>
+ <p>Switch to <b>Storm-Relative Velocity (N0S)</b> and select two gates. Enter independently read signed radial velocities below. This computes a two-point shear estimate; it does not decode pixels or automatically detect a tornado.</p>
+ <div class="rotationActions"><button id="rotationPick">Select Two Radar Points</button><button id="rotationCalc">Calculate Shear</button><button id="rotationClear">Clear</button></div>
+ <div class="rotationActions"><label>Gate A velocity (mph)<input id="rotationA" type="number" step="0.1" min="-250" max="250" placeholder="-35"></label>
+ <label>Gate B velocity (mph)<input id="rotationB" type="number" step="0.1" min="-250" max="250" placeholder="+35"></label></div>
+ <div id="rotationPicked">0 of 2 points selected</div>
+ <div id="rotationResult" role="status">No estimate. Measurements must be entered manually; this is not a tornado warning.</div>
+</div>
 <div class="polygonTools">
 <h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to find mapped cities, towns, and neighborhoods inside the polygon. Built-in Census towns show immediately, with blue map markers. For additional local neighborhoods, use More Communities (Online); this service may be unavailable.</p>
 <div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button><button id="focusArea" type="button" disabled>◎ Focus My Polygon</button><button id="retry" type="button" disabled>↻ More Communities (Online)</button></div>
@@ -38,5 +47,5 @@
 <a id="official" href="https://www.weather.gov/alerts" rel="noopener noreferrer" target="_blank">View official NWS alert ↗</a>
 </aside></div>
 <footer>Official NWS alert data may be delayed or unavailable. Tracking follows a warning area, not a live radar-derived storm cell. Movement is shown only when stated in the NWS bulletin. Keep Wireless Emergency Alerts enabled.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="site-radar.js"></script><script src="tracking-engine.js"></script><script src="drawn-tracks.js"></script><script src="storm.js"></script><script src="polygon-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="site-radar.js"></script><script src="tracking-engine.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="storm.js"></script><script src="polygon-ui.js"></script><script src="rotation-tool.js"></script>
 </body></html>
