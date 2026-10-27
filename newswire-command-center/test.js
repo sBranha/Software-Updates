@@ -99,6 +99,7 @@ test('image-three desktop dashboard is the active Electron window and preserves 
  for(const source of ['desktop-concept3.html','concept3.css','concept3-ui.js'])
   assert.ok(pkg.build.files.includes(source),source);
  assert.match(css,/grid-template-columns:210px/);
- assert.match(html,/NO VELOCITY/);
+ assert.match(html,/REFLECTIVITY \/ DOPPLER VELOCITY/);
+ assert.match(html,/main-radar-desk\.js/);
  new Function(ui);
 });
