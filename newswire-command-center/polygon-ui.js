@@ -14,12 +14,13 @@ function buttons(){
  $('undo').disabled=!drawing||points.length===0;
  $('finish').disabled=!drawing||points.length<3;
  $('retry').disabled=drawing||working||!D.validPolygon(points);
+ $('focusArea').disabled=drawing||!D.validPolygon(points);
 }
 function clearGeometry(){
  if(shape){map.removeLayer(shape);shape=null}
  if(draft){map.removeLayer(draft);draft=null}
  if(vertices){map.removeLayer(vertices);vertices=null}
- if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
+ if(!expand&&communityLayer){map.removeLayer(communityLayer);communityLayer=null}
 }
 function paint(){
  clearGeometry();
@@ -31,6 +32,14 @@ function paint(){
   vertices=L.layerGroup().addTo(map);
   points.forEach(p=>L.circleMarker(p,{radius:4,color:'#ffd552',weight:2,fillOpacity:1}).addTo(vertices));
  }
+}
+function focusPolygon(animate=false){
+ if(!D.validPolygon(points))return false;
+ const bounds=L.latLngBounds(points.map(p=>[p.lat,p.lng]));
+ if(!bounds.isValid())return false;
+ map.invalidateSize();
+ map.fitBounds(bounds.pad(.3),{maxZoom:11,padding:[28,28],animate});
+ return true;
 }
 function cancellation(){
  drawing=false;points=[];clearGeometry();setStatus('drawStatus','Drawing canceled. Previous polygon was not saved.');
@@ -52,7 +61,8 @@ async function lookup(expand=false){
   setStatus('communitySummary','COMMUNITY LOOKUP UNAVAILABLE');return;
  }
  const token=++requestToken;
- working=true;buttons();$('places').replaceChildren();
+ working=true;buttons();
+ if(!expand)$('places').replaceChildren();
  if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
  setStatus('placesStatus',expand?'Checking optional online neighborhoods; built-in towns remain available…':'Finding Census-based town centers inside your polygon (works offline)…');
  setStatus('communitySummary','COMMUNITY LOOKUP IN PROGRESS…');
@@ -85,7 +95,10 @@ async function lookup(expand=false){
    found.length?
     found.length+' documented place center'+(found.length===1?'':'s')+' inside your polygon. Census towns work without internet; blue markers indicate approximate centers.':
     'No built-in town center falls inside this outline. This does NOT mean the storm area is unpopulated.');
-  if(result.warning)setStatus('drawStatus','Offline data loaded. Optional online expansion failed: '+result.warning);
+  if(result.warning){
+   console.info('NewsWire optional communities provider:',result.warning);
+   setStatus('drawStatus','Offline towns loaded. Extra online neighborhoods are unavailable right now; your local results are still shown.');
+  }
   else setStatus('drawStatus','Census-based offline places loaded. '+(expand&&result.online?'Extra OpenStreetMap labels added. ': '')+'Smaller neighborhoods may be missing.');
   if(nearby.length&&found.length===0)setStatus('placesStatus',$('placesStatus').textContent+' See NEARBY towns below — they are outside your polygon.');
 
@@ -100,6 +113,7 @@ function restore(){
   const a=JSON.parse(localStorage.getItem(STORE)||'null');
   if(Array.isArray(a)&&D.validPolygon(a)){
    points=a;drawing=false;paint();buttons();
+   setTimeout(()=>{if(!drawing&&D.validPolygon(points))focusPolygon(false)},500);
    setStatus('drawStatus','Restored your saved polygon from the last session.');
    setStatus('communitySummary','SAVED POLYGON — CHECKING COMMUNITIES');
    lookup();
@@ -118,13 +132,14 @@ $('finish').addEventListener('click',()=>{
  if(!drawing)return;
  if(!D.validPolygon(points)){setStatus('drawStatus','At least three distinct non-collinear corners are required.');return}
  try{D.safeQuery(points)}catch(error){setStatus('drawStatus',String(error.message));return}
- drawing=false;paint();buttons();
+ drawing=false;paint();buttons();focusPolygon(true);
  try{localStorage.setItem(STORE,JSON.stringify(points))}catch(_){}
  setStatus('drawStatus','USER-DRAWN outline saved ('+points.length+' corners). Checking real community names…');
  lookup();
  $('communitySummary')?.scrollIntoView({block:'nearest',behavior:'smooth'});
 });
 $('retry').addEventListener('click',()=>lookup(true));
+$('focusArea').addEventListener('click',()=>focusPolygon(true));
 $('clear').addEventListener('click',clear);
 map.on('click',event=>{
  if(!drawing||!event?.latlng)return;
