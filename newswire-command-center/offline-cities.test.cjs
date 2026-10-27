@@ -46,7 +46,7 @@ test('bundled verified nationwide Census dataset exists and includes Alabama cit
 });
 test('package includes offline database and source generation script; Windows remains only release platform',()=>{
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.0');
+ assert.equal(pkg.version,'0.8.1');
  assert.ok(pkg.build.files.includes('data/census-places-2025.json'));
  assert.ok(pkg.build.files.includes('offline-cities.cjs'));
  const workflow=fs.readFileSync(path.join(__dirname,'..','.github','workflows','build-newswire-streamdeck-v0.7.1.yml'),'utf8');
