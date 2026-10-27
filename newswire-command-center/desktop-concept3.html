@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="concept3.css"></head>
 <body>
 <header class="masthead">
- <div class="brand"><div class="mark" aria-hidden="true">⚡</div><div><div class="brandTitle">News<span>Wire</span> <small>v0.8.0</small></div><div class="brandSub">NATIONWIDE WEATHER, NEWS & ALERTS</div></div></div>
+ <div class="brand"><div class="mark" aria-hidden="true">⚡</div><div><div class="brandTitle">News<span>Wire</span> <small>v0.8.2</small></div><div class="brandSub">NATIONWIDE WEATHER, NEWS & ALERTS</div></div></div>
  <nav class="primaryNav" aria-label="Main sections">
   <button type="button" class="navLink" data-open-panel="local"><span>⌂</span>Home</button>
   <button type="button" class="navLink active" id="nav-map"><span>▧</span>Map</button>
@@ -53,10 +53,42 @@
    <a class="tab" href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer">Official Radar ↗</a>
    <button id="navWarnings" class="tab">Warnings</button>
    <button id="country" class="tab">U.S. overview</button></div>
-   <div class="mapCaption"><span class="liveDot"></span> OFFICIAL NWS WARNINGS <span class="safetyNote">ANIMATED NEXRAD REFLECTIVITY · NO VELOCITY</span></div>
+   <div class="mapCaption"><span class="liveDot"></span> OFFICIAL NWS WARNINGS <span class="safetyNote">SELECT NWS SITE FOR REFLECTIVITY / DOPPLER VELOCITY</span></div>
+  </div>
+  <div class="mainRadarStudio" role="group" aria-label="Complete meteorology station and product controls on main radar">
+   <label for="mainSource">RADAR SOURCE</label>
+   <select id="mainSource"><option value="mosaic">National mosaic</option><option value="site">Single-site Doppler</option></select>
+   <label for="mainSite">NWS RADAR</label><select id="mainSite" aria-label="Select Hytop KHTX or another NEXRAD site"></select>
+   <button id="mainFocusSite" type="button">⌖ Go To Radar</button>
+   <label for="mainProduct">PRODUCT</label><select id="mainProduct" aria-label="Reflectivity, radial velocity or storm-relative velocity"></select>
+   <button id="mainPrev" title="Previous observed radar scan" disabled>◀</button><button id="mainNext" title="Next observed radar scan" disabled>▶</button>
+   <button id="mainLatest" title="Update to latest actual radar scan">↻ Latest</button>
+   <button id="mainLoop" title="Play or pause radar frames">⏸ Loop</button>
+   <button id="mainWarningToggle" aria-pressed="true">NWS Polygons: ON</button>
+   <button id="mainAnalysisToggle" aria-expanded="false" aria-controls="mainAnalysisDrawer">✎ Draw / Analyze</button>
+   <span class="mainScanTime" id="mainScanTime" role="status">Radar source is initializing…</span>
   </div>
   <section class="mapShell" aria-label="Official nationwide tornado-warning map">
    <div id="map"></div>
+   <section id="mainAnalysisDrawer" class="mainAnalysisDrawer" hidden aria-label="Draw storm polygons and analyze radial velocity without opening another window">
+    <div class="drawerTitle">MAIN RADAR · STORM ANALYSIS <small>All tools work here—no extra window required</small></div>
+    <div class="drawerSection"><strong>My Storm Polygon</strong><p>Draw an area directly on this map. Community names are from verified geographic databases; this is not an official NWS storm track.</p>
+     <div class="drawerRow"><button id="mainDraw">✎ Draw Polygon</button><button id="mainUndo" disabled>Undo</button><button id="mainFinish" disabled>Finish</button><button id="mainClear">Clear</button></div>
+     <div id="mainDrawStatus" class="drawerStatus" role="status">Click Draw Polygon to start outlining a storm area.</div>
+     <div id="mainAreaSummary">No drawn storm area</div>
+     <ul id="mainPlaces"></ul>
+     <button id="mainFindMore" disabled>Find More Communities (Online)</button>
+    </div>
+    <div class="drawerSection"><strong>Velocity Couplet · Manual Analysis</strong>
+     <p>Choose a velocity product, pick two points on this map, and enter independently read signed velocity values. No automatic tornado detection.</p>
+     <button id="mainVelocityPick">⌖ Select Two Velocity Gates</button>
+     <div id="mainVelocityCount">0 of 2 velocity gates</div>
+     <div class="drawerRow"><label>Gate A mph<input id="mainVelA" type="number" min="-250" max="250" placeholder="-40"></label>
+       <label>Gate B mph<input id="mainVelB" type="number" min="-250" max="250" placeholder="+40"></label></div>
+     <div class="drawerRow"><button id="mainVelocityCalculate">Calculate Shear</button><button id="mainVelocityClear">Clear Gates</button></div>
+     <div id="mainVelocityResult" role="status">Manual measurements only; radar colors are not decoded velocities.</div>
+    </div>
+   </section>
    <div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Warning polygons show issued NWS alert areas, not current tornado positions.</div></div>
    <div class="mapActions"><button id="home">⌖ My Location</button><button id="resume">⟳ Resume Auto-Fly</button><button id="pinStorm1" type="button">⌖ Pin Storm 1</button><button id="pinStorm2" type="button">⌖ Pin Storm 2</button><button id="pinStorm3" type="button">⌖ Pin 3</button><button id="pinStorm4" type="button">⌖ Pin 4</button></div>
   </section>
@@ -83,5 +115,5 @@
  <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / MULTI-STORM RADAR</div><div class="miniTitle">▦ Track 4 Radar Areas</div><p id="trackedState">Pick Track 1–4 beside a warning, or pin any location.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button><button type="button" data-open-panel="storm-3">Storm 3 ↗</button><button type="button" data-open-panel="storm-4">Storm 4 ↗</button></div></div>
 </div>
 <footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script>
 </body></html>
