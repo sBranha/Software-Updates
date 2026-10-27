@@ -124,6 +124,7 @@ function detail(a){
 }
 function select(a,userClicked=false){
  detail(a);
+ if(userClicked)mainRadarDesk?.analyzeWarning?.(a);
  if(a.geometry){warningCenter(a);if(userClicked)pauseUntil=Date.now()+MANUAL_PAUSE_MS}
  else if(userClicked)sayStatus('Official warning has no polygon; details are shown in the sidebar.');
 }
