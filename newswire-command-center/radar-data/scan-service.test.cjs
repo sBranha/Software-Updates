@@ -53,7 +53,7 @@ test('KHTX archive frame layers use exact observed UTC time and safe TMS',()=>{
 });
 test('Windows package includes both renderer radar and native scan service',()=>{
  const pkg=require('../package.json');
- assert.equal(pkg.version,'0.8.1');
+ assert.equal(pkg.version,'0.8.2');
  assert.ok(pkg.build.files.includes('site-radar.js'));
  assert.ok(pkg.build.files.includes('radar-data/scan-service.cjs'));
  const html=fs.readFileSync(path.join(__dirname,'..','storm.html'),'utf8');
