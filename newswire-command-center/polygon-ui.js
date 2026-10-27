@@ -39,13 +39,13 @@ function cancellation(){
 function clear(){
  drawing=false;points=[];requestToken++;working=false;clearGeometry();
  try{localStorage.removeItem(STORE)}catch(_){}
- $('places').replaceChildren();
+ $('places').replaceChildren();$('nearby').replaceChildren();$('nearbyHeading').hidden=true;
  setStatus('placesStatus','No communities loaded. Draw a polygon to look them up.');
  setStatus('communitySummary','NO DRAWN AREA');
  setStatus('drawStatus','Area cleared. No user polygon is displayed.');
  buttons();
 }
-async function lookup(){
+async function lookup(expand=false){
  if(!D.validPolygon(points)){setStatus('placesStatus','Finish a valid polygon first.');return}
  if(!bridge?.lookupCommunities){
   setStatus('placesStatus','Desktop community lookup unavailable. Update to NewsWire v0.7.6.');
@@ -54,18 +54,18 @@ async function lookup(){
  const token=++requestToken;
  working=true;buttons();$('places').replaceChildren();
  if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
- setStatus('placesStatus','Contacting community database… This may take up to 40 seconds if a service is down.');
+ setStatus('placesStatus',expand?'Checking optional online neighborhoods; built-in towns remain available…':'Finding Census-based town centers inside your polygon (works offline)…');
  setStatus('communitySummary','COMMUNITY LOOKUP IN PROGRESS…');
  try{
-  const result=await bridge.lookupCommunities(points.map(p=>({lat:p.lat,lng:p.lng})));
+  const result=await bridge.lookupCommunities(points.map(p=>({lat:p.lat,lng:p.lng})),expand);
   if(token!==requestToken)return;
   if(!result?.ok)throw Error(result?.error||'Unknown lookup failure');
   const found=Array.isArray(result.places)?result.places:[];
-  const list=$('places');list.replaceChildren();
+  const list=$('places');list.replaceChildren();$('nearby').replaceChildren();
   communityLayer=L.layerGroup().addTo(map);
   for(const place of found){
    const li=document.createElement('li'),name=document.createElement('strong'),kind=document.createElement('small');
-   name.textContent=place.name;kind.textContent=' — '+place.type;
+   name.textContent=place.name;kind.textContent=' — '+(place.state?place.state+' · ':'')+(place.type==='census_place'?'Census town center':'OpenStreetMap '+place.type);
    li.append(name,kind);list.append(li);
    if(Number.isFinite(place.lat)&&Number.isFinite(place.lng)){
     const marker=L.circleMarker([place.lat,place.lng],{
@@ -74,15 +74,25 @@ async function lookup(){
     marker.bindTooltip(place.name+' · mapped '+place.type);
    }
   }
-  setStatus('communitySummary',found.length+' MAPPED COMMUNIT'+(found.length===1?'Y':'IES')+' INSIDE YOUR AREA');
-  setStatus('placesStatus',found.length?
-   found.length+' OpenStreetMap place labels inside your polygon'+(result.complete===false?' (partial results — database limit reached)':'')+'. Blue map dots show their approximate centers.':
-   'No named place centers returned inside your drawn polygon. This does NOT mean no one lives in the area.');
-  if(result.complete===false)setStatus('drawStatus','Some communities may be missing because the source returned too many results. Draw a smaller area.');
+  const nearby=Array.isArray(result.nearby)?result.nearby:[];
+  for(const n of nearby){
+   const li=document.createElement('li');li.textContent=n.name+(n.state?', '+n.state:'')+' — nearby, OUTSIDE polygon ('+n.distanceKm+' km from center)';
+   $('nearby').append(li);
+  }
+  $('nearbyHeading').hidden=nearby.length===0;
+  setStatus('communitySummary',found.length+' MAPPED TOWN'+(found.length===1?'':'S')+' INSIDE YOUR OUTLINE');
+  setStatus('placesStatus',
+   found.length?
+    found.length+' documented place center'+(found.length===1?'':'s')+' inside your polygon. Census towns work without internet; blue markers indicate approximate centers.':
+    'No built-in town center falls inside this outline. This does NOT mean the storm area is unpopulated.');
+  if(result.warning)setStatus('drawStatus','Offline data loaded. Optional online expansion failed: '+result.warning);
+  else setStatus('drawStatus','Census-based offline places loaded. '+(expand&&result.online?'Extra OpenStreetMap labels added. ': '')+'Smaller neighborhoods may be missing.');
+  if(nearby.length&&found.length===0)setStatus('placesStatus',$('placesStatus').textContent+' See NEARBY towns below — they are outside your polygon.');
+
  }catch(error){
   if(token!==requestToken)return;
   setStatus('communitySummary','COMMUNITY LOOKUP FAILED — RETRY AVAILABLE');
-  setStatus('placesStatus','Lookup failed: '+String(error?.message||error).slice(0,650)+'. Click Retry Communities. Your polygon is still saved.');
+  setStatus('placesStatus','Offline place database error: '+String(error?.message||error).slice(0,650)+'. The Windows installer may be incomplete.');
  }finally{if(token===requestToken){working=false;buttons()}}
 }
 function restore(){
@@ -114,7 +124,7 @@ $('finish').addEventListener('click',()=>{
  lookup();
  $('communitySummary')?.scrollIntoView({block:'nearest',behavior:'smooth'});
 });
-$('retry').addEventListener('click',lookup);
+$('retry').addEventListener('click',()=>lookup(true));
 $('clear').addEventListener('click',clear);
 map.on('click',event=>{
  if(!drawing||!event?.latlng)return;
