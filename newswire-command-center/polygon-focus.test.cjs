@@ -57,5 +57,5 @@ test('Windows-only release includes new focus control and v0.8.4 artifact',()=>{
  assert.match(html,/id="focusArea"/);
  const pkg=require('./package.json');
  assert.equal(pkg.version,'0.8.4');
- assert.match(pkg.build.win.artifactName,/0\.8\.3/);
+ assert.match(pkg.build.win.artifactName,/0\.8\.4/);
 });
