@@ -38,7 +38,7 @@ function safeQuery(points){
  const b=bbox(points);if(!b)throw Error('Draw at least three non-collinear corners.');
  if(b.north-b.south>1.5||b.east-b.west>1.5)throw Error('Draw a smaller storm area (up to 1.5° in each direction).');
  return '[out:json][timeout:20];(nwr["place"~"^(city|town|village|hamlet|suburb|neighbourhood)$"]('+
- [b.south,b.west,b.north,b.east].map(n=>n.toFixed(5)).join(',')+'););out center 700;';
+ [b.south,b.west,b.north,b.east].map(n=>n.toFixed(5)).join(',')+'););out center 2500;';
 }
 function placeList(osm,points){
  const seen=new Set(),list=[];
