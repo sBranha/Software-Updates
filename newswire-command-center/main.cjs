@@ -208,7 +208,7 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:track-updates',(event,items)=>{
   if(event.sender!==views.get('map')?.webContents||!Array.isArray(items))return;
   for(const x of items.slice(0,4)){
-   if(!x||![1,2].includes(x.slot)||!tracked[x.slot])continue;
+   if(!x||![1,2,3,4].includes(x.slot)||!tracked[x.slot])continue;
    const item=T.safeWarning(x.item);
    if(item&&item.id===tracked[x.slot].id)tracked[x.slot]=item;
   }
