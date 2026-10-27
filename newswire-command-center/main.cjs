@@ -189,8 +189,8 @@ app.whenReady().then(()=>{
  const radarScanCache=new Map();
  ipcMain.handle('newswire:radar-scans',async(event,site,product)=>{
   const owner=BrowserWindow.fromWebContents(event.sender);
-  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
-   return {ok:false,error:'Radar scan listings are available only in active storm desk windows'};
+  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!(owner.webContents.getURL().includes('/storm.html')||owner===views.get('map')))
+   return {ok:false,error:'Radar scans require an active main map or storm desk window'};
   try{
    const k=String(site)+':'+String(product);
    const old=radarScanCache.get(k),now=Date.now();
@@ -205,8 +205,8 @@ app.whenReady().then(()=>{
  });
  ipcMain.handle('newswire:communities-lookup',async(event,points,expand=false)=>{
   const owner=BrowserWindow.fromWebContents(event.sender);
-  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
-   return {ok:false,error:'Community lookup permitted only from an open storm tracking window.'};
+  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!(owner.webContents.getURL().includes('/storm.html')||owner===views.get('map')))
+   return {ok:false,error:'Community lookup requires an active main map or storm tracking window.'};
   try{
    const result=await lookupCommunities(points,{expand:expand===true,fetchImpl:(url,opts)=>net.fetch(url,opts)});
    return {ok:true,...result};
