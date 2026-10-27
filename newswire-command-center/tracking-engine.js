@@ -14,6 +14,12 @@ function validGeometry(geometry){
 }
 function safeWarning(a){
  if(!a||typeof a!=='object'||typeof a.id!=='string'||!a.id||a.id.length>350)return null;
+ if(a.source==='manual'){
+  const lat=Number(a.point?.lat),lon=Number(a.point?.lon);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return null;
+  return {id:a.id,source:'manual',point:{lat,lon},manual:true,area:'Radar watch area '+lat.toFixed(3)+', '+lon.toFixed(3),
+   headline:'Manually pinned radar location',description:'',instruction:'This is a fixed viewing area, not an automatically tracked storm.',expires:'',sent:'',url:'https://www.weather.gov/alerts',geometry:null,motion:null};
+ }
  const out={
   id:a.id,area:String(a.area||'Warning area not stated').slice(0,320),
   expires:String(a.expires||'').slice(0,100),sent:String(a.sent||'').slice(0,100),
