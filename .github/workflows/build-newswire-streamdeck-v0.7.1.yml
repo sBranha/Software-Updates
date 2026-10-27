@@ -1,66 +1,17 @@
-name: NewsWire v0.7.5 desktop and Animated Radar, Drawn Tracks and Communities preview
+name: NewsWire v0.7.6 WINDOWS ONLY - Polygon Communities Lookup Fix
 on:
   push:
-    branches: [newswire-drawn-tracks-radar-loop-v0.7.5]
+    branches: [newswire-windows-community-lookup-v0.7.6]
     paths:
       - 'newswire-command-center/**'
-      - 'newswire-streamdeck/**'
       - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  test-and-pack-plugin:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Run bridge and shared weather engine tests
-        run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs
-          node --check newswire-command-center/main.cjs
-          node --check newswire-command-center/window-layout.cjs
-          node --check newswire-command-center/panels.js
-          node --check newswire-command-center/workspace-ui.js
-          node --check newswire-command-center/concept3-ui.js
-          node --check newswire-command-center/storm.js
-          node --check newswire-command-center/radar.js
-          node --check newswire-command-center/tracking-engine.js
-          node --check newswire-command-center/radar-loop.js
-          node --check newswire-command-center/drawn-tracks.js
-          node --check newswire-command-center/polygon-ui.js
-          node --check newswire-command-center/preload.cjs
-          node --check newswire-command-center/deck-bridge.cjs
-          node --check newswire-command-center/app.js
-          node --check newswire-streamdeck/com.newswire.commandcenter.sdPlugin/bin/plugin.js
-      - name: Install Stream Deck CLI
-        run: npm install -g @elgato/cli@latest --no-audit --no-fund
-      - name: Validate and pack plugin
-        run: |
-          mkdir -p newswire-streamdeck/dist
-          streamdeck pack newswire-streamdeck/com.newswire.commandcenter.sdPlugin --output newswire-streamdeck/dist --no-update-check
-          ls -la newswire-streamdeck/dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: NewsWire-v0.7.5-StreamDeck-PLUGIN-PREVIEW
-          path: newswire-streamdeck/dist/*.streamDeckPlugin
-          if-no-files-found: error
-          retention-days: 30
-  desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: windows
-            ext: exe
-          - os: macos-latest
-            target: mac
-            ext: dmg
-    runs-on: ${{ matrix.os }}
+  windows-test-and-build:
+    name: Test and package Windows ONLY
+    runs-on: windows-latest
     timeout-minutes: 45
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -68,68 +19,62 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Run desktop tests
+          node-version: '24'
+      - name: Test polygon services and desktop modules
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/draw-loop.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
-      - name: Install dependencies
+          node --check newswire-command-center/polygon-ui.js
+          node --check newswire-command-center/communities-service.cjs
+          node --check newswire-command-center/drawn-tracks.js
+      - name: Install desktop dependencies
         working-directory: newswire-command-center
         run: npm install --no-audit --no-fund
-      - name: Build desktop installer
+      - name: Package Windows x64 installer only
         working-directory: newswire-command-center
-        run: npm run package:${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+        run: npm run package:windows
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.5-${{ matrix.target }}-UNSIGNED-PREVIEW
-          path: newswire-command-center/dist/*.${{ matrix.ext }}
+          name: NewsWire-v0.7.6-Windows-only
+          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.6-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 30
-
-  release-preview:
-    name: Publish clearly labeled preview files
-    concurrency:
-      group: newswire-v075-streamdeck-release
-      cancel-in-progress: true
-    needs: [test-and-pack-plugin, desktop]
+  release-windows:
+    name: Publish tested WINDOWS ONLY preview
+    needs: windows-test-and-build
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     permissions:
       contents: write
+    concurrency:
+      group: newswire-v076-win-release
+      cancel-in-progress: true
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: NewsWire-v0.7.5-*
+          name: NewsWire-v0.7.6-Windows-only
           path: release-assets
-          merge-multiple: true
-      - name: Publish tested development preview
+      - name: Publish Windows installer (no Mac build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='newswire-v0.7.5-streamdeck-preview'
-          test -f release-assets/com.newswire.commandcenter.streamDeckPlugin
-          ls -lh release-assets/
+          TAG="newswire-v0.7.6-windows-preview"
+          FILE="release-assets/NewsWire-Command-Center-0.7.6-Windows-Setup.exe"
+          test -s "$FILE"
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-windows-community-lookup-v0.7.6" --jq '.object.sha')
+          test "$GITHUB_SHA" = "$LATEST" || { echo "Superseded by a newer build; skipping publish"; exit 0; }
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire 0.7.5 — Animated radar and community polygon tracking desktop preview' \
-              --notes 'NewsWire v0.7.5 preview adds a 30-minute animated IEM/NOAA NEXRAD reflectivity loop based on seven five-minute relative-age WMS layers, four independent storm monitoring windows, and user-drawn polygons in each tracking view. OpenStreetMap community names are looked up within each user polygon. The polygons are user estimates, NOT official warnings or computer-generated storm paths. Mapped community coverage is incomplete; no arrival-time prediction. Windows and Mac installers unsigned and not physically tested; automated CI tested code. Keep Wireless Emergency Alerts enabled. Signed Google Play Android bundle is unchanged.'
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title 'NewsWire v0.7.6 - Windows ONLY - Community Polygon Lookup Repair' \
+              --notes 'Windows-only preview. Fixes drawn-polygon community lookup by making Overpass calls in the Electron main process rather than restricted file-origin JavaScript. Displays status near the top of the tracker and places as blue dots on the radar map; adds Retry Communities and clear error states. Free OpenStreetMap names are approximate and can be incomplete, and the source may be unreachable. Polygon is user-drawn, not an official warning or storm-arrival forecast. Automated source tests passed, but real API responses and the physical Windows UI have not been verified. UNSIGNED installer. Mac is on hold at user request; signed Android Play version unchanged.'
           fi
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-drawn-tracks-radar-loop-v0.7.5" --jq '.object.sha')
-          if [ "$GITHUB_SHA" != "$LATEST" ]; then
-            echo "Skipping superseded build $GITHUB_SHA, latest is $LATEST"
-            exit 0
-          fi
-          for asset in release-assets/*; do
-            ok=0
-            for attempt in 1 2 3 4 5; do
-              if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$asset" --clobber; then
-                ok=1
-                break
-              fi
-              sleep $((attempt * 3))
-            done
-            test "$ok" = 1
+          for attempt in 1 2 3 4 5; do
+            if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$FILE" --clobber; then break; fi
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep $((attempt*3))
           done
+          sha256sum "$FILE"
