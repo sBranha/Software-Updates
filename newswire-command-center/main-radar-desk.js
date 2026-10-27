@@ -314,8 +314,20 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
  if(mode==='mosaic')update('mainScanTime','National mosaic · approximate frame age');
  const refreshTimer=setInterval(()=>{if(mode==='site'&&radarOn)loadScans()},120000);
  window.addEventListener('beforeunload',()=>{clearInterval(refreshTimer);stopSite();siteRadar.dispose?.()});
+ function analyzeWarning(warning){
+  const center=warning?.center;
+  if(!center||!Number.isFinite(center.lat)||!Number.isFinite(center.lon))return;
+  const sites=R().SITES.map(entry=>({entry,
+   meters:V().distanceMeters({lat:center.lat,lng:center.lon},{lat:entry.lat,lng:entry.lng})
+  })).sort((a,b)=>a.meters-b.meters);
+  if(sites.length&&sites[0].meters<=300000){
+   activate('site',sites[0].entry.id,product);
+   update('mainRadarState','Nearby site selected for issued warning: '+sites[0].entry.id+
+    ' · not an inferred tornado location or motion');
+  }else update('mainRadarState','No listed single-site Doppler radar within 300 km of this warning; use national mosaic.');
+ }
  return {consumeClick,onRadarToggle,onLoop,onRefresh,isWarningsShown:()=>warningOn,
-  selectSite:(id)=>{activate('site',id,product);focusSite()},
+  selectSite:(id)=>{activate('site',id,product);focusSite()},analyzeWarning,
   getMode:()=>mode,getSite:()=>site,getProduct:()=>product};
 }
 return {init,chooseConfig};
