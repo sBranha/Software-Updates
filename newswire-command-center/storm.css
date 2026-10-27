@@ -14,3 +14,9 @@
 #places small{color:#9bbbd3}
 .advisory{font-size:11px;color:#ffdda0;border-top:1px solid #655837;padding-top:9px;line-height:1.5}
 #loop[aria-pressed="true"]{background:#095d91;border-color:#62ceff}
+
+/* Clearly visible result count and working/failure statuses */
+.communitySummary{padding:12px 14px;font-size:13px;font-weight:850;letter-spacing:.04em;background:linear-gradient(110deg,#12537b,#11334c);border:1px solid #4e91b6;border-radius:8px;color:#e2f8ff}
+#retry{background:#124d6d;border-color:#67b0df;grid-column:span 2}
+#retry:disabled{opacity:.42}
+#places li:hover{color:#b3f5ff}
