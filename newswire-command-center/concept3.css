@@ -125,3 +125,50 @@ a.tab:hover{text-decoration:none;background:#195681}.tab.current,.tab[aria-press
  .mainRadarStudio select{max-width:135px}
  .mainScanTime{flex-basis:100%}
 }
+
+/* v0.8.3 radar-first meteorology studio: one HUGE map, station/products always visible.
+   Do not make separate storm windows necessary to use the radar. */
+body.studioMode{height:100vh!important;min-height:0!important;overflow:hidden!important}
+body.studioMode .masthead,
+body.studioMode .controlStrip,
+body.studioMode .leftPanel,
+body.studioMode .mapTabs,
+body.studioMode .dashboardStrip,
+body.studioMode .disclaimer{display:none!important}
+body.studioMode .shell{
+ position:relative;display:flex!important;grid-template-columns:none!important;
+ flex:1 1 auto;min-height:0;height:100vh;width:100%;overflow:hidden
+}
+body.studioMode .centerPanel{
+ flex:1 1 100%;width:100%;height:100%!important;min-height:0!important;
+ display:flex;flex-direction:column;min-width:0
+}
+body.studioMode .mainRadarStudio{
+ display:flex;flex:0 0 auto;align-items:center;justify-content:flex-start;
+ padding:8px 12px;min-height:46px;max-height:108px;overflow-y:auto;
+ background:linear-gradient(110deg,#061c31,#0a334e);border-bottom:1px solid #4e84a2
+}
+body.studioMode .mapShell{flex:1 1 auto;min-height:0;width:100%;position:relative}
+body.studioMode .mapFooter{flex:0 0 auto;min-height:31px;max-height:40px}
+body.studioMode .rightPanel{display:none!important}
+body.studioMode.studioAlertsVisible .rightPanel{
+ display:flex!important;position:absolute;right:7px;top:53px;bottom:38px;
+ z-index:1000;width:min(364px,44vw)!important;max-width:364px;height:auto!important;
+ overflow-y:auto;box-shadow:0 14px 45px #000a;border:1px solid #5082a8;
+ background:#0a233adf;backdrop-filter:blur(10px);border-radius:11px;
+ flex-direction:column;padding:10px
+}
+body.studioMode .mapLabel{max-width:340px}
+body.studioMode #mainAnalysisDrawer{
+ z-index:1020;right:10px;top:8px;max-height:calc(100% - 18px);
+ width:min(350px,40vw)
+}
+#studioToggle[aria-pressed="true"]{background:#075b76;border-color:#6bd9fa;color:#ecfcff}
+#studioAlerts[aria-pressed="true"]{background:#754820;border-color:#e8ad55}
+#studioFullscreen{border-color:#87bee3}
+body.studioMode .leaflet-container{width:100%!important;height:100%!important}
+@media(max-width:900px){
+ body.studioMode .mainRadarStudio{max-height:180px}
+ body.studioMode.studioAlertsVisible .rightPanel{width:min(360px,85vw)!important}
+ body.studioMode #mainAnalysisDrawer{width:min(350px,84vw)}
+}
