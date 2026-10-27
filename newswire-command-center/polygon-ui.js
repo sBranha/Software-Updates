@@ -8,6 +8,7 @@ if(!map||!D)return;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 const STORE='nwcc-drawn-track-'+slot;
 let drawing=false,points=[],shape=null,draft=null,vertices=null,communityLayer=null,requestToken=0,working=false;
+window.NWPolygonIsDrawing=false;
 const setStatus=(id,message)=>{const el=$(id);if(el)el.textContent=message};
 function buttons(){
  $('draw').textContent=drawing?'Cancel Drawing':'✎ Draw Polygon';
@@ -42,11 +43,11 @@ function focusPolygon(animate=false){
  return true;
 }
 function cancellation(){
- drawing=false;points=[];clearGeometry();setStatus('drawStatus','Drawing canceled. Previous polygon was not saved.');
+ drawing=false;window.NWPolygonIsDrawing=false;points=[];clearGeometry();setStatus('drawStatus','Drawing canceled. Previous polygon was not saved.');
  buttons();
 }
 function clear(){
- drawing=false;points=[];requestToken++;working=false;clearGeometry();
+ drawing=false;window.NWPolygonIsDrawing=false;points=[];requestToken++;working=false;clearGeometry();
  try{localStorage.removeItem(STORE)}catch(_){}
  $('places').replaceChildren();$('nearby').replaceChildren();$('nearbyHeading').hidden=true;
  setStatus('placesStatus','No communities loaded. Draw a polygon to look them up.');
@@ -123,7 +124,8 @@ function restore(){
 }
 $('draw').addEventListener('click',()=>{
  if(drawing){cancellation();return}
- drawing=true;points=[];requestToken++;working=false;clearGeometry();
+ window.NWStreetViewCancel?.();
+ drawing=true;window.NWPolygonIsDrawing=true;points=[];requestToken++;working=false;clearGeometry();
  setStatus('communitySummary','DRAWING A NEW USER ESTIMATE');
  setStatus('drawStatus','Click 3–40 map corners, then Finish Shape. This is YOUR outline, not an official storm path.');
  buttons();
@@ -133,7 +135,7 @@ $('finish').addEventListener('click',()=>{
  if(!drawing)return;
  if(!D.validPolygon(points)){setStatus('drawStatus','At least three distinct non-collinear corners are required.');return}
  try{D.safeQuery(points)}catch(error){setStatus('drawStatus',String(error.message));return}
- drawing=false;paint();buttons();focusPolygon(true);
+ drawing=false;window.NWPolygonIsDrawing=false;paint();buttons();focusPolygon(true);
  try{localStorage.setItem(STORE,JSON.stringify(points))}catch(_){}
  setStatus('drawStatus','USER-DRAWN outline saved ('+points.length+' corners). Checking real community names…');
  lookup();
