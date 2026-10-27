@@ -1,12 +1,12 @@
 {
   "name": "newswire-command-center",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "private": true,
   "description": "Free nationwide storm warning command center using official NWS alert data",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs",
+    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs",
     "package:windows": "electron-builder --win nsis --x64 --publish never",
     "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
@@ -42,7 +42,10 @@
       "tracking-engine.js",
       "storm.html",
       "storm.css",
-      "storm.js"
+      "storm.js",
+      "drawn-tracks.js",
+      "radar-loop.js",
+      "polygon-ui.js"
     ],
     "asar": true,
     "win": {
@@ -54,7 +57,7 @@
           ]
         }
       ],
-      "artifactName": "NewsWire-Command-Center-0.7.4-Windows-Setup.${ext}"
+      "artifactName": "NewsWire-Command-Center-0.7.5-Windows-Setup.${ext}"
     },
     "mac": {
       "target": [
@@ -66,7 +69,7 @@
           ]
         }
       ],
-      "artifactName": "NewsWire-Command-Center-0.7.4-Mac-${arch}.${ext}",
+      "artifactName": "NewsWire-Command-Center-0.7.5-Mac-${arch}.${ext}",
       "category": "public.app-category.weather"
     },
     "nsis": {
