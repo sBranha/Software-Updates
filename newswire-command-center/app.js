@@ -7,7 +7,7 @@ const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
 let auto=true,voice=false,satellite=true,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
-let liveRadar=null;
+let liveRadar=null,pinSlot=null;
 const selectedTracks={1:null,2:null};
 let home=null,pointIds=new Set(),localAlerts=[],localVerified=false,localError='',lastChecked=null;
 const sayStatus=message=>{$('status').textContent=message};
@@ -36,6 +36,8 @@ function mapInit(){
   const btn=$('radarToggle');if(btn){btn.setAttribute('aria-pressed',String(radarOn));btn.textContent='Radar: '+(radarOn?'ON':'OFF');}
  }
  map.on('dragstart',()=>{pauseUntil=Date.now()+MANUAL_PAUSE_MS;setText('mapHint','Manual map control: auto-fly paused for 2 minutes. Resume any time.')});
+ map.on('click',e=>{if(pinSlot){const slot=pinSlot;pinSlot=null;trackManualSlot(slot,e.latlng)}});
+
  if(home)markHome(); else $('mapHint').textContent='Red outlines mark official warning areas, not an observed tornado path.';
 }
 function markHome(){
@@ -131,6 +133,16 @@ function deckBind(){
   }else if(ids[action])$(ids[action]).click();
   deckReport();
  });
+}
+function trackManualSlot(slot,point){
+ const bridge=window.NewsWireDesktopBridge;
+ if(!bridge||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lng)||![1,2].includes(slot))return;
+ const item={id:'manual-radar-watch-'+slot+'-'+Date.now(),source:'manual',point:{lat:point.lat,lon:point.lng}};
+ selectedTracks[slot]=item.id;
+ bridge.trackWarning(slot,item);
+ setText('mapHint','Pinned fixed radar watch '+slot+' at '+point.lat.toFixed(3)+', '+point.lng.toFixed(3)+'. This pin does not auto-follow a moving storm.');
+ const e=$('trackedState');if(e)e.textContent='Watch '+slot+' pinned (stationary) · real radar updates';
+ pauseUntil=Date.now()+MANUAL_PAUSE_MS;
 }
 function trackSelected(slot,item){
  const bridge=window.NewsWireDesktopBridge;
@@ -294,6 +306,12 @@ function bind(){
  $('auto').addEventListener('click',()=>{auto=!auto;setting('auto',String(auto));setButtons()});
  $('voice').addEventListener('click',()=>{voice=!voice;setting('voice',String(voice));setButtons()});
  $('style').addEventListener('click',()=>{satellite=!satellite;setting('satellite',String(satellite));mapStyle()});
+ for(const slot of [1,2]){
+  $('pinStorm'+slot)?.addEventListener('click',()=>{
+   if(!map){setText('mapHint','Map unavailable; cannot pin a watch area.');return}
+   pinSlot=slot;setText('mapHint','Click a radar location to watch in Storm Tracker '+slot+'. This is a fixed radar viewing location.');
+  });
+ }
  $('radarToggle')?.addEventListener('click',()=>{
   if(!liveRadar)return;
   const shown=liveRadar.show(!liveRadar.isShown());setting('radar',String(shown));
