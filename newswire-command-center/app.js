@@ -7,7 +7,7 @@ const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
 let auto=true,voice=false,satellite=true,mapMode='satellite',streetPick=false,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
-let liveRadar=null,pinSlot=null;
+let liveRadar=null,pinSlot=null,mainRadarDesk=null;
 const selectedTracks={1:null,2:null,3:null,4:null};
 let home=null,pointIds=new Set(),localAlerts=[],localVerified=false,localError='',lastChecked=null;
 const sayStatus=message=>{$('status').textContent=message};
@@ -56,9 +56,22 @@ function mapInit(){
   });
   const radarOn=setting('radar')!=='false';liveRadar.show(radarOn);
   const btn=$('radarToggle');if(btn){btn.setAttribute('aria-pressed',String(radarOn));btn.textContent='Radar: '+(radarOn?'ON':'OFF');}
+  if(window.NewsWireMainRadarDesk){
+   mainRadarDesk=window.NewsWireMainRadarDesk.init({
+    map,L,composite:liveRadar,
+    setActive:source=>{liveRadar=source},
+    onWarningToggle:()=>draw(),
+    onInteraction:()=>{
+     pauseUntil=Date.now()+MANUAL_PAUSE_MS;streetPick=false;pinSlot=null;
+     if($('streetView')){$('streetView').textContent='Street View ↗';$('streetView').setAttribute('aria-pressed','false')}
+     map.getContainer().style.cursor='';
+    }
+   });
+  }
  }
  map.on('dragstart',()=>{pauseUntil=Date.now()+MANUAL_PAUSE_MS;setText('mapHint','Manual map control: auto-fly paused for 2 minutes. Resume any time.')});
  map.on('click',e=>{
+  if(mainRadarDesk?.consumeClick?.(e)){pauseUntil=Date.now()+MANUAL_PAUSE_MS;return}
   if(streetPick){
    streetPick=false;$('streetView').textContent='Street View ↗';
    $('streetView').setAttribute('aria-pressed','false');
@@ -117,6 +130,7 @@ function select(a,userClicked=false){
 function draw(){
  if(!map)return;
  if(polygonLayer){map.removeLayer(polygonLayer);polygonLayer=null}
+ if(mainRadarDesk&&!mainRadarDesk.isWarningsShown())return;
  polygonLayer=L.geoJSON({type:'FeatureCollection',features:alerts.filter(a=>a.geometry).map(a=>({
   type:'Feature',geometry:a.geometry,properties:{id:a.id,event:a.event,area:a.area,expires:a.expires}
  }))},{style:()=>({color:'#ff4569',weight:3,fillColor:'#e72c55',fillOpacity:.16}),
@@ -355,6 +369,7 @@ function bind(){
   });
  }
  $('radarLoop')?.addEventListener('click',()=>{
+  if(mainRadarDesk){mainRadarDesk.onLoop();return}
   if(!liveRadar)return;
   if(!liveRadar.isShown())liveRadar.show(true);
   const play=liveRadar.play?.(!liveRadar.isPlaying?.())||false;
@@ -362,6 +377,7 @@ function bind(){
   $('radarLoop').setAttribute('aria-pressed',String(play));
  });
  $('radarToggle')?.addEventListener('click',()=>{
+  if(mainRadarDesk){mainRadarDesk.onRadarToggle();return}
   if(!liveRadar)return;
   const shown=liveRadar.show(!liveRadar.isShown());setting('radar',String(shown));
   $('radarToggle').textContent='Radar: '+(shown?'ON':'OFF');
@@ -394,7 +410,7 @@ function start(){
  deckReport();refresh();
  setInterval(()=>{if(!document.hidden||window.NewsWireDesktopBridge)refresh()},EVERY_MS);
  if(window.NewsWireDesktopBridge)setInterval(deckReport,5000);
- if(window.NewsWireRadar)setInterval(()=>{if(liveRadar&&(!document.hidden||window.NewsWireDesktopBridge))liveRadar.refresh()},300000);
+ if(window.NewsWireRadar)setInterval(()=>{if(liveRadar&&(!document.hidden||window.NewsWireDesktopBridge)){if(mainRadarDesk)mainRadarDesk.onRefresh();else liveRadar.refresh()}},300000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!lastChecked||Date.now()-lastChecked.getTime()>EVERY_MS))refresh()});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
