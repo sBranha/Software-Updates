@@ -70,5 +70,5 @@ test('manual radar-watch pins are valid but do not claim NWS storm motion or aut
  assert.match(app,/trackManualSlot/);
  assert.match(html,/id="pinStorm1"/);
  assert.match(html,/id="pinStorm2"/);
- assert.match(storm,/fixed radar viewing point/i);
+ assert.match(storm,/Manually selected radar viewing point/i);
 });
