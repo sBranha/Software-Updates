@@ -5,7 +5,7 @@ const E=window.NewsWireNationwide, $=id=>document.getElementById(id);
 const EVERY_MS=90000, AUTO_GAP_MS=45000, MANUAL_PAUSE_MS=120000;
 const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
-let auto=true,voice=false,satellite=true,lastFly=0,pauseUntil=0;
+let auto=true,voice=false,satellite=true,mapMode='satellite',streetPick=false,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
 let liveRadar=null,pinSlot=null;
 const selectedTracks={1:null,2:null,3:null,4:null};
@@ -14,20 +14,42 @@ const sayStatus=message=>{$('status').textContent=message};
 function setting(k,v){try{if(v===undefined)return localStorage.getItem('nwcc-'+k);localStorage.setItem('nwcc-'+k,v)}catch(e){return null}}
 function fmtDate(raw){if(!raw)return 'Not stated';const d=new Date(raw);return Number.isFinite(d.getTime())?d.toLocaleString():'Not stated'}
 function setText(id,value){$(id).textContent=value}
-function layerUrl(){return satellite?
- 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}':
- 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}'}
+const MV=window.NewsWireMapViews;
 let base;
-function mapStyle(){
- if(!map)return;
+function mapStyle(next){
+ if(!map||!MV)return;
+ mapMode=MV.normalize(next||mapMode);
+ satellite=mapMode==='satellite';
  if(base)map.removeLayer(base);
- base=L.tileLayer(layerUrl(),{maxZoom:18,maxNativeZoom:16,attribution:'Map services and data: U.S. Geological Survey, National Geospatial Program'}).addTo(map);base.bringToBack();
- $('style').textContent=satellite?'Satellite map':'Street map';$('style').setAttribute('aria-pressed',String(satellite));
+ base=MV.createLayer(L,mapMode).addTo(map);base.bringToBack();
+ // All radar and official warning overlays remain independent of this basemap.
+ for(const [id,mode] of [['style','satellite'],['streetMap','streets'],['terrainMap','terrain']]){
+  const el=$(id);if(el)el.setAttribute('aria-pressed',String(mapMode===mode));
+ }
+ const footer=$('baseMapLabel');if(footer)footer.textContent=MV.STYLES[mapMode].label;
+ setting('map-mode',mapMode);
+}
+function streetViewPick(){
+ if(!map||!MV)return;
+ streetPick=!streetPick;
+ if(streetPick)pinSlot=null;
+ const btn=$('streetView');
+ btn.textContent=streetPick?'✕ Cancel Street View':'Street View ↗';
+ btn.setAttribute('aria-pressed',String(streetPick));
+ map.getContainer().style.cursor=streetPick?'crosshair':'';
+ setText('mapHint',streetPick?'Click a specific road or location to open Google Street View in your browser. Photography is not live radar.':
+  'Street View selection canceled.');
+}
+function openStreetView(lat,lng){
+ try{
+  window.open(MV.streetViewUrl(lat,lng),'_blank','noopener,noreferrer');
+  setText('mapHint','Opened Google Street View for this point. Ground-level photographs may not be available here.');
+ }catch(error){setText('mapHint','Street View location unavailable: '+error.message)}
 }
 function mapInit(){
  if(typeof L==='undefined'){sayStatus('Map library unavailable. Warning list may still load.');return}
  map=L.map('map',{preferCanvas:true,zoomControl:true,minZoom:3,maxZoom:17}).setView([39,-97],4);
- mapStyle();
+ mapStyle(mapMode);
  if(window.NewsWireRadar){
   liveRadar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,message=>{
    const el=$('radarFeed');if(el)el.textContent=message;
@@ -36,7 +58,15 @@ function mapInit(){
   const btn=$('radarToggle');if(btn){btn.setAttribute('aria-pressed',String(radarOn));btn.textContent='Radar: '+(radarOn?'ON':'OFF');}
  }
  map.on('dragstart',()=>{pauseUntil=Date.now()+MANUAL_PAUSE_MS;setText('mapHint','Manual map control: auto-fly paused for 2 minutes. Resume any time.')});
- map.on('click',e=>{if(pinSlot){const slot=pinSlot;pinSlot=null;trackManualSlot(slot,e.latlng)}});
+ map.on('click',e=>{
+  if(streetPick){
+   streetPick=false;$('streetView').textContent='Street View ↗';
+   $('streetView').setAttribute('aria-pressed','false');
+   map.getContainer().style.cursor='';
+   openStreetView(e.latlng.lat,e.latlng.lng);return;
+  }
+  if(pinSlot){const slot=pinSlot;pinSlot=null;trackManualSlot(slot,e.latlng)}
+ });
 
  if(home)markHome(); else $('mapHint').textContent='Red outlines mark official warning areas, not an observed tornado path.';
 }
@@ -305,10 +335,14 @@ function bind(){
  $('resume').addEventListener('click',restoreAuto);
  $('auto').addEventListener('click',()=>{auto=!auto;setting('auto',String(auto));setButtons()});
  $('voice').addEventListener('click',()=>{voice=!voice;setting('voice',String(voice));setButtons()});
- $('style').addEventListener('click',()=>{satellite=!satellite;setting('satellite',String(satellite));mapStyle()});
+ $('style').addEventListener('click',()=>{mapStyle('satellite');setting('satellite','true')});
+ $('streetMap').addEventListener('click',()=>{mapStyle('streets');setting('satellite','false')});
+ $('terrainMap').addEventListener('click',()=>{mapStyle('terrain');setting('satellite','false')});
+ $('streetView').addEventListener('click',streetViewPick);
  for(const slot of [1,2,3,4]){
   $('pinStorm'+slot)?.addEventListener('click',()=>{
    if(!map){setText('mapHint','Map unavailable; cannot pin a watch area.');return}
+   streetPick=false;$('streetView').textContent='Street View ↗';$('streetView').setAttribute('aria-pressed','false');map.getContainer().style.cursor='';
    pinSlot=slot;setText('mapHint','Click a radar location to watch in Storm Tracker '+slot+'. This is a fixed radar viewing location.');
   });
  }
@@ -333,7 +367,7 @@ window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
  setHome(lat,lon,'Device GPS','gps')};
 window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
- loadHome();auto=setting('auto')!=='false';satellite=setting('satellite')!=='false';
+ loadHome();auto=setting('auto')!=='false';mapMode=MV?.normalize(setting('map-mode'));satellite=mapMode==='satellite';
  setButtons();mapInit();bind();deckBind();markHome();
  if(window.NewsWireDesktopBridge){
   const bridge=window.NewsWireDesktopBridge;
