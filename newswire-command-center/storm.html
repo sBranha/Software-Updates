@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NewsWire — Storm Tracker</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NewsWire — Radar Watch & Polygon Track</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="storm.css"></head>
 <body>
 <header><div class="identity"><span class="bolt">⚡</span><div><div class="eyebrow">NEWSWIRE / LIVE RADAR + USER-DRAWN STORM AREAS</div><h1 id="title">Storm Tracking — Slot</h1></div></div><div class="controls"><button id="loop" aria-pressed="true">▶ Radar Loop</button><button id="radar" aria-pressed="true">Radar: ON</button><button id="satellite" aria-pressed="true">Satellite: ON</button><button id="focus">⌖ Focus Warning</button><button id="main">Open Main Desk</button></div></header>
@@ -10,7 +10,7 @@
 <div class="data"><span>WARNING EXPIRES</span><b id="expires">—</b></div>
 <div class="data"><span>NWS-MENTIONED MOTION</span><b id="motion">Not available</b></div>
 <div class="data"><span>RADAR SOURCE</span><b id="radarState">Connecting to IEM / NWS NEXRAD…</b></div>
-<div class="description" id="description">In the main NewsWire warning list, choose Track 1 or Track 2 to assign a warning here.</div>
+<div class="description" id="description">In the main NewsWire warning list, choose Track 1–4, or pin a map position, to assign a viewing area here.</div>
 <div class="polygonTools">
 <h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to list communities whose mapped points lie inside.</p>
 <div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button></div>
