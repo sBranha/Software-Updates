@@ -36,6 +36,10 @@ jobs:
       - name: Run application tests
         working-directory: newswire-command-center
         run: npm test
+      - name: Probe live KHTX radar observation metadata (informational)
+        working-directory: newswire-command-center
+        continue-on-error: true
+        run: node radar-data/probe-live.cjs
       - name: Package Windows EXE
         working-directory: newswire-command-center
         run: npm run package:windows
