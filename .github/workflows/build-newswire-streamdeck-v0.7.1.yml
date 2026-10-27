@@ -1,7 +1,7 @@
-name: NewsWire v0.7.9 WINDOWS ONLY - Meteorologist Studio Map Modes and Google Maps Links
+name: NewsWire v0.8.0 WINDOWS ONLY - Independent Fullscreen Storm Desks
 on:
   push:
-    branches: [newswire-windows-studio-maps-v0.7.9]
+    branches: [newswire-independent-storm-desks-v0.8.0]
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
@@ -30,7 +30,7 @@ jobs:
       - name: Test polygon services and desktop modules
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs newswire-command-center/studio-map.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/draw-loop.test.cjs newswire-command-center/communities-service.test.cjs newswire-command-center/offline-cities.test.cjs newswire-command-center/polygon-focus.test.cjs newswire-command-center/studio-map.test.cjs newswire-command-center/independent-desks.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/polygon-ui.js
@@ -51,8 +51,8 @@ jobs:
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.9-Windows-only
-          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.9-Windows-Setup.exe
+          name: NewsWire-v0.8.0-Windows-only
+          path: newswire-command-center/dist/NewsWire-Command-Center-0.8.0-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 30
   release-windows:
@@ -63,27 +63,27 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: newswire-v079-win-release
+      group: newswire-v080-win-release
       cancel-in-progress: true
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: NewsWire-v0.7.9-Windows-only
+          name: NewsWire-v0.8.0-Windows-only
           path: release-assets
       - name: Publish Windows installer (no Mac build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="newswire-v0.7.9-windows-preview"
-          FILE="release-assets/NewsWire-Command-Center-0.7.9-Windows-Setup.exe"
+          TAG="newswire-v0.8.0-windows-preview"
+          FILE="release-assets/NewsWire-Command-Center-0.8.0-Windows-Setup.exe"
           test -s "$FILE"
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-windows-studio-maps-v0.7.9" --jq '.object.sha')
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-independent-storm-desks-v0.8.0" --jq '.object.sha')
           test "$GITHUB_SHA" = "$LATEST" || { echo "Superseded by a newer build; skipping publish"; exit 0; }
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire v0.7.9 - WINDOWS ONLY - Studio Maps, Google Maps and Street View' \
-              --notes 'Windows-only v0.7.9 preview. Added Satellite, Streets and Terrain base-map controls to the main desktop and all four popout radar trackers. Satellite remains the default. Radar and NWS warning outlines remain independent of the base map. Added Google Maps link at current map center and click-to-open Google Street View panorama in external browser via official no-key Maps URLs. Fully embedded Google Maps is NOT provided and would require a Google Maps Platform API key and billing; no billable Google key is distributed. Offline U.S. Census city list and user polygons remain intact. Builds and automated tests pass; physical Windows UI and live tile delivery remain unverified. UNSIGNED Windows installer. Mac builds paused at user request; Android Play build unchanged.'
+              --title 'NewsWire v0.8.0 - WINDOWS ONLY - Four Independent Storm Desks' \
+              --notes 'Windows-only v0.8.0 preview. Four individually configurable detachable storm windows. Each independently stores zoom and location, satellite/street/terrain map mode, radar on/off, radar animation, NWS warning overlay, auto-focus, radar-only presentation mode, and personal storm polygon with offline Census community lookup. Each storm pane has Full Screen button and stays draggable to different physical monitors. Other panels are unaffected by changes to an individual storm pane. Still displays IEM NEXRAD composite reflectivity only: direct single-site KHTX velocity and dual-polarization/3D are NOT yet implemented. Drawn shapes are not official storm forecasts. Google Maps and Street View are external links. Automated tests and Windows packaging pass, but real multimonitor/UI and live feeds remain unverified until tested on hardware. Windows installer is unsigned; Mac paused, Android unchanged.'
           fi
           for attempt in 1 2 3 4 5; do
             if gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$FILE" --clobber; then break; fi
