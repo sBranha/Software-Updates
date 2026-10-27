@@ -1,6 +1,6 @@
 {
   "name": "newswire-command-center",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": true,
   "description": "Free nationwide storm warning command center using official NWS alert data",
   "main": "main.cjs",
@@ -37,7 +37,12 @@
       "panels.js",
       "desktop-concept3.html",
       "concept3.css",
-      "concept3-ui.js"
+      "concept3-ui.js",
+      "radar.js",
+      "tracking-engine.js",
+      "storm.html",
+      "storm.css",
+      "storm.js"
     ],
     "asar": true,
     "win": {
@@ -49,7 +54,7 @@
           ]
         }
       ],
-      "artifactName": "NewsWire-Command-Center-0.7.3-Windows-Setup.${ext}"
+      "artifactName": "NewsWire-Command-Center-0.7.4-Windows-Setup.${ext}"
     },
     "mac": {
       "target": [
@@ -61,7 +66,7 @@
           ]
         }
       ],
-      "artifactName": "NewsWire-Command-Center-0.7.3-Mac-${arch}.${ext}",
+      "artifactName": "NewsWire-Command-Center-0.7.4-Mac-${arch}.${ext}",
       "category": "public.app-category.weather"
     },
     "nsis": {
