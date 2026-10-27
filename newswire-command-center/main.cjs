@@ -1,9 +1,10 @@
 'use strict';
-const {app,BrowserWindow,shell,session,dialog,ipcMain,screen,Menu}=require('electron');
+const {app,BrowserWindow,shell,session,dialog,ipcMain,screen,Menu,net}=require('electron');
 const path=require('node:path');
 const {createBridge}=require('./deck-bridge.cjs');
 const W=require('./window-layout.cjs');
 const T=require('./tracking-engine.js');
+const {lookupCommunities}=require('./communities-service.cjs');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
 const views=new Map();
 const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html','storm-1':'storm.html','storm-2':'storm.html','storm-3':'storm.html','storm-4':'storm.html'};
@@ -156,6 +157,18 @@ app.whenReady().then(()=>{
   if(!map)return;
   const send=()=>map.webContents.send('newswire:workspace-track-request',slot,id);
   if(map.webContents.isLoading())map.webContents.once('did-finish-load',send);else send();
+ });
+ ipcMain.handle('newswire:communities-lookup',async(event,points)=>{
+  const owner=BrowserWindow.fromWebContents(event.sender);
+  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
+   return {ok:false,error:'Community lookup permitted only from an open storm tracking window.'};
+  try{
+   const result=await lookupCommunities(points,{fetchImpl:(url,opts)=>net.fetch(url,opts)});
+   return {ok:true,...result};
+  }catch(error){
+   console.error('NewsWire community lookup:',String(error.message||error).slice(0,450));
+   return {ok:false,error:String(error?.message||'Community lookup failed').slice(0,600)};
+  }
  });
  ipcMain.on('newswire:track-warning',(event,slot,raw)=>{
   if(event.sender!==views.get('map')?.webContents||![1,2,3,4].includes(slot))return;
