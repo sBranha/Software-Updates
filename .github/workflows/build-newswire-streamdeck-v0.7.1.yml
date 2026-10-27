@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NewsWire-v0.7.7-Windows-only
-          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.6-Windows-Setup.exe
+          path: newswire-command-center/dist/NewsWire-Command-Center-0.7.7-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 30
   release-windows:
@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="newswire-v0.7.7-windows-preview"
-          FILE="release-assets/NewsWire-Command-Center-0.7.6-Windows-Setup.exe"
+          FILE="release-assets/NewsWire-Command-Center-0.7.7-Windows-Setup.exe"
           test -s "$FILE"
           LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-offline-communities-v0.7.7" --jq '.object.sha')
           test "$GITHUB_SHA" = "$LATEST" || { echo "Superseded by a newer build; skipping publish"; exit 0; }
