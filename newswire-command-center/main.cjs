@@ -5,6 +5,7 @@ const {createBridge}=require('./deck-bridge.cjs');
 const W=require('./window-layout.cjs');
 const T=require('./tracking-engine.js');
 const {lookupCommunities}=require('./communities-service.cjs');
+const {fetchScans}=require('./radar-data/scan-service.cjs');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
 const views=new Map();
 const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html','storm-1':'storm.html','storm-2':'storm.html','storm-3':'storm.html','storm-4':'storm.html'};
@@ -179,6 +180,23 @@ app.whenReady().then(()=>{
   const send=()=>map.webContents.send('newswire:workspace-track-request',slot,id);
   if(map.webContents.isLoading())map.webContents.once('did-finish-load',send);else send();
  });
+ const radarScanCache=new Map();
+ ipcMain.handle('newswire:radar-scans',async(event,site,product)=>{
+  const owner=BrowserWindow.fromWebContents(event.sender);
+  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
+   return {ok:false,error:'Radar scan listings are available only in active storm desk windows'};
+  try{
+   const k=String(site)+':'+String(product);
+   const old=radarScanCache.get(k),now=Date.now();
+   if(old&&now-old.fetched<60000)return {...old.data,cached:true};
+   const r=await fetchScans(site,product,{fetchImpl:(url,opt)=>net.fetch(url,opt),now});
+   const data={ok:true,...r,fetchedAt:new Date(now).toISOString()};
+   radarScanCache.set(k,{fetched:now,data});
+   return data;
+  }catch(error){
+   return {ok:false,error:'Radar scan metadata unavailable: '+String(error?.message||error).slice(0,210)};
+  }
+ });
  ipcMain.handle('newswire:communities-lookup',async(event,points,expand=false)=>{
   const owner=BrowserWindow.fromWebContents(event.sender);
   if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
@@ -202,7 +220,7 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:track-updates',(event,items)=>{
   if(event.sender!==views.get('map')?.webContents||!Array.isArray(items))return;
   for(const x of items.slice(0,4)){
-   if(!x||![1,2].includes(x.slot)||!tracked[x.slot])continue;
+   if(!x||![1,2,3,4].includes(x.slot)||!tracked[x.slot])continue;
    const item=T.safeWarning(x.item);
    if(item&&item.id===tracked[x.slot].id)tracked[x.slot]=item;
   }
