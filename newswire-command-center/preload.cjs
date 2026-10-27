@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
  })},
  openPanel:type=>{if(['map','local','warnings','storm-1','storm-2'].includes(type))ipcRenderer.send('newswire:open-panel',type)},
  arrangePanels:()=>ipcRenderer.send('newswire:arrange-panels'),
+ requestTrack:(slot,id)=>{if([1,2].includes(slot)&&typeof id==='string')ipcRenderer.send('newswire:request-track',slot,id)},
+ onRequestTrack:listener=>{if(typeof listener==='function')ipcRenderer.on('newswire:workspace-track-request',(_e,slot,id)=>listener(slot,id))},
  trackWarning:(slot,data)=>{if([1,2].includes(slot)&&data&&typeof data==='object')ipcRenderer.send('newswire:track-warning',slot,data)},
  onTrackedWarning:listener=>{if(typeof listener==='function')ipcRenderer.on('newswire:tracked-warning',(_e,slot,item,feedOk)=>listener(slot,item,feedOk))},
  publishTrackUpdates:items=>{if(Array.isArray(items))ipcRenderer.send('newswire:track-updates',items)},
