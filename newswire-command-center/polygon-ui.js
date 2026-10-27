@@ -20,7 +20,7 @@ function clearGeometry(){
  if(shape){map.removeLayer(shape);shape=null}
  if(draft){map.removeLayer(draft);draft=null}
  if(vertices){map.removeLayer(vertices);vertices=null}
- if(!expand&&communityLayer){map.removeLayer(communityLayer);communityLayer=null}
+ if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
 }
 function paint(){
  clearGeometry();
@@ -63,15 +63,16 @@ async function lookup(expand=false){
  const token=++requestToken;
  working=true;buttons();
  if(!expand)$('places').replaceChildren();
- if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
+ if(!expand&&communityLayer){map.removeLayer(communityLayer);communityLayer=null}
  setStatus('placesStatus',expand?'Checking optional online neighborhoods; built-in towns remain available…':'Finding Census-based town centers inside your polygon (works offline)…');
- setStatus('communitySummary','COMMUNITY LOOKUP IN PROGRESS…');
+ if(!expand)setStatus('communitySummary','COMMUNITY LOOKUP IN PROGRESS…');
  try{
   const result=await bridge.lookupCommunities(points.map(p=>({lat:p.lat,lng:p.lng})),expand);
   if(token!==requestToken)return;
   if(!result?.ok)throw Error(result?.error||'Unknown lookup failure');
   const found=Array.isArray(result.places)?result.places:[];
   const list=$('places');list.replaceChildren();$('nearby').replaceChildren();
+  if(communityLayer){map.removeLayer(communityLayer);communityLayer=null}
   communityLayer=L.layerGroup().addTo(map);
   for(const place of found){
    const li=document.createElement('li'),name=document.createElement('strong'),kind=document.createElement('small');
