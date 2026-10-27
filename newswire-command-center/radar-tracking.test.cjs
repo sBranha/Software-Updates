@@ -53,3 +53,22 @@ test('two independent warning windows, separate position persistence and all IPC
  for(const f of ['radar.js','tracking-engine.js','storm.html','storm.css','storm.js'])assert.ok(pkg.build.files.includes(f),f);
  for(const f of ['radar.js','tracking-engine.js','storm.js','main.cjs','app.js','preload.cjs'])new Function(source[f]||fs.readFileSync(path.join(__dirname,f),'utf8'));
 });
+
+test('manual radar-watch pins are valid but do not claim NWS storm motion or automatic cell following',()=>{
+ const a=T.safeWarning({id:'manual-1',source:'manual',point:{lat:34.245,lon:-86.312}});
+ assert.ok(a?.manual);
+ assert.equal(a.geometry,null);
+ assert.equal(a.motion,null);
+ assert.equal(a.point.lat,34.245);
+ assert.match(a.instruction,/fixed viewing area/i);
+ assert.equal(T.safeWarning({id:'bad',source:'manual',point:{lat:200,lon:0}}),null);
+ const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
+ const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+ const html=fs.readFileSync(path.join(__dirname,'desktop-concept3.html'),'utf8');
+ const storm=fs.readFileSync(path.join(__dirname,'storm.js'),'utf8');
+ assert.match(main,/item\.manual/);
+ assert.match(app,/trackManualSlot/);
+ assert.match(html,/id="pinStorm1"/);
+ assert.match(html,/id="pinStorm2"/);
+ assert.match(storm,/fixed radar viewing point/i);
+});
