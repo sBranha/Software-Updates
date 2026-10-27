@@ -8,7 +8,7 @@ let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking
 let auto=true,voice=false,satellite=true,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
 let liveRadar=null,pinSlot=null;
-const selectedTracks={1:null,2:null};
+const selectedTracks={1:null,2:null,3:null,4:null};
 let home=null,pointIds=new Set(),localAlerts=[],localVerified=false,localError='',lastChecked=null;
 const sayStatus=message=>{$('status').textContent=message};
 function setting(k,v){try{if(v===undefined)return localStorage.getItem('nwcc-'+k);localStorage.setItem('nwcc-'+k,v)}catch(e){return null}}
@@ -29,7 +29,7 @@ function mapInit(){
  map=L.map('map',{preferCanvas:true,zoomControl:true,minZoom:3,maxZoom:17}).setView([39,-97],4);
  mapStyle();
  if(window.NewsWireRadar){
-  liveRadar=NewsWireRadar.createRadar(L,map,message=>{
+  liveRadar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,message=>{
    const el=$('radarFeed');if(el)el.textContent=message;
   });
   const radarOn=setting('radar')!=='false';liveRadar.show(radarOn);
@@ -114,7 +114,7 @@ function deckReport(){
   warnings:alerts.map(a=>({id:a.id,area:a.area,expires:a.expires,
    headline:a.headline,instruction:a.instruction,url:E.officialUrl(a)}))
  });
- if(typeof bridge.publishTrackUpdates==='function')bridge.publishTrackUpdates([1,2]
+ if(typeof bridge.publishTrackUpdates==='function')bridge.publishTrackUpdates([1,2,3,4]
   .map(slot=>({slot,item:alerts.find(a=>a.id===selectedTracks[slot])||null}))
   .filter(x=>x.item));
 }
@@ -136,7 +136,7 @@ function deckBind(){
 }
 function trackManualSlot(slot,point){
  const bridge=window.NewsWireDesktopBridge;
- if(!bridge||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lng)||![1,2].includes(slot))return;
+ if(!bridge||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lng)||![1,2,3,4].includes(slot))return;
  const item={id:'manual-radar-watch-'+slot+'-'+Date.now(),source:'manual',point:{lat:point.lat,lon:point.lng}};
  selectedTracks[slot]=item.id;
  bridge.trackWarning(slot,item);
@@ -147,7 +147,7 @@ function trackManualSlot(slot,point){
 function trackSelected(slot,item){
  const bridge=window.NewsWireDesktopBridge;
  if(!bridge||typeof bridge.trackWarning!=='function'||!feedOk)return;
- if(![1,2].includes(slot)||!item?.id)return;
+ if(![1,2,3,4].includes(slot)||!item?.id)return;
  selectedTracks[slot]=item.id;
  bridge.trackWarning(slot,{id:item.id,area:item.area,headline:item.headline,
   description:item.description,instruction:item.instruction,expires:item.expires,
@@ -170,7 +170,7 @@ function render(){
   b.append(title,sub);b.addEventListener('click',()=>select(a,true));group.append(b);
   if(window.NewsWireDesktopBridge){
    const ctl=document.createElement('div');ctl.className='trackControls';
-   for(const slot of [1,2]){
+   for(const slot of [1,2,3,4]){
     const t=document.createElement('button');t.type='button';t.textContent='Track '+slot+' ↗';
     t.title='Open tracked NWS warning area with independent live radar on storm window '+slot;
     t.addEventListener('click',()=>trackSelected(slot,a));ctl.append(t);
@@ -306,12 +306,19 @@ function bind(){
  $('auto').addEventListener('click',()=>{auto=!auto;setting('auto',String(auto));setButtons()});
  $('voice').addEventListener('click',()=>{voice=!voice;setting('voice',String(voice));setButtons()});
  $('style').addEventListener('click',()=>{satellite=!satellite;setting('satellite',String(satellite));mapStyle()});
- for(const slot of [1,2]){
+ for(const slot of [1,2,3,4]){
   $('pinStorm'+slot)?.addEventListener('click',()=>{
    if(!map){setText('mapHint','Map unavailable; cannot pin a watch area.');return}
    pinSlot=slot;setText('mapHint','Click a radar location to watch in Storm Tracker '+slot+'. This is a fixed radar viewing location.');
   });
  }
+ $('radarLoop')?.addEventListener('click',()=>{
+  if(!liveRadar)return;
+  if(!liveRadar.isShown())liveRadar.show(true);
+  const play=liveRadar.play?.(!liveRadar.isPlaying?.())||false;
+  $('radarLoop').textContent=play?'⏸ Pause Loop':'▶ Play Loop';
+  $('radarLoop').setAttribute('aria-pressed',String(play));
+ });
  $('radarToggle')?.addEventListener('click',()=>{
   if(!liveRadar)return;
   const shown=liveRadar.show(!liveRadar.isShown());setting('radar',String(shown));
