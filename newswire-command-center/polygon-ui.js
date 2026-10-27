@@ -5,7 +5,7 @@ const $=id=>document.getElementById(id),map=window.NewsWireStormMap,D=window.New
 if(!map||!D)return;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 const STORE='nwcc-drawn-track-'+slot;
-let drawing=false,points=[],shape=null,draft=null,lastRequest=0,requestToken=0;
+let drawing=false,points=[],shape=null,draft=null,vertices=null,lastRequest=0,requestToken=0;
 const setStatus=(id,t)=>{$(id).textContent=t};
 function buttons(){
  $('draw').textContent=drawing?'Cancel Drawing':'✎ Draw Polygon';
@@ -15,6 +15,7 @@ function buttons(){
 function clearGeometry(){
  if(shape){map.removeLayer(shape);shape=null}
  if(draft){map.removeLayer(draft);draft=null}
+ if(vertices){map.removeLayer(vertices);vertices=null}
 }
 function paint(){
  clearGeometry();
@@ -25,7 +26,8 @@ function paint(){
  }
  if(points.length){
   draft=L.polyline(points,{color:'#ffd552',weight:4,dashArray:'7 4'}).addTo(map);
-  points.forEach(p=>L.circleMarker(p,{radius:4,color:'#ffd552',weight:2,fillOpacity:1}).addTo(draft));
+  vertices=L.layerGroup().addTo(map);
+  points.forEach(p=>L.circleMarker(p,{radius:4,color:'#ffd552',weight:2,fillOpacity:1}).addTo(vertices));
  }
 }
 function cancel(){
