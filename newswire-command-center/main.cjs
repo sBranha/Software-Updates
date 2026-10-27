@@ -158,12 +158,12 @@ app.whenReady().then(()=>{
   const send=()=>map.webContents.send('newswire:workspace-track-request',slot,id);
   if(map.webContents.isLoading())map.webContents.once('did-finish-load',send);else send();
  });
- ipcMain.handle('newswire:communities-lookup',async(event,points)=>{
+ ipcMain.handle('newswire:communities-lookup',async(event,points,expand=false)=>{
   const owner=BrowserWindow.fromWebContents(event.sender);
   if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||!owner.webContents.getURL().includes('/storm.html'))
    return {ok:false,error:'Community lookup permitted only from an open storm tracking window.'};
   try{
-   const result=await lookupCommunities(points,{fetchImpl:(url,opts)=>net.fetch(url,opts)});
+   const result=await lookupCommunities(points,{expand:expand===true,fetchImpl:(url,opts)=>net.fetch(url,opts)});
    return {ok:true,...result};
   }catch(error){
    console.error('NewsWire community lookup:',String(error.message||error).slice(0,450));
