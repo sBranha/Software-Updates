@@ -27,7 +27,7 @@ function ridgeOptions(site,product){if(!siteFor(site)||!productFor(product))thro
 function createSiteRadar(L,map,onState){
  if(!L?.tileLayer?.wms)throw Error('Leaflet WMS required');
  const notify=typeof onState==='function'?onState:()=>{};
- let site='KHTX',product='N0B',layer=null,shown=false,lastLoaded=null,errorTiles=0;
+ let site='KHTX',product='N0B',layer=null,shown=false,lastLoaded=null,errorTiles=0,scanTime=null;
  function status(msg){notify(msg)}
  function remove(){
   if(layer&&map.hasLayer(layer))map.removeLayer(layer);
@@ -36,7 +36,7 @@ function createSiteRadar(L,map,onState){
  function select(siteID,productID){
   if(!siteFor(siteID))throw Error('Unknown NEXRAD radar site');
   if(!productFor(productID))throw Error('Unsupported radar product');
-  site=siteID;product=productID;lastLoaded=null;errorTiles=0;
+  site=siteID;product=productID;lastLoaded=null;errorTiles=0;scanTime=null;
   remove();
   const cfg=ridgeOptions(site,product);
   const layerNew=L.tileLayer.wms(WMS+'?sector='+cfg.sector+'&prod='+cfg.prod,{
@@ -58,6 +58,31 @@ function createSiteRadar(L,map,onState){
   status(site+' '+product+' single-site RIDGE image requested; scan time not verified');
   return {site,product};
  }
+ // Display a specific REAL UTC archived Level III scan, not a duplicated latest frame.
+ function showScan(iso){
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(String(iso))||
+     !Number.isFinite(Date.parse(iso)))throw Error('Invalid observation UTC scan time');
+  if(!L.tileLayer)throw Error('Leaflet raster tile layers unavailable');
+  const timestamp=iso.replace(/[-:TZ]/g,'');
+  const layerID='ridge::'+site.slice(1)+'-'+product+'-'+timestamp;
+  const url='https://mesonet.agron.iastate.edu/c/tile.py/1.0.0/'+layerID+'/{z}/{x}/{y}.png';
+  remove();scanTime=iso;errorTiles=0;
+  const newLayer=L.tileLayer(url,{maxZoom:18,maxNativeZoom:12,opacity:.86,
+   attribution:'NOAA NEXRAD Level III archived radar via Iowa Environmental Mesonet'});
+  newLayer.on('tileload',()=>{
+   if(layer!==newLayer)return;lastLoaded=Date.now();errorTiles=0;
+   status(site+' '+product+' observed '+scanTime+' (UTC, IEM archive)');
+  });
+  newLayer.on('tileerror',()=>{
+   if(layer!==newLayer)return;
+   if(++errorTiles>=3)status(site+' '+product+' archive image missing for '+scanTime);
+  });
+  layer=newLayer;
+  if(shown){layer.addTo(map);layer.bringToFront()}
+  status('Loading '+site+' '+product+' observed '+scanTime+' from archive');
+  return scanTime;
+ }
+ function showLatest(){select(site,product);return scanTime}
  function show(on){
   shown=Boolean(on);
   if(shown){
@@ -69,13 +94,13 @@ function createSiteRadar(L,map,onState){
   return shown;
  }
  function refresh(){
-  if(shown&&layer){
+  if(shown&&layer&&!scanTime){
    layer.setParams({_nw_refresh:Math.floor(Date.now()/300000)},false);
    status('Refreshing '+site+' '+product+' from IEM RIDGE (timestamp unverified)…');
   }
  }
  function dispose(){show(false);remove()}
- return {select,show,refresh,dispose,site:()=>site,product:()=>product,isShown:()=>shown,lastLoaded:()=>lastLoaded};
+ return {select,show,showScan,showLatest,refresh,dispose,site:()=>site,product:()=>product,isShown:()=>shown,lastLoaded:()=>lastLoaded,scanTime:()=>scanTime};
 }
 return {WMS,SITES,PRODUCTS,siteFor,productFor,ridgeOptions,createSiteRadar};
 });
