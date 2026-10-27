@@ -49,6 +49,7 @@ test('new v0.8.4 controls preserve radar source selection and packaged module',(
  assert.ok(pkg.build.files.includes('storm-motion.js'));
  for(const id of ['mainMotionPick','mainMotionClear','mainMotionFocus','mainMotionStatus','mainMotionGuide'])
   assert.match(html,new RegExp('id="'+id+'"'));
- assert.match(main,/observedPair/);
+ assert.match(main,/NewsWireMotionUI/);
+ assert.match(fs.readFileSync(path.join(__dirname,'main-motion-ui.js'),'utf8'),/observedPair/);
  assert.match(storm,/bulletinGuide/);
 });
