@@ -47,7 +47,7 @@ test('large OSM result sets marked potentially incomplete, never definitive',asy
 });
 test('desktop UI calls native bridge, maps places and provides retry and explicit feedback',()=>{
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.4');
+ assert.equal(pkg.version,'0.8.5');
  assert.ok(pkg.build.files.includes('communities-service.cjs'));
  assert.ok(pkg.build.files.includes('offline-cities.cjs'));
  const preload=fs.readFileSync(path.join(__dirname,'preload.cjs'),'utf8');
