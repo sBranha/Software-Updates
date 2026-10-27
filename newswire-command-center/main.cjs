@@ -17,13 +17,20 @@ function external(url){
   if(u.protocol!=='https:')return;
   if(SAFE_LINKS.has(u.hostname)){shell.openExternal(u.toString());return}
   // Google Street View outbound links only; no arbitrary external Google URLs.
-  if(u.hostname==='www.google.com'&&u.pathname==='/maps/@'&&
-      u.searchParams.get('api')==='1'&&u.searchParams.get('map_action')==='pano'){
-   const p=u.searchParams.get('viewpoint')||'';
+  if(u.hostname==='www.google.com'&&u.pathname==='/maps/@'&&u.searchParams.get('api')==='1'){
+   const action=u.searchParams.get('map_action');
+   const p=(action==='pano'?u.searchParams.get('viewpoint'):
+     action==='map'?u.searchParams.get('center'):null)||'';
    const coords=p.split(',').map(Number);
-   if(coords.length===2&&Number.isFinite(coords[0])&&Number.isFinite(coords[1])&&
-      Math.abs(coords[0])<=90&&Math.abs(coords[1])<=180){
-    shell.openExternal(u.toString());
+   const ok=coords.length===2&&Number.isFinite(coords[0])&&Number.isFinite(coords[1])&&
+     Math.abs(coords[0])<=90&&Math.abs(coords[1])<=180;
+   if(!ok)return;
+   if(action==='pano'){shell.openExternal(u.toString());return}
+   if(action==='map'){
+    const zoom=Number(u.searchParams.get('zoom'));
+    const style=u.searchParams.get('basemap');
+    if(Number.isInteger(zoom)&&zoom>=0&&zoom<=21&&
+       ['roadmap','satellite','terrain'].includes(style))shell.openExternal(u.toString());
    }
   }
  }catch(_){}
