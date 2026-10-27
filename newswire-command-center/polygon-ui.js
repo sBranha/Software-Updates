@@ -43,8 +43,20 @@ function focusPolygon(animate=false){
  return true;
 }
 function cancellation(){
- drawing=false;window.NWPolygonIsDrawing=false;points=[];clearGeometry();setStatus('drawStatus','Drawing canceled. Previous polygon was not saved.');
- buttons();
+ drawing=false;window.NWPolygonIsDrawing=false;requestToken++;working=false;
+ try{
+  const saved=JSON.parse(localStorage.getItem(STORE)||'null');
+  points=D.validPolygon(saved)?saved:[];
+ }catch(_){points=[]}
+ paint();buttons();
+ if(D.validPolygon(points)){
+  setStatus('drawStatus','Drawing canceled. Your previous saved polygon has been restored in this storm desk.');
+  lookup();
+ }else{
+  setStatus('drawStatus','Drawing canceled. No saved polygon for this storm desk.');
+  setStatus('communitySummary','NO DRAWN AREA');
+  $('places').replaceChildren();$('nearby').replaceChildren();$('nearbyHeading').hidden=true;
+ }
 }
 function clear(){
  drawing=false;window.NWPolygonIsDrawing=false;points=[];requestToken++;working=false;clearGeometry();
@@ -151,6 +163,6 @@ map.on('click',event=>{
  points.push(p);paint();buttons();
  setStatus('drawStatus',points.length+' corners selected. '+(points.length>=3?'Press Finish Shape to look up communities.':'Add more corners.'));
 });
-window.addEventListener('newswire:slot-changed',()=>{if(!drawing)clear()});
+// Selecting a new NWS warning must never erase the user-drawn polygon for this desk.
 buttons();restore();
 })();
