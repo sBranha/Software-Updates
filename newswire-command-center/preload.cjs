@@ -2,9 +2,9 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
  reportState:s=>{if(s&&typeof s==='object')ipcRenderer.send('newswire:deck-state',s)},
- lookupCommunities:points=>{
+ lookupCommunities:(points,expand=false)=>{
   if(!Array.isArray(points)||points.length<3||points.length>40)return Promise.resolve({ok:false,error:'Draw 3 to 40 corners.'});
-  return ipcRenderer.invoke('newswire:communities-lookup',points);
+  return ipcRenderer.invoke('newswire:communities-lookup',points,expand===true);
  },
  onAction:listener=>{if(typeof listener==='function')ipcRenderer.on('newswire:deck-action',(_e,action)=>{
   if(typeof action==='string')listener(action)
