@@ -147,6 +147,14 @@ app.whenReady().then(()=>{
    win.webContents.send('newswire:workspace-state',latest);
   sendTracked(1);sendTracked(2);
  });
+ ipcMain.on('newswire:request-track',(event,slot,id)=>{
+  if(!isTrusted(event.sender)||![1,2].includes(slot)||typeof id!=='string'||id.length>350)return;
+  if(!latest?.feedOk||!latest.warnings.some(a=>a.id===id))return;
+  const map=newWindow('map');
+  if(!map)return;
+  const send=()=>map.webContents.send('newswire:workspace-track-request',slot,id);
+  if(map.webContents.isLoading())map.webContents.once('did-finish-load',send);else send();
+ });
  ipcMain.on('newswire:track-warning',(event,slot,raw)=>{
   if(event.sender!==views.get('map')?.webContents||![1,2].includes(slot))return;
   const item=T.safeWarning(raw);
