@@ -6,6 +6,7 @@ const W=require('./window-layout.cjs');
 const T=require('./tracking-engine.js');
 const {lookupCommunities}=require('./communities-service.cjs');
 const {fetchScans}=require('./radar-data/scan-service.cjs');
+const {scan:scanAutoEcho}=require('./radar-data/auto-echo.cjs');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
 const views=new Map();
 const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html','storm-1':'storm.html','storm-2':'storm.html','storm-3':'storm.html','storm-4':'storm.html'};
@@ -209,6 +210,30 @@ app.whenReady().then(()=>{
   }catch(error){
    return {ok:false,error:'Radar scan metadata unavailable: '+String(error?.message||error).slice(0,210)};
   }
+ });
+ const echoCache=new Map(),echoPending=new Map();
+ ipcMain.handle('newswire:auto-echo',async(event,site)=>{
+  const owner=BrowserWindow.fromWebContents(event.sender);
+  if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||owner!==views.get('map'))
+   return {ok:false,error:'Automatic echo analysis requires the active main radar'};
+  if(!['KHTX','KOHX','KFFC','KMRX'].includes(site))
+   return {ok:false,error:'Unsupported radar station'};
+  const clock=Date.now(),cached=echoCache.get(site);
+  if(cached&&clock-cached.when<90000)return {...cached.data,cached:true};
+  if(echoPending.has(site))return echoPending.get(site);
+  const task=(async()=>{
+   try{
+    const result=await scanAutoEcho(site,{fetchImpl:(url,opt)=>net.fetch(url,opt),now:clock});
+    if(!result.ok)return result;
+    const data={...result,analyzedAt:new Date(clock).toISOString()};
+    echoCache.set(site,{when:clock,data});
+    return data;
+   }catch(error){
+    return {ok:false,error:'Experimental radar echo tracking unavailable: '+String(error?.message||error).slice(0,220)};
+   }
+  })();
+  echoPending.set(site,task);
+  try{return await task}finally{echoPending.delete(site)}
  });
  ipcMain.handle('newswire:communities-lookup',async(event,points,expand=false)=>{
   const owner=BrowserWindow.fromWebContents(event.sender);

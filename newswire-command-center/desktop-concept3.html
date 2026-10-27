@@ -65,6 +65,7 @@
    <button id="mainLatest" title="Update to latest actual radar scan">↻ Latest</button>
    <button id="mainLoop" title="Play or pause radar frames">⏸ Loop</button>
    <button id="mainWarningToggle" aria-pressed="true">NWS Polygons: ON</button><button id="mainMotionGuide" type="button" aria-pressed="false" title="Official bulletin motion from the warning area centroid, not actual storm coordinates">NWS Motion Guides: OFF</button>
+   <button id="mainAutoEchoToggle" type="button" aria-pressed="false" title="Detect and compare colored NEXRAD reflectivity echo regions between actual published scans; experimental, not tornado detection">◌ Auto Echoes: OFF</button>
    <button id="mainAnalysisToggle" aria-expanded="false" aria-controls="mainAnalysisDrawer">✎ Draw / Analyze</button>
    <button id="studioAlerts" type="button" aria-pressed="false" title="See official NWS warnings without leaving the map">⚠ Warnings Panel</button>
    <button id="studioToggle" type="button" aria-pressed="true" title="Toggle full-map meteorology workspace without requiring pop-out radar windows">↩ Standard Layout</button>
@@ -82,7 +83,13 @@
      <ul id="mainPlaces"></ul>
      <button id="mainFindMore" disabled>Find More Communities (Online)</button>
     </div>
-    <div class="drawerSection"><strong>Scan-to-Scan Echo Motion · Measured by You</strong>
+    <div class="drawerSection autoEchoSection"><strong>Automatic Reflectivity Echo Tracks · EXPERIMENTAL</strong>
+ <p>NewsWire downloads actual NEXRAD N0B archive images, identifies connected colored radar echo regions, and compares successive scans to estimate movement. No manual clicking needed. Shapes can be merged/split, weak echoes missed, and matching can be wrong. These are NOT official storm cells, tornado or rotation detections, or arrival-time forecasts. Never replace NWS warnings.</p>
+ <div class="drawerRow"><button id="mainAutoEchoRefresh" disabled>↻ Scan Again</button></div>
+ <div id="mainAutoEchoStatus" class="drawerStatus" role="status">Enable Auto Echoes above to analyze your selected radar site. Radar data may be unavailable or stale.</div>
+ <ul id="mainAutoEchoList"></ul>
+ </div>
+ <div class="drawerSection"><strong>Scan-to-Scan Echo Motion · Measured by You</strong>
  <p>Choose single-site radar with actual scan history. Pause on an older scan and click an identifiable storm echo core; step to a later scan and click the SAME core. NewsWire calculates observed displacement and a dashed +10/+20/+30 minute linear projection. Not automatic storm identification, tornado detection, or arrival times.</p>
  <div class="drawerRow"><button id="mainMotionPick">⌖ Mark Two Scan Cores</button><button id="mainMotionFocus" disabled>◎ Focus Motion</button><button id="mainMotionClear">Clear Motion</button></div>
  <div id="mainMotionStatus" class="drawerStatus" role="status">Select single-site radar and two actual observed scans before measuring movement.</div>
@@ -122,5 +129,5 @@
  <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / MULTI-STORM RADAR</div><div class="miniTitle">▦ Track 4 Radar Areas</div><p id="trackedState">Pick Track 1–4 beside a warning, or pin any location.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button><button type="button" data-open-panel="storm-3">Storm 3 ↗</button><button type="button" data-open-panel="storm-4">Storm 4 ↗</button></div></div>
 </div>
 <footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="auto-echo-ui.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
 </body></html>

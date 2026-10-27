@@ -32,6 +32,7 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
  let radarOn=safeGet('radar')!=='false';
  let drawing=false,points=[],area=null,pointsLayer=null,communityLayer=null,lookupToken=0,lookupWorking=false;
  let picking=false,gates=[],gateLayer=null;
+ let autoEchoUI=null;
  const motionUI=window.NewsWireMotionUI?.init({L,map,
   snapshot:()=>({mode,site,product,frames:siteFrames,index:frameIndex}),
   stopLoop:cancelTimer,
@@ -126,6 +127,7 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
   if(keepOn)active.show(true);
   if(typeof setActive==='function')setActive(active);
   persistCfg();buttons();
+  autoEchoUI?.radarChanged();
   if(mode==='site')loadScans();
   else update('mainScanTime','National mosaic · approximate frame age, not verified observation time');
  }
@@ -318,6 +320,11 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
  if(mode==='site'){composite.show(false);active=siteRadar;if(radarOn)active.show(true);loadScans()}
  else{active=composite;if(!radarOn)active.show(false)}
  setActive?.(active);buttons();
+ autoEchoUI=window.NewsWireAutoEchoUI?.init({
+  L,map,snapshot:()=>({mode,site,product}),
+  selectReflectivity:()=>{if(mode!=='site'||product!=='N0B')activate('site',site,'N0B')},
+  onInteraction
+ });
  if(mode==='mosaic')update('mainScanTime','National mosaic · approximate frame age');
  const refreshTimer=setInterval(()=>{if(mode==='site'&&radarOn)loadScans()},120000);
  window.addEventListener('beforeunload',()=>{clearInterval(refreshTimer);stopSite();siteRadar.dispose?.()});
