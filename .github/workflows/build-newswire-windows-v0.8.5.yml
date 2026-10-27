@@ -2,7 +2,7 @@ name: NewsWire v0.8.5 Windows EXE
 on:
   push:
     branches:
-      - newswire-storm-motion-v0.8.5
+      - newswire-automated-echoes-v0.8.5
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-windows-v0.8.5.yml'
