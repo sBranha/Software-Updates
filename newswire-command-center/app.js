@@ -119,7 +119,7 @@ function deckReport(){
 function deckBind(){
  if(!window.NewsWireDesktopBridge)return;
  const ids={'home':'home','country':'country','resume':'resume','auto':'auto',
-  'voice':'voice','satellite':'style','refresh':'refresh'};
+  'voice':'voice','satellite':'style','radar':'radarToggle','refresh':'refresh'};
  window.NewsWireDesktopBridge.onAction(action=>{
   if(action==='warning-latest'||action==='warning-next'){
    if(alerts.length){
