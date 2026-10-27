@@ -7,9 +7,47 @@ const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 $('title').textContent='Storm Tracker '+(String(slot));
 const map=L.map('map',{zoomControl:true}).setView([39,-97],5);
 window.NewsWireStormMap=map;
-const base=L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}',{
- attribution:'Imagery: U.S. Geological Survey',maxZoom:17,maxNativeZoom:16
-}).addTo(map);
+const MV=window.NewsWireMapViews;
+const settingKey='nwcc-storm-map-mode-'+slot;
+let mapMode='satellite',base,streetPicking=false;
+function mapStyle(mode){
+ mapMode=MV.normalize(mode);
+ if(base)map.removeLayer(base);
+ base=MV.createLayer(L,mapMode).addTo(map).bringToBack();
+ for(const [id,key] of [['satellite','satellite'],['streets','streets'],['terrain','terrain']]){
+  const button=$(id);button.setAttribute('aria-pressed',String(mapMode===key));
+ }
+ try{localStorage.setItem(settingKey,mapMode)}catch(_){}
+}
+try{mapMode=MV.normalize(localStorage.getItem(settingKey))}catch(_){}
+mapStyle(mapMode);
+function cancelStreetPicking(){
+ streetPicking=false;
+ $('streetView').textContent='Street View ↗';
+ $('streetView').setAttribute('aria-pressed','false');
+ map.getContainer().style.cursor='';
+}
+window.NWStreetViewCancel=cancelStreetPicking;
+function toggleStreetPicking(){
+ if(window.NWPolygonIsDrawing){
+  $('drawStatus').textContent='Finish or cancel drawing your polygon before choosing a Street View point.';
+  return;
+ }
+ streetPicking=!streetPicking;
+ $('streetView').setAttribute('aria-pressed',String(streetPicking));
+ $('streetView').textContent=streetPicking?'✕ Cancel Street View':'Street View ↗';
+ map.getContainer().style.cursor=streetPicking?'crosshair':'';
+ $('streetViewHint').textContent=streetPicking?'Click a road or place on this map. Google Street View will open in your browser; images may be older and are not live.':
+  'Pan or zoom to a location, then choose Street View and click the map.';
+}
+map.on('click',event=>{
+ if(!streetPicking||window.NWPolygonIsDrawing)return;
+ cancelStreetPicking();
+ try{
+  window.open(MV.streetViewUrl(event.latlng.lat,event.latlng.lng),'_blank','noopener,noreferrer');
+  $('streetViewHint').textContent='Opening Google Street View at the selected point. Imagery is not available everywhere.';
+ }catch(error){$('streetViewHint').textContent='Street View unavailable: '+error.message}
+});
 const radar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,s=>$('radarState').textContent=s);
 radar.show(true);
 map.createPane('warning');
@@ -69,10 +107,10 @@ $('loop').addEventListener('click',()=>{
  $('loop').setAttribute('aria-pressed',String(playing));
  $('loop').textContent=playing?'⏸ Pause Loop':'▶ Play Loop';
 });
-$('satellite').addEventListener('click',()=>{
- const on=map.hasLayer(base);if(on)map.removeLayer(base);else base.addTo(map).bringToBack();
- $('satellite').setAttribute('aria-pressed',String(!on));$('satellite').textContent='Satellite: '+(!on?'ON':'OFF');
-});
+$('satellite').addEventListener('click',()=>mapStyle('satellite'));
+$('streets').addEventListener('click',()=>mapStyle('streets'));
+$('terrain').addEventListener('click',()=>mapStyle('terrain'));
+$('streetView').addEventListener('click',toggleStreetPicking);
 $('focus').addEventListener('click',()=>{
  if(selection?.manual&&selection.point)map.flyTo([selection.point.lat,selection.point.lon],9);
  else if(warningLayer&&warningLayer.getBounds().isValid())map.fitBounds(warningLayer.getBounds().pad(.6),{maxZoom:9});
