@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.NewsWireDrawnTracks=api;})(typeof window!=='undefined'?window:globalThis,function(){
 'use strict';
 const TYPES=new Set(['city','town','village','hamlet','suburb','neighbourhood']);
-const HOSTS=['https://overpass.kumi.systems/api/interpreter','https://overpass-api.de/api/interpreter'];
+const HOSTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 function validPoint(p){return p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180}
 function validPolygon(points){
  return Array.isArray(points)&&points.length>=3&&points.length<=40&&points.every(validPoint)
