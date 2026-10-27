@@ -80,3 +80,8 @@ a.tab:hover{text-decoration:none;background:#195681}.tab.current,.tab[aria-press
 @media(max-width:1200px){#radarFeed{max-width:30%}.dualButtons button{font-size:10px}}
 
 .dualButtons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.mapActions{flex-wrap:wrap;max-width:98%}#radarLoop[aria-pressed="true"]{background:#124d7c;color:#abf4ff}
+
+/* Compact map-choice controls: usable in a broadcast-style multi-monitor workspace. */
+.mapTabs{gap:6px}.mapTabs .tabSet{display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:wrap}
+#style[aria-pressed="true"],#streetMap[aria-pressed="true"],#terrainMap[aria-pressed="true"]{background:#0869ba;border-color:#90dfff;color:#fff}
+#streetView[aria-pressed="true"]{background:#736021;border-color:#e6c963;color:#fff}
