@@ -65,7 +65,7 @@ function newWindow(type,options={}){
    backgroundThrottling:false,preload:path.join(__dirname,'preload.cjs')}
  });
  views.set(type,win);
- win.once('ready-to-show',()=>{if(!win.isDestroyed()){win.show();if(latest&&type!=='map')win.webContents.send('newswire:workspace-state',latest)}});
+ win.once('ready-to-show',()=>{if(!win.isDestroyed()){if(type==='map')win.maximize();win.show();if(latest&&type!=='map')win.webContents.send('newswire:workspace-state',latest)}});
  win.on('move',()=>remember(type,win));
  win.on('resize',()=>remember(type,win));
  win.on('close',()=>{remember(type,win);savePositions()});
@@ -156,8 +156,15 @@ app.whenReady().then(()=>{
  ipcMain.on('newswire:toggle-window-fullscreen',event=>{
   if(!isTrusted(event.sender))return;
   const owner=BrowserWindow.fromWebContents(event.sender);
-  if(!owner||owner.isDestroyed()||![1,2,3,4].some(slot=>views.get('storm-'+slot)===owner))return;
+  if(!owner||owner.isDestroyed()||!(views.get('map')===owner||[1,2,3,4].some(slot=>views.get('storm-'+slot)===owner)))return;
   owner.setFullScreen(!owner.isFullScreen());
+ });
+ ipcMain.on('newswire:exit-window-fullscreen',event=>{
+  if(!isTrusted(event.sender))return;
+  const owner=BrowserWindow.fromWebContents(event.sender);
+  if(!owner||owner.isDestroyed()||!(views.get('map')===owner||
+    [1,2,3,4].some(slot=>views.get('storm-'+slot)===owner)))return;
+  if(owner.isFullScreen())owner.setFullScreen(false);
  });
  ipcMain.on('newswire:workspace-state',(event,s)=>{
   if(!isTrusted(event.sender)||views.get('map')?.webContents!==event.sender||!s||typeof s!=='object')return;
