@@ -53,3 +53,13 @@ body.radarOnly .stormMapCol{min-height:0}
 #siteScanTime{font-size:11px;color:#eddb9e;min-width:195px}
 #sitePrev,#siteNext,#siteLatest{border-color:#6890aa;background:#1a4966}
 #sitePrev:disabled,#siteNext:disabled{opacity:.35}
+
+/* Human-reviewed velocity couplet analysis; cannot auto-detect rotation. */
+.rotationTools{background:linear-gradient(125deg,#102d49,#1c2b46);border:1px solid #527eab;border-radius:10px;padding:13px}
+.rotationTools h3{font-size:13px;color:#d2f5ff;margin:0 0 5px}
+.rotationTools p{font-size:11px;color:#c4d4e1;margin:6px 0}
+.rotationActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0}
+.rotationActions label{flex:1 1 90px;font-size:10px;color:#c3dfea}
+.rotationActions input{display:block;width:100%;margin-top:3px;border:1px solid #4e7fa7;border-radius:5px;background:#11263d;color:white;padding:7px}
+#rotationPicked,#rotationResult{font-size:11px;color:#ecdcaf;overflow-wrap:anywhere;margin:8px 0}
+#rotationResult{background:#1c3047;border:1px solid #3c5973;padding:10px;border-radius:7px}
