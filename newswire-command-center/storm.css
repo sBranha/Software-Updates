@@ -35,3 +35,11 @@
 #satellite[aria-pressed="true"],#streets[aria-pressed="true"],#terrain[aria-pressed="true"]{background:#0864ac;border-color:#86dfff}
 #streetView[aria-pressed="true"]{background:#665622;color:#fff6c6;border-color:#ffcd45}
 @media(max-width:800px){.stormMapCol #map{min-height:43vh}}
+
+/* Per-monitor independent meteorology controls. Each selection belongs to this Electron window. */
+.studioRadarBar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:9px 12px;background:linear-gradient(100deg,#08273c,#0d354b);border-bottom:1px solid #406480}
+.studioRadarBar label{font-size:10px;font-weight:800;color:#8dc7e9;letter-spacing:.07em}
+.studioRadarBar select{font-size:12px;color:#eff9ff;background:#12334c;border:1px solid #43789b;border-radius:5px;padding:7px;max-width:230px}
+.studioRadarBar select:disabled,.studioRadarBar button:disabled{opacity:.48}
+.studioRadarInfo{font-size:11px;color:#d3e7f4;flex:1 1 220px;text-align:right}
+@media(max-width:850px){.studioRadarBar{gap:4px}.studioRadarBar select{max-width:150px}.studioRadarInfo{flex-basis:100%;text-align:left}}
