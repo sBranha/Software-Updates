@@ -1,1 +1,16 @@
 :root{color-scheme:dark;--line:#345878;--text:#ecf8ff}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:#071a2e;color:var(--text)}body{display:flex;flex-direction:column;overflow:hidden}header{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;gap:12px;background:#0b243d;border-bottom:1px solid var(--line)}.identity{display:flex;gap:10px;align-items:center}.bolt{font-size:29px;background:#07569b;border-radius:9px;padding:6px}.eyebrow{font-size:10px;color:#79caff;letter-spacing:.13em;font-weight:800}h1{margin:0;font-size:20px}h2{font-size:19px;color:#d6f0ff}.controls{display:flex;flex-wrap:wrap;gap:7px}button{border:1px solid #326b9a;border-radius:7px;padding:8px 10px;color:#e9f7ff;background:#143754;font-weight:750;cursor:pointer}button:hover{background:#225781}button[aria-pressed="true"]{background:#06579e}.notice{padding:8px 14px;background:#382b1c;border-bottom:1px solid #745836;color:#ffdfa2;font-size:12px}.layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,310px)}#map{height:100%;width:100%;background:#0b293f;min-width:0}aside{padding:14px;display:flex;gap:12px;flex-direction:column;background:#0c223a;border-left:1px solid #355b7a;overflow:auto}.status{font-size:12px;color:#ffdf9f;background:#3d3022;border:1px solid #6a5334;padding:11px;border-radius:8px}.status.live{color:#bcfbdd;background:#123c35;border-color:#2b765f}.data{padding:10px 0;border-bottom:1px solid #284660}.data span{display:block;color:#83bfe3;font-size:10px;font-weight:850;letter-spacing:.1em}.data b{display:block;font-size:14px;margin-top:4px}.description{font-size:12px;color:#b7d0e4;white-space:pre-wrap;line-height:1.55;overflow-wrap:anywhere}a{color:#76d4ff;font-weight:730}footer{flex:none;padding:9px 13px;font-size:10px;color:#98b5cf;background:#07182a;border-top:1px solid #284863}.leaflet-container{background:#0b2a42}.leaflet-control-zoom a{background:#102c46!important;color:white!important}@media(max-width:800px){header{flex-wrap:wrap}.layout{grid-template-columns:1fr}#map{min-height:48vh}aside{max-height:40vh}footer{display:none}}
+
+/* User-drawn polygons and approximate OpenStreetMap community results */
+.polygonTools{background:linear-gradient(135deg,#173a52,#082333);border:1px solid #3a6984;border-radius:12px;padding:14px}
+.polygonTools h3{color:#a6e8ff;font-size:13px;letter-spacing:.045em;margin:0 0 8px}
+.polygonTools p{font-size:12px;color:#c2d7e6;margin:0 0 10px}
+.toolRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:9px 0}
+.toolRow button{font-size:11px;min-width:0;padding:8px 5px}
+.toolRow button:disabled{opacity:.4;cursor:not-allowed}
+#draw{background:#756026;border-color:#d9b34b}
+.drawStatus,.placesStatus{font-size:12px;color:#ffe6a4;background:#292b30;border:1px solid #5f5b49;border-radius:6px;padding:9px;margin:10px 0}
+#places{max-height:260px;overflow:auto;padding-left:19px;margin:8px 0 14px}
+#places li{padding:5px 2px;border-bottom:1px solid #21415b;color:#e4f6ff}
+#places small{color:#9bbbd3}
+.advisory{font-size:11px;color:#ffdda0;border-top:1px solid #655837;padding-top:9px;line-height:1.5}
+#loop[aria-pressed="true"]{background:#095d91;border-color:#62ceff}
