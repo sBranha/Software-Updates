@@ -25,3 +25,5 @@
 #nearby{padding:0 0 0 18px;margin:7px 0 10px;font-size:12px;color:#a6bfd6}
 #nearby li{padding:4px 2px}
 .communitySummary{color:#e1fbff;background:#124264;border-color:#35a0c9}
+
+#focusArea{background:#125675;border-color:#63d5f3;grid-column:span 2}#focusArea:disabled{opacity:.44}#placesStatus,#drawStatus{overflow-wrap:break-word;word-break:normal}.communitySummary{position:sticky;top:0;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.3)}
