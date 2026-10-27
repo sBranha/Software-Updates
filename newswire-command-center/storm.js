@@ -4,7 +4,7 @@
 const $=id=>document.getElementById(id);
 const bridge=window.NewsWireDesktopBridge;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
-$('title').textContent='Storm Tracker '+(slot===2?'2':'1');
+$('title').textContent='Storm Tracker '+(String(slot));
 const map=L.map('map',{zoomControl:true}).setView([39,-97],5);
 window.NewsWireStormMap=map;
 const base=L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}',{
