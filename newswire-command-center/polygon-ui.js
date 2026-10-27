@@ -124,7 +124,7 @@ function restore(){
 }
 $('draw').addEventListener('click',()=>{
  if(drawing){cancellation();return}
- window.NWStreetViewCancel?.();
+ window.NWStreetViewCancel?.();window.NWVelocityCancel?.();
  drawing=true;window.NWPolygonIsDrawing=true;points=[];requestToken++;working=false;clearGeometry();
  setStatus('communitySummary','DRAWING A NEW USER ESTIMATE');
  setStatus('drawStatus','Click 3–40 map corners, then Finish Shape. This is YOUR outline, not an official storm path.');
