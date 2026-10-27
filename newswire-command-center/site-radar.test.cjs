@@ -54,7 +54,7 @@ test('four detachables get individual site/product and saved polygon keys',()=>{
  assert.match(code,/saveRadar\(\)/);
  assert.match(draw,/nwcc-drawn-track-'\+slot/);
  assert.doesNotMatch(draw,/newswire:slot-changed/);
- assert.match(code,/radarMode==='site'\?'site':/); // Guard against replacing site mode with mosaic silently.
+ assert.match(code,/radarMode==='site'\?radarLocal:radarComposite/); // Guard against replacing site mode with mosaic silently.
 });
 test('only Windows is built; no product falsely promises 3D or Level II decoder',()=>{
  const pkg=require('./package.json');
