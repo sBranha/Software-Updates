@@ -6,7 +6,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs",
+    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs",
     "package:windows": "electron-builder --win nsis --x64 --publish never",
     "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
