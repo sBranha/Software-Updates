@@ -6,14 +6,15 @@
 <section class="notice"><strong>Official NWS warning tracking, not a detected tornado.</strong> The shaded polygon is the issued warning area; it does not mark the storm's precise position or predicted path.</section>
 <div class="layout"><section id="map" aria-label="Tracked warning boundary with live NEXRAD radar mosaic"></section><aside>
 <div class="status" id="status">Waiting for a warning to be assigned…</div>
+<div id="communitySummary" class="communitySummary" role="status">NO DRAWN AREA</div>
 <h2 id="area">No storm selected</h2>
 <div class="data"><span>WARNING EXPIRES</span><b id="expires">—</b></div>
 <div class="data"><span>NWS-MENTIONED MOTION</span><b id="motion">Not available</b></div>
 <div class="data"><span>RADAR SOURCE</span><b id="radarState">Connecting to IEM / NWS NEXRAD…</b></div>
 <div class="description" id="description">In the main NewsWire warning list, choose Track 1–4, or pin a map position, to assign a viewing area here.</div>
 <div class="polygonTools">
-<h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to list communities whose mapped points lie inside.</p>
-<div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button></div>
+<h3>Draw My Storm Area</h3><p>Click around the map to outline your area. Finish to find mapped cities, towns, and neighborhoods inside the polygon. Results appear here AND as blue markers on the map.</p>
+<div class="toolRow"><button id="draw" type="button">✎ Draw Polygon</button><button id="undo" type="button" disabled>Undo Corner</button><button id="finish" type="button" disabled>Finish Shape</button><button id="clear" type="button">Clear</button><button id="retry" type="button" disabled>↻ Retry Communities</button></div>
 <div id="drawStatus" class="drawStatus" role="status">No user-drawn area.</div>
 <h3>Communities Inside Your Polygon</h3><div id="placesStatus" class="placesStatus">Draw a polygon to look up mapped cities, towns, villages and neighborhoods.</div>
 <ul id="places"></ul>
