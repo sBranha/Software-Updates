@@ -128,5 +128,5 @@ test('main html, Electron IPC and package include every full-workstation control
  const pkg=require('./package.json');
  assert.equal(pkg.version,'0.8.4');
  assert.ok(pkg.build.files.includes('main-radar-desk.js'));
- assert.match(pkg.build.win.artifactName,/0\.8\.3/);
+ assert.match(pkg.build.win.artifactName,/0\.8\.4/);
 });
