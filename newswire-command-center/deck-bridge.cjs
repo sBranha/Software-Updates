@@ -2,7 +2,7 @@
 // Offline local-file bridge. No network port, no elevated access and no cloud service.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const DIR=path.join(os.homedir(),'.newswire-command-center','streamdeck');
-const COMMANDS=new Set(['warning-latest','warning-next','home','country','resume','auto','voice','satellite','refresh','zoom-in','zoom-out','display-1','display-2','display-3','nws-radar','workspace-3']);
+const COMMANDS=new Set(['warning-latest','warning-next','home','country','resume','auto','voice','satellite','refresh','zoom-in','zoom-out','display-1','display-2','display-3','nws-radar','workspace-3','storm-1','storm-2','radar']);
 function ensure(){fs.mkdirSync(DIR,{recursive:true,mode:0o700});}
 function writeAtomic(dest,obj){
  ensure();
