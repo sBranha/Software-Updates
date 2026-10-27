@@ -1,16 +1,18 @@
 'use strict';
-// Main-process weather-desk community lookup, eliminating Electron file:// CORS restrictions.
-// OSM community labels are approximate and this is not an official NWS forecast.
+// FAST OFFLINE lookup, with optional expanded OpenStreetMap lookup.
+// Never make successful offline results conditional on online server health.
 const D=require('./drawn-tracks.js');
+const OFF=require('./offline-cities.cjs');
 const PROVIDERS=Object.freeze([
  'https://overpass.private.coffee/api/interpreter',
  'https://overpass-api.de/api/interpreter',
  'https://overpass.nchc.org.tw/api/interpreter'
 ]);
-async function lookupCommunities(points,{fetchImpl,timeoutMs=12500,providers=PROVIDERS}={}){
- const query=D.safeQuery(points); // strictly validates client-provided coordinates and query size
- const fetcher=fetchImpl||fetch;
- const errors=[];
+async function lookupCommunities(points,{fetchImpl,timeoutMs=9000,providers=PROVIDERS,expand=false,cities}={}){
+ const query=D.safeQuery(points);
+ const offline=OFF.query(points,{cities});
+ if(!expand)return offline;
+ const errors=[],fetcher=fetchImpl||fetch;
  for(const endpoint of providers){
   if(!PROVIDERS.includes(endpoint))throw Error('Unapproved community lookup endpoint');
   const ctl=new AbortController(),timeout=setTimeout(()=>ctl.abort(),timeoutMs);
@@ -24,18 +26,23 @@ async function lookupCommunities(points,{fetchImpl,timeoutMs=12500,providers=PRO
    let result;
    try{result=JSON.parse(bytes)}catch(_){throw Error('Invalid community response')}
    if(!result||!Array.isArray(result.elements))throw Error('Missing community data');
-   return {
-    places:D.placeList(result,points),
-    // An object count at the limit may truncate results; never claim full coverage.
-    complete:result.elements.length<2500,
-    elementsReturned:result.elements.length,
-    source:'OpenStreetMap via Overpass',
-    provider:new URL(endpoint).hostname
-   };
+   const extra=D.placeList(result,points);
+   const all=[...offline.places];
+   const seen=new Set(all.map(p=>p.name.toLowerCase()));
+   for(const p of extra){
+    if(seen.has(p.name.toLowerCase()))continue;seen.add(p.name.toLowerCase());
+    all.push({...p,source:'OpenStreetMap'});
+   }
+   all.sort((a,b)=>a.name.localeCompare(b.name));
+   return {...offline,places:all.slice(0,300),online:true,complete:false,
+    source:'Offline U.S. Census centers + expanded OpenStreetMap communities',
+    note:offline.note+' Online OpenStreetMap entries are additional representative points.',
+    elementsReturned:result.elements.length};
   }catch(err){
    errors.push(new URL(endpoint).hostname+': '+String(err?.message||'Network error').slice(0,100));
   }finally{clearTimeout(timeout)}
  }
- throw Error('All OpenStreetMap community servers failed. '+errors.join(' | '));
+ return {...offline,online:false,
+  warning:'Optional online expansion unavailable. Offline Census places are still shown. '+errors.join(' | ')};
 }
 module.exports={lookupCommunities,PROVIDERS};
