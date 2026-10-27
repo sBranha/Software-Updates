@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="concept3.css"></head>
 <body>
 <header class="masthead">
- <div class="brand"><div class="mark" aria-hidden="true">⚡</div><div><div class="brandTitle">News<span>Wire</span> <small>v0.7.4</small></div><div class="brandSub">NATIONWIDE WEATHER, NEWS & ALERTS</div></div></div>
+ <div class="brand"><div class="mark" aria-hidden="true">⚡</div><div><div class="brandTitle">News<span>Wire</span> <small>v0.7.5</small></div><div class="brandSub">NATIONWIDE WEATHER, NEWS & ALERTS</div></div></div>
  <nav class="primaryNav" aria-label="Main sections">
   <button type="button" class="navLink" data-open-panel="local"><span>⌂</span>Home</button>
   <button type="button" class="navLink active" id="nav-map"><span>▧</span>Map</button>
@@ -45,16 +45,16 @@
  <main class="centerPanel">
   <div class="mapTabs">
    <div class="tabSet"><button id="style" class="tab current" aria-pressed="true">Satellite map</button>
-   <button type="button" class="tab" id="radarToggle" aria-pressed="true">Radar: ON</button>
+   <button type="button" class="tab" id="radarToggle" aria-pressed="true">Radar: ON</button><button type="button" class="tab" id="radarLoop" aria-pressed="true">⏸ Pause Loop</button>
    <a class="tab" href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer">Official Radar ↗</a>
    <button id="navWarnings" class="tab">Warnings</button>
    <button id="country" class="tab">U.S. overview</button></div>
-   <div class="mapCaption"><span class="liveDot"></span> OFFICIAL NWS WARNINGS <span class="safetyNote">LIVE RADAR REFLECTIVITY · VELOCITY NOT INCLUDED</span></div>
+   <div class="mapCaption"><span class="liveDot"></span> OFFICIAL NWS WARNINGS <span class="safetyNote">ANIMATED NEXRAD REFLECTIVITY · NO VELOCITY</span></div>
   </div>
   <section class="mapShell" aria-label="Official nationwide tornado-warning map">
    <div id="map"></div>
    <div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Warning polygons show issued NWS alert areas, not current tornado positions.</div></div>
-   <div class="mapActions"><button id="home">⌖ My Location</button><button id="resume">⟳ Resume Auto-Fly</button><button id="pinStorm1" type="button">⌖ Pin Storm 1</button><button id="pinStorm2" type="button">⌖ Pin Storm 2</button></div>
+   <div class="mapActions"><button id="home">⌖ My Location</button><button id="resume">⟳ Resume Auto-Fly</button><button id="pinStorm1" type="button">⌖ Pin Storm 1</button><button id="pinStorm2" type="button">⌖ Pin Storm 2</button><button id="pinStorm3" type="button">⌖ Pin 3</button><button id="pinStorm4" type="button">⌖ Pin 4</button></div>
   </section>
   <div class="mapFooter"><div><span class="liveDot"></span><b id="mapFooterState">NWS FEED NOT VERIFIED</b></div><span id="radarFeed" aria-live="polite">Live reflectivity: connecting to IEM / NOAA NWS…</span><span>USGS satellite · <span id="mapFooterCount">—</span> tornado warnings</span></div>
  </main>
@@ -76,8 +76,8 @@
  <button class="miniPanel" data-open-panel="map"><div class="miniEyebrow">01 / COMMAND CENTER</div><div class="miniTitle">🌎 Nationwide Map</div><p>Live warning polygons, satellite map and NWS bulletin focus.</p><div class="miniLink">Open national map ↗</div></button>
  <button class="miniPanel" data-open-panel="warnings"><div class="miniEyebrow">02 / ALERT OPERATIONS</div><div class="miniTitle">⚠ Active Warnings</div><p>Separate live warning list with selected alert details.</p><div class="miniLink">Open warning window ↗</div></button>
  <button class="miniPanel" data-open-panel="local"><div class="miniEyebrow">03 / LOCAL DESK</div><div class="miniTitle">☁ Local Dashboard</div><p>Local safety status and ZIP controls. Weather/news expanding later.</p><div class="miniLink">Open local window ↗</div></button>
- <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / DUAL STORM TRACKER</div><div class="miniTitle">▦ Track Two Warnings</div><p id="trackedState">Pick Track 1 or Track 2 beside an official warning.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button></div></div>
+ <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / MULTI-STORM RADAR</div><div class="miniTitle">▦ Track 4 Radar Areas</div><p id="trackedState">Pick Track 1–4 beside a warning, or pin any location.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button><button type="button" data-open-panel="storm-3">Storm 3 ↗</button><button type="button" data-open-panel="storm-4">Storm 4 ↗</button></div></div>
 </div>
 <footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="radar.js"></script><script src="tracking-engine.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script>
 </body></html>
