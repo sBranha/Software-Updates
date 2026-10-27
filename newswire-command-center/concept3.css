@@ -78,3 +78,5 @@ a.tab:hover{text-decoration:none;background:#195681}.tab.current,.tab[aria-press
 .dualButtons button{flex:1;padding:5px 9px;font-size:11px;border-radius:5px;border:1px solid #3f94ca;background:#15507b}
 #radarFeed{color:#7bcaff;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%}
 @media(max-width:1200px){#radarFeed{max-width:30%}.dualButtons button{font-size:10px}}
+
+.dualButtons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.mapActions{flex-wrap:wrap;max-width:98%}#radarLoop[aria-pressed="true"]{background:#124d7c;color:#abf4ff}
