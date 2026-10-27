@@ -27,3 +27,11 @@
 .communitySummary{color:#e1fbff;background:#124264;border-color:#35a0c9}
 
 #focusArea{background:#125675;border-color:#63d5f3;grid-column:span 2}#focusArea:disabled{opacity:.44}#placesStatus,#drawStatus{overflow-wrap:break-word;word-break:normal}.communitySummary{position:sticky;top:0;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* Full-size detachable storm radar with selectable Google Street View coordinate link. */
+.stormMapCol{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.stormMapCol #map{flex:1 1 auto;min-height:0;width:100%;height:auto}
+.streetViewHint{flex:0 0 auto;background:#0e3150;border-top:1px solid #417599;color:#c3e9ff;padding:7px 12px;font-size:12px;min-height:32px}
+#satellite[aria-pressed="true"],#streets[aria-pressed="true"],#terrain[aria-pressed="true"]{background:#0864ac;border-color:#86dfff}
+#streetView[aria-pressed="true"]{background:#665622;color:#fff6c6;border-color:#ffcd45}
+@media(max-width:800px){.stormMapCol #map{min-height:43vh}}
