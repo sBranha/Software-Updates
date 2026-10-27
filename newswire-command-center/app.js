@@ -339,6 +339,14 @@ function bind(){
  $('streetMap').addEventListener('click',()=>{mapStyle('streets');setting('satellite','false')});
  $('terrainMap').addEventListener('click',()=>{mapStyle('terrain');setting('satellite','false')});
  $('streetView').addEventListener('click',streetViewPick);
+ $('googleMaps').addEventListener('click',()=>{
+  if(!map)return;
+  try{
+   const p=MV.mapCoordinates(map);
+   window.open(MV.googleMapUrl(p.lat,p.lng,map.getZoom(),mapMode),'_blank','noopener,noreferrer');
+   setText('mapHint','Google Maps opened in your browser at the current radar location. Radar and warning overlays stay in NewsWire.');
+  }catch(error){setText('mapHint','Google Maps unavailable: '+error.message)}
+ });
  for(const slot of [1,2,3,4]){
   $('pinStorm'+slot)?.addEventListener('click',()=>{
    if(!map){setText('mapHint','Map unavailable; cannot pin a watch area.');return}
