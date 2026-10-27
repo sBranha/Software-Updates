@@ -6,10 +6,11 @@ const bridge=window.NewsWireDesktopBridge;
 const slot=Number(new URLSearchParams(location.search).get('slot'))||1;
 $('title').textContent='Storm Tracker '+(slot===2?'2':'1');
 const map=L.map('map',{zoomControl:true}).setView([39,-97],5);
+window.NewsWireStormMap=map;
 const base=L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}',{
  attribution:'Imagery: U.S. Geological Survey',maxZoom:17,maxNativeZoom:16
 }).addTo(map);
-const radar=NewsWireRadar.createRadar(L,map,s=>$('radarState').textContent=s);
+const radar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,s=>$('radarState').textContent=s);
 radar.show(true);
 map.createPane('warning');
 map.getPane('warning').style.zIndex=500;
@@ -18,6 +19,7 @@ let fixedMarker=null;
 function paint(item,feed){
  feedOk=Boolean(feed);
  const changed=!selection||selection.id!==item?.id;
+ if(changed&&selection&&selection.id!==item?.id)window.dispatchEvent(new CustomEvent('newswire:slot-changed'));
  selection=item;
  if(warningLayer){map.removeLayer(warningLayer);warningLayer=null}
  if(fixedMarker){map.removeLayer(fixedMarker);fixedMarker=null}
@@ -56,7 +58,17 @@ function paint(item,feed){
   const bounds=warningLayer.getBounds();if(changed&&bounds.isValid())map.fitBounds(bounds.pad(.7),{maxZoom:9});
  }else $('description').textContent+='\n\nNo NWS polygon supplied: location not guessed.';
 }
-$('radar').addEventListener('click',()=>{$('radar').setAttribute('aria-pressed',String(radar.show(!radar.isShown())));$('radar').textContent='Radar: '+(radar.isShown()?'ON':'OFF')});
+$('radar').addEventListener('click',()=>{
+ const on=radar.show(!radar.isShown());
+ $('radar').setAttribute('aria-pressed',String(on));$('radar').textContent='Radar: '+(on?'ON':'OFF');
+ $('loop').setAttribute('aria-pressed',String(on&&radar.isPlaying?.()));
+});
+$('loop').addEventListener('click',()=>{
+ if(!radar.isShown()){radar.show(true);$('radar').setAttribute('aria-pressed','true');$('radar').textContent='Radar: ON'}
+ const playing=radar.play?radar.play(!radar.isPlaying()):false;
+ $('loop').setAttribute('aria-pressed',String(playing));
+ $('loop').textContent=playing?'⏸ Pause Loop':'▶ Play Loop';
+});
 $('satellite').addEventListener('click',()=>{
  const on=map.hasLayer(base);if(on)map.removeLayer(base);else base.addTo(map).bringToBack();
  $('satellite').setAttribute('aria-pressed',String(!on));$('satellite').textContent='Satellite: '+(!on?'ON':'OFF');
