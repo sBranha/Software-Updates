@@ -25,10 +25,10 @@ test('each independent storm window contains worksheet and clearly identifies ma
  assert.match(html,/rotation-tool\.js/);
  const controller=fs.readFileSync(path.join(__dirname,'rotation-tool.js'),'utf8');
  new Function(controller);
- assert.match(controller,/nwcc-manual-velocity-'\\+slot/);
- assert.match(controller,/V\.analyze/);
+ assert.ok(controller.includes("const saveKey='nwcc-manual-velocity-'+slot"));
+ assert.ok(controller.includes('V.analyze('));
  assert.match(controller,/NOT automatic rotation|not an automatic rotation/i);
- assert.match(fs.readFileSync(path.join(__dirname,'polygon-ui.js'),'utf8'),/NWVelocityCancel/);
+ assert.ok(fs.readFileSync(path.join(__dirname,'polygon-ui.js'),'utf8').includes('NWVelocityCancel'));
  const pkg=require('./package.json');
  assert.ok(pkg.build.files.includes('rotation-tool.js'));
  assert.ok(pkg.build.files.includes('velocity-couplet.js'));
