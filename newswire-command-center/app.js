@@ -5,6 +5,7 @@ const E=window.NewsWireNationwide, $=id=>document.getElementById(id);
 const EVERY_MS=90000, AUTO_GAP_MS=45000, MANUAL_PAUSE_MS=120000;
 const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
+let motionGuideLayer=null,motionGuidesOn=false;
 let auto=true,voice=false,satellite=true,mapMode='satellite',streetPick=false,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
 let liveRadar=null,pinSlot=null,mainRadarDesk=null;
@@ -50,6 +51,13 @@ function mapInit(){
  if(typeof L==='undefined'){sayStatus('Map library unavailable. Warning list may still load.');return}
  map=L.map('map',{preferCanvas:true,zoomControl:true,minZoom:3,maxZoom:17}).setView([39,-97],4);
  mapStyle(mapMode);
+ motionGuideLayer=L.layerGroup().addTo(map);
+ $('mainMotionGuide')?.addEventListener('click',()=>{
+  motionGuidesOn=!motionGuidesOn;
+  $('mainMotionGuide').textContent='NWS Motion Guides: '+(motionGuidesOn?'ON':'OFF');
+  $('mainMotionGuide').setAttribute('aria-pressed',String(motionGuidesOn));
+  drawMotionGuides();
+ });
  if(window.NewsWireRadar){
   liveRadar=(window.NewsWireRadarLoop||NewsWireRadar).createRadar(L,map,message=>{
    const el=$('radarFeed');if(el)el.textContent=message;
@@ -128,10 +136,27 @@ function select(a,userClicked=false){
  if(a.geometry){warningCenter(a);if(userClicked)pauseUntil=Date.now()+MANUAL_PAUSE_MS}
  else if(userClicked)sayStatus('Official warning has no polygon; details are shown in the sidebar.');
 }
+function drawMotionGuides(){
+ if(!map||!motionGuideLayer||!window.NewsWireStormMotion)return;
+ motionGuideLayer.clearLayers();
+ if(!motionGuidesOn||!feedOk)return;
+ let count=0;
+ for(const alert of alerts.slice(0,75)){
+  const guide=window.NewsWireStormMotion.bulletinGuide(alert);
+  if(!guide)continue;
+  const start=[guide.start.lat,guide.start.lng],end=[guide.end.lat,guide.end.lng];
+  L.polyline([start,end],{color:'#cb9bff',weight:2,dashArray:'8 6',opacity:.85})
+   .addTo(motionGuideLayer).bindTooltip('NWS '+guide.direction+' '+guide.mph+' mph · from WARNING AREA center, not a tornado path');
+  L.circleMarker(start,{radius:4,color:'#dbbaff',weight:2,fillOpacity:.5})
+   .addTo(motionGuideLayer).bindTooltip('Warning polygon center — NOT a storm or tornado location');
+  count++;
+ }
+ setText('mapHint',count+' NWS bulletin direction guide(s), from WARNING CENTROIDS; NOT radar-detected storm/tornado tracks.');
+}
 function draw(){
  if(!map)return;
  if(polygonLayer){map.removeLayer(polygonLayer);polygonLayer=null}
- if(mainRadarDesk&&!mainRadarDesk.isWarningsShown())return;
+ if(mainRadarDesk&&!mainRadarDesk.isWarningsShown()){drawMotionGuides();return}
  polygonLayer=L.geoJSON({type:'FeatureCollection',features:alerts.filter(a=>a.geometry).map(a=>({
   type:'Feature',geometry:a.geometry,properties:{id:a.id,event:a.event,area:a.area,expires:a.expires}
  }))},{style:()=>({color:'#ff4569',weight:3,fillColor:'#e72c55',fillOpacity:.16}),
@@ -141,6 +166,7 @@ function draw(){
   b.textContent='NWS TORNADO WARNING';p.textContent=a.area+' · Expires '+fmtDate(a.expires);
   div.append(b,p);layer.bindPopup(div);layer.on('click',()=>detail(a));
  }}).addTo(map);
+ drawMotionGuides();
 }
 function deckReport(){
  const bridge=window.NewsWireDesktopBridge;
