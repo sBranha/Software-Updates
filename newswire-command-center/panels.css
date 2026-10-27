@@ -14,3 +14,5 @@ fieldset{border:0;margin:0;padding:0;display:flex;gap:8px;align-items:center;fle
 .notice{border:1px solid #734b2d;background:#3a291c70;padding:12px 16px;border-radius:9px;color:#ffd89b}
 footer{font-size:11px;color:#94acc4;padding:14px 20px;border-top:1px solid var(--border)}
 @media(max-width:780px){.split{grid-template-columns:1fr}header{padding:14px}.subnav{padding:10px}main{padding:13px}.big{font-size:24px}}
+
+.trackControls{display:flex;gap:7px;margin:-5px 0 10px}.trackControls button{flex:1;font-size:12px;padding:6px;background:#12547c;border:1px solid #3b88bb}
