@@ -42,7 +42,7 @@
    btn.append(b,small);btn.addEventListener('click',()=>select(w));list.append(btn);
    if(bridge.requestTrack){
     const row=document.createElement('div');row.className='trackControls';
-    for(const slot of [1,2]){const t=document.createElement('button');t.type='button';
+    for(const slot of [1,2,3,4]){const t=document.createElement('button');t.type='button';
      t.textContent='Track '+slot+' ↗';t.addEventListener('click',()=>bridge.requestTrack(slot,w.id));row.append(t);}
     list.append(row);
    }
