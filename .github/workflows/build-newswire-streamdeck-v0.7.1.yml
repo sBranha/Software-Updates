@@ -1,11 +1,11 @@
-name: NewsWire v0.7.3 desktop and Image 3 Desktop Dashboard preview
+name: NewsWire v0.7.4 desktop and Real Radar and Dual Storm Tracking preview
 on:
   push:
-    branches: [newswire-concept3-ui-v0.7.3]
+    branches: [newswire-live-radar-dual-storm-v0.7.4]
     paths:
       - 'newswire-command-center/**'
       - 'newswire-streamdeck/**'
-      - '.github/workflows/build-newswire-streamdeck-v0.7.3.yml'
+      - '.github/workflows/build-newswire-streamdeck-v0.7.1.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,12 +20,15 @@ jobs:
           node-version: '24'
       - name: Run bridge and shared weather engine tests
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/window-layout.test.cjs newswire-command-center/radar-tracking.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/window-layout.cjs
           node --check newswire-command-center/panels.js
           node --check newswire-command-center/workspace-ui.js
           node --check newswire-command-center/concept3-ui.js
+          node --check newswire-command-center/storm.js
+          node --check newswire-command-center/radar.js
+          node --check newswire-command-center/tracking-engine.js
           node --check newswire-command-center/preload.cjs
           node --check newswire-command-center/deck-bridge.cjs
           node --check newswire-command-center/app.js
@@ -39,7 +42,7 @@ jobs:
           ls -la newswire-streamdeck/dist
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.3-StreamDeck-PLUGIN-PREVIEW
+          name: NewsWire-v0.7.4-StreamDeck-PLUGIN-PREVIEW
           path: newswire-streamdeck/dist/*.streamDeckPlugin
           if-no-files-found: error
           retention-days: 30
@@ -66,7 +69,7 @@ jobs:
       - name: Run desktop tests
         shell: bash
         run: |
-          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs
+          node --test newswire-command-center/test.js newswire-command-center/deck-bridge.test.cjs newswire-command-center/radar-tracking.test.cjs newswire-command-center/window-layout.test.cjs
           node --check newswire-command-center/main.cjs
           node --check newswire-command-center/preload.cjs
       - name: Install dependencies
@@ -77,7 +80,7 @@ jobs:
         run: npm run package:${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: NewsWire-v0.7.3-${{ matrix.target }}-UNSIGNED-PREVIEW
+          name: NewsWire-v0.7.4-${{ matrix.target }}-UNSIGNED-PREVIEW
           path: newswire-command-center/dist/*.${{ matrix.ext }}
           if-no-files-found: error
           retention-days: 30
@@ -85,7 +88,7 @@ jobs:
   release-preview:
     name: Publish clearly labeled preview files
     concurrency:
-      group: newswire-v073-streamdeck-release
+      group: newswire-v074-streamdeck-release
       cancel-in-progress: true
     needs: [test-and-pack-plugin, desktop]
     runs-on: ubuntu-latest
@@ -94,7 +97,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: NewsWire-v0.7.3-*
+          pattern: NewsWire-v0.7.4-*
           path: release-assets
           merge-multiple: true
       - name: Publish tested development preview
@@ -102,16 +105,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='newswire-v0.7.3-streamdeck-preview'
+          TAG='newswire-v0.7.4-streamdeck-preview'
           test -f release-assets/com.newswire.commandcenter.streamDeckPlugin
           ls -lh release-assets/
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title 'NewsWire 0.7.3 — Image 3 command center preview' \
-              --notes 'NewsWire v0.7.3 desktop preview follows user-approved screenshot 3: top NewsWire navigation; local panel; dominant USGS satellite map; right official NWS warning status/details; four interactive dashboard cards. Detachable local dashboard and warnings windows remain draggable to multiple monitors and are Stream Deck XL compatible. This version does NOT claim live radar velocity, measured temperature or live local news. Windows/Mac installers are unsigned and not physically verified. Keep Wireless Emergency Alerts active. Android Google Play bundle remains unchanged.'
+              --title 'NewsWire 0.7.4 — Live radar and dual warning tracking desktop preview' \
+              --notes 'NewsWire v0.7.4 preview adds IEM/NOAA NEXRAD current reflectivity WMS overlay (visible by default), warnings on top, independent Storm 1 and Storm 2 radar windows for two selected official NWS warning polygons, and three new Stream Deck actions. This is warning-area monitoring with refreshed radar mosaic; NOT automatic storm-cell tracking, not exact tornado location, and no velocity-derived rotation detection. Direction/speed appear only if explicitly present in NWS description. Builds have automated tests but have not been tested on a physical desktop/Stream Deck or against live radar image delivery. Unsigned desktop installers. Keep official NOAA/NWS and Wireless Emergency Alerts. Android Play bundle unchanged.'
           fi
-          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-concept3-ui-v0.7.3" --jq '.object.sha')
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/newswire-live-radar-dual-storm-v0.7.4" --jq '.object.sha')
           if [ "$GITHUB_SHA" != "$LATEST" ]; then
             echo "Skipping superseded build $GITHUB_SHA, latest is $LATEST"
             exit 0
