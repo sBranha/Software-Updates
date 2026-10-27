@@ -31,11 +31,13 @@ test('reject missing, giant and unrelated map geometries',()=>{
  assert.equal(T.safeWarning({id:'nws1',area:'Example County',description:'MOVING EAST AT 20 MPH',geometry:g}).motion.mph,20);
  assert.equal(T.safeWarning({description:'missing ID'}),null);
 });
-test('two independent warning windows, separate position persistence and all IPC paths',()=>{
+test('four independent warning windows, separate position persistence and all IPC paths',()=>{
  const files=['main.cjs','preload.cjs','app.js','desktop-concept3.html','storm.html','storm.js','window-layout.cjs'];
  const source=Object.fromEntries(files.map(x=>[x,fs.readFileSync(path.join(__dirname,x),'utf8')]));
  assert.match(source['main.cjs'],/storm-1/);
  assert.match(source['main.cjs'],/storm-2/);
+ assert.match(source['main.cjs'],/storm-3/);
+ assert.match(source['main.cjs'],/storm-4/);
  assert.match(source['main.cjs'],/newswire:track-warning/);
  assert.match(source['main.cjs'],/newswire:track-updates/);
  assert.match(source['main.cjs'],/sendTracked/);
@@ -49,8 +51,8 @@ test('two independent warning windows, separate position persistence and all IPC
  assert.match(source['desktop-concept3.html'],/data-open-panel="storm-1"/);
  assert.match(source['desktop-concept3.html'],/data-open-panel="storm-2"/);
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.7.4');
- for(const f of ['radar.js','tracking-engine.js','storm.html','storm.css','storm.js'])assert.ok(pkg.build.files.includes(f),f);
+ assert.equal(pkg.version,'0.7.5');
+ for(const f of ['radar.js','radar-loop.js','drawn-tracks.js','polygon-ui.js','tracking-engine.js','storm.html','storm.css','storm.js'])assert.ok(pkg.build.files.includes(f),f);
  for(const f of ['radar.js','tracking-engine.js','storm.js','main.cjs','app.js','preload.cjs'])new Function(source[f]||fs.readFileSync(path.join(__dirname,f),'utf8'));
 });
 
