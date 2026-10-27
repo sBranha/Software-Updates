@@ -3,9 +3,11 @@ const {app,BrowserWindow,shell,session,dialog,ipcMain,screen,Menu}=require('elec
 const path=require('node:path');
 const {createBridge}=require('./deck-bridge.cjs');
 const W=require('./window-layout.cjs');
+const T=require('./tracking-engine.js');
 const SAFE_LINKS=new Set(['www.weather.gov','radar.weather.gov','api.weather.gov']);
 const views=new Map();
-const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html'};
+const pageNames={map:'desktop-concept3.html',local:'local.html',warnings:'warnings.html','storm-1':'storm.html','storm-2':'storm.html'};
+const tracked={1:null,2:null};
 let bridge,layoutFile,layout={},latest=null;
 let saveTimer=null;
 function external(url){
@@ -29,11 +31,11 @@ function newWindow(type,options={}){
   existing.show();existing.focus();return existing;
  }
  const work=screen.getPrimaryDisplay().workArea;
- const defaults=type==='map'?{width:1480,height:900}:type==='local'?{width:780,height:740}:{width:920,height:800};
+ const defaults=type==='map'?{width:1480,height:900}:type==='local'?{width:780,height:740}:type==='warnings'?{width:920,height:800}:{width:1000,height:760};
  const initial=options.bounds||layout[type]||{x:work.x+55,y:work.y+50,...defaults};
  const bounds=W.clampBounds(initial,screen.getAllDisplays(),defaults);
  const win=new BrowserWindow({
-  title:type==='map'?'NewsWire — National Command Center':type==='local'?'NewsWire — Local Dashboard':'NewsWire — Active Warnings',
+  title:type==='map'?'NewsWire — National Command Center':type==='local'?'NewsWire — Local Dashboard':type==='warnings'?'NewsWire — Active Warnings':`NewsWire — Storm Tracker ${type.slice(-1)}`,
   ...bounds,minWidth:490,minHeight:400,show:false,autoHideMenuBar:true,
   backgroundColor:'#06111d',
   webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,
@@ -49,8 +51,19 @@ function newWindow(type,options={}){
  win.webContents.on('will-navigate',(e,url)=>{
   if(url!==win.webContents.getURL()){e.preventDefault();external(url)}
  });
- win.loadFile(path.join(__dirname,pageNames[type]));
+ if(type.startsWith('storm-')){
+  const slot=Number(type.slice(-1));
+  win.webContents.on('did-finish-load',()=>sendTracked(slot));
+  win.loadFile(path.join(__dirname,pageNames[type]),{query:{slot:String(slot)}});
+ }else win.loadFile(path.join(__dirname,pageNames[type]));
  return win;
+}
+function sendTracked(slot){
+ const win=views.get('storm-'+slot);
+ if(!win||win.isDestroyed()||win.webContents.isLoading())return;
+ // Feed errors and disappeared warnings are not shown as live tracked storms.
+ const found=tracked[slot]&&latest?.warnings?.some(a=>a.id===tracked[slot].id);
+ win.webContents.send('newswire:tracked-warning',slot,tracked[slot],Boolean(latest?.feedOk&&found));
 }
 function setDisplay(type,index){
  const win=newWindow(type);
@@ -82,6 +95,7 @@ function deliver(action){
  if(/^display-[123]$/.test(action)){setDisplay('map',Number(action.at(-1)));return}
  if(action==='nws-radar'){external('https://radar.weather.gov/');return}
  if(action==='workspace-3'){arrange();return}
+ if(action==='storm-1'||action==='storm-2'){newWindow(action);return}
  const win=views.get('map');
  if(!win||win.isDestroyed())return;
  win.webContents.send('newswire:deck-action',action);
@@ -93,6 +107,8 @@ function menu(){
    {label:'National Command Center',accelerator:'CmdOrCtrl+1',click:()=>newWindow('map')},
    {label:'Local Dashboard',accelerator:'CmdOrCtrl+2',click:()=>newWindow('local')},
    {label:'Active Warnings',accelerator:'CmdOrCtrl+3',click:()=>newWindow('warnings')},
+   {label:'Storm Tracker 1',accelerator:'CmdOrCtrl+4',click:()=>newWindow('storm-1')},
+   {label:'Storm Tracker 2',accelerator:'CmdOrCtrl+5',click:()=>newWindow('storm-2')},
    {type:'separator'},{label:'Arrange on All Monitors',accelerator:'CmdOrCtrl+Shift+M',click:arrange}
   ]},
   {label:'View',submenu:[{role:'reload'},{role:'togglefullscreen'},{role:'toggleDevTools'}]}
@@ -129,6 +145,24 @@ app.whenReady().then(()=>{
   };
   for(const [type,win] of views)if(type!=='map'&&!win.isDestroyed())
    win.webContents.send('newswire:workspace-state',latest);
+  sendTracked(1);sendTracked(2);
+ });
+ ipcMain.on('newswire:track-warning',(event,slot,raw)=>{
+  if(event.sender!==views.get('map')?.webContents||![1,2].includes(slot))return;
+  const item=T.safeWarning(raw);
+  if(!item||!latest?.feedOk||!latest.warnings.some(x=>x.id===item.id)||T.hasExpired(item))return;
+  tracked[slot]=item;
+  newWindow('storm-'+slot);
+  sendTracked(slot);
+ });
+ ipcMain.on('newswire:track-updates',(event,items)=>{
+  if(event.sender!==views.get('map')?.webContents||!Array.isArray(items))return;
+  for(const x of items.slice(0,2)){
+   if(!x||![1,2].includes(x.slot)||!tracked[x.slot])continue;
+   const item=T.safeWarning(x.item);
+   if(item&&item.id===tracked[x.slot].id)tracked[x.slot]=item;
+  }
+  sendTracked(1);sendTracked(2);
  });
  ipcMain.on('newswire:focus-warning',(event,id)=>{
   if(!isTrusted(event.sender)||typeof id!=='string'||id.length>350)return;
