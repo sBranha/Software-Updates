@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
  })},
  openPanel:type=>{if(['map','local','warnings','storm-1','storm-2','storm-3','storm-4'].includes(type))ipcRenderer.send('newswire:open-panel',type)},
  arrangePanels:()=>ipcRenderer.send('newswire:arrange-panels'),
+ toggleFullscreen:()=>ipcRenderer.send('newswire:toggle-window-fullscreen'),
  requestTrack:(slot,id)=>{if([1,2,3,4].includes(slot)&&typeof id==='string')ipcRenderer.send('newswire:request-track',slot,id)},
  onRequestTrack:listener=>{if(typeof listener==='function')ipcRenderer.on('newswire:workspace-track-request',(_e,slot,id)=>listener(slot,id))},
  trackWarning:(slot,data)=>{if([1,2,3,4].includes(slot)&&data&&typeof data==='object')ipcRenderer.send('newswire:track-warning',slot,data)},
