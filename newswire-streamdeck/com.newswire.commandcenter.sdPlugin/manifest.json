@@ -5,7 +5,7 @@
   "Category": "NewsWire Command Center",
   "Description": "Free offline controls for the NewsWire Storm Command Center. Official NWS warning status and map controls.",
   "Author": "NewsWire",
-  "Version": "0.7.3.0",
+  "Version": "0.7.4.0",
   "SDKVersion": 2,
   "CodePath": "bin/plugin.js",
   "Nodejs": {
@@ -275,6 +275,51 @@
         "Keypad"
       ],
       "Tooltip": "Open local, map, and warnings windows across available monitors",
+      "States": [
+        {
+          "Image": "imgs/key",
+          "ShowTitle": true
+        }
+      ]
+    },
+    {
+      "UUID": "com.newswire.commandcenter.storm-1",
+      "Name": "Storm Tracker 1",
+      "Icon": "imgs/action",
+      "Controllers": [
+        "Keypad"
+      ],
+      "Tooltip": "Bring Storm Tracker 1 to front",
+      "States": [
+        {
+          "Image": "imgs/key",
+          "ShowTitle": true
+        }
+      ]
+    },
+    {
+      "UUID": "com.newswire.commandcenter.storm-2",
+      "Name": "Storm Tracker 2",
+      "Icon": "imgs/action",
+      "Controllers": [
+        "Keypad"
+      ],
+      "Tooltip": "Bring Storm Tracker 2 to front",
+      "States": [
+        {
+          "Image": "imgs/key",
+          "ShowTitle": true
+        }
+      ]
+    },
+    {
+      "UUID": "com.newswire.commandcenter.radar",
+      "Name": "Toggle Radar",
+      "Icon": "imgs/action",
+      "Controllers": [
+        "Keypad"
+      ],
+      "Tooltip": "Enable or disable real radar reflectivity overlay",
       "States": [
         {
           "Image": "imgs/key",
