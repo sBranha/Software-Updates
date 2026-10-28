@@ -70,7 +70,7 @@ test('scan uses two real timestamps and does not manufacture motion if no echoes
 test('valid application includes operational native echo analysis bridge and packaged dependency',()=>{
  const fs=require('node:fs'),p=require('node:path');
  const root=p.join(__dirname,'..'),pkg=require('../package.json');
- assert.equal(pkg.version,'0.8.5');
+ assert.equal(pkg.version,'0.8.6');
  assert.equal(pkg.dependencies.pngjs,'7.0.0');
  for(const path of ['radar-data/auto-echo.cjs','auto-echo-ui.js'])assert.ok(pkg.build.files.includes(path),path);
  const main=fs.readFileSync(p.join(root,'main.cjs'),'utf8'),
