@@ -2,7 +2,7 @@ name: NewsWire v0.8.6 Windows EXE
 on:
   push:
     branches:
-      - newswire-automated-echoes-v0.8.6
+      - newswire-all-radar-sites-v0.8.6
     paths:
       - 'newswire-command-center/**'
       - '.github/workflows/build-newswire-windows-v0.8.6.yml'
