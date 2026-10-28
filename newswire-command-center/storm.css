@@ -65,3 +65,6 @@ body.radarOnly .stormMapCol{min-height:0}
 #rotationResult{background:#1c3047;border:1px solid #3c5973;padding:10px;border-radius:7px}
 
 #stormRadarSearch{background:#0e3453;border:1px solid #5086ad;color:#eaf8ff;border-radius:6px;padding:8px;min-width:104px;width:170px;font:600 11px system-ui}
+
+/* v0.8.7 Storm Desk official warning clock, no inferred arrival estimates */
+.stormRemaining{font-size:14px;font-weight:800;color:#ffbd74;padding:7px 12px;border-left:3px solid #fe7253;margin:5px 0 11px}

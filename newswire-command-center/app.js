@@ -169,6 +169,7 @@ function releaseInactiveLock(){
  }
 }
 function select(a,userClicked=false){
+ if(userClicked&&lockedWarningId&&lockedWarningId!==a?.id)lockedWarningId=null;
  detail(a);
  if(userClicked)mainRadarDesk?.analyzeWarning?.(a);
  if(a.geometry){warningCenter(a);if(userClicked)pauseUntil=Date.now()+MANUAL_PAUSE_MS}

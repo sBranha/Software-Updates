@@ -15,7 +15,7 @@ function countdown(expires,now=Date.now()){
 function portion(text,label){
  const s=String(text||'');
  const lines=s.split(/\r?\n/);
- const marker=new RegExp('^\\s*(?:\\*\\s*)?'+label+'\\s*[.:]\\s*(.+)','i');
+ const marker=new RegExp('^\\s*(?:\\*\\s*)?'+label+'\\s*(?:\\.{2,}|:)\\s*(.+)','i');
  const line=lines.find(x=>marker.test(x));
  return line?(line.match(marker)?.[1]||'').trim().slice(0,230):null;
 }

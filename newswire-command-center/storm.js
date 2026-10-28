@@ -234,7 +234,7 @@ function paint(item,feed){
   $('status').className='status';
   $('status').textContent='Independent radar ready. Select a NEXRAD site or draw your own polygon; no NWS warning is assigned.';
   $('area').textContent='No storm selected';
-  $('expires').textContent='—';$('motion').textContent='Not available';$('description').textContent='Waiting for an official NWS warning selection.';
+  $('expires').textContent='—';$('stormRemaining').textContent='No active warning assigned';$('motion').textContent='Not available';$('description').textContent='Waiting for an official NWS warning selection.';
   return;
  }
  if(item.manual&&item.point){
@@ -255,6 +255,7 @@ function paint(item,feed){
  $('status').textContent=!feedOk?'OFFICIAL NWS WARNING FEED UNAVAILABLE — LAST ASSIGNED WARNING MAY BE STALE':
   expired?'WARNING EXPIRED — select another active warning':'Monitoring selected official NWS warning area';
  $('expires').textContent=item.expires?new Date(item.expires).toLocaleString():'Not stated';
+ $('stormRemaining').textContent=window.NewsWireWarningOps?.countdown(item.expires)||'Expiration unknown';
  const motion=NewsWireTracking.parseMotion(item.description);
  const guide=window.NewsWireStormMotion?.bulletinGuide(item);
  if(motionVisible&&guide&&feedOk&&!expired){
@@ -265,7 +266,13 @@ function paint(item,feed){
    .addTo(motionLayer).bindTooltip('Warning centroid, NOT a tornado position');
  }
  $('motion').textContent=motion?motion.direction+' at '+motion.mph+' mph (NWS bulletin)':'Not reported in bulletin; no track projected';
- $('description').textContent=item.headline+'\n\n'+(item.instruction||'Consult the official NWS bulletin for safety directions.');
+ const info=window.NewsWireWarningOps?.summarize(item);
+ $('description').textContent=(item.headline||'Official NWS warning')+
+   (info?.source?'\nNWS SOURCE: '+info.source:'')+
+   (info?.hazard?'\nNWS HAZARD: '+info.hazard:'')+
+   (info?.impact?'\nNWS IMPACT: '+info.impact:'')+
+   '\n\n'+(item.instruction||'Consult the official NWS bulletin for safety directions.')+
+   '\n\n'+(item.description||'');
  try{const u=new URL(item.url);$('official').href=u.protocol==='https:'&&['api.weather.gov','www.weather.gov'].includes(u.hostname)?u.toString():'https://www.weather.gov/alerts'}catch(_){$('official').href='https://www.weather.gov/alerts'}
  if(NewsWireTracking.validGeometry(item.geometry)){
   const geo={type:'Feature',geometry:item.geometry,properties:{}};

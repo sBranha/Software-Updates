@@ -10,7 +10,7 @@ test('officially located NEXRAD stations include Hytop KHTX and independent near
  assert.equal(k.name,'Hytop / Northeast Alabama');
 });
 test('real RIDGE Level III products include reflectivity, base velocity, storm-relative velocity',()=>{
- assert.deepEqual(S.PRODUCTS.map(x=>x.id),['N0B','N0U','N0S']);
+ assert.deepEqual(S.PRODUCTS.map(x=>x.id),['N0B','N0Q','N0U','N0S','N0X','N0C','N0K','N0H']);
  for(const product of S.PRODUCTS){
   const params=S.ridgeOptions('KHTX',product.id);
   assert.equal(params.sector,'HTX');assert.equal(params.prod,product.id);
