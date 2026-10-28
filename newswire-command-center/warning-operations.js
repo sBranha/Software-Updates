@@ -17,7 +17,7 @@ function portion(text,label){
  const lines=s.split(/\r?\n/);
  const marker=new RegExp('^\\s*(?:\\*\\s*)?'+label+'\\s*(?:\\.{2,}|:)\\s*(.+)','i');
  const line=lines.find(x=>marker.test(x));
- return line?(line.match(marker)?.[1]||'').trim().replace(/[.\\s]+$/,'').slice(0,230):null;
+ return line?(line.match(marker)?.[1]||'').trim().replace(/\.+$/,'').slice(0,230):null;
 }
 function motion(text){
  const s=String(text||'');
