@@ -8,6 +8,7 @@ let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking
 let showLocationPin=true;
 let motionGuideLayer=null,motionGuidesOn=false;
 let auto=true,voice=false,satellite=true,mapMode='satellite',streetPick=false,lastFly=0,pauseUntil=0;
+let selectedWarningId=null,lockedWarningId=null;
 let deckSelectedIndex=-1,feedOk=false;
 let liveRadar=null,pinSlot=null,mainRadarDesk=null;
 const selectedTracks={1:null,2:null,3:null,4:null};
@@ -131,10 +132,41 @@ function warningCenter(a){
 }
 function detail(a){
  if(!a)return;
- $('detail').textContent='AREA: '+a.area+'\nISSUED: '+fmtDate(a.sent)+'\nEXPIRES: '+fmtDate(a.expires)+
-   '\n\n'+a.headline+'\n\n'+(a.instruction||'Read the full official NWS bulletin for safety instructions.')+
-   (a.geometry?'\n\nBoundary available on map.':'\n\nThis alert has no supplied map polygon.');
+ selectedWarningId=a.id;
+ const op=window.NewsWireWarningOps?.summarize(a);
+ const fields=['AREA: '+a.area,'ISSUED: '+fmtDate(a.sent),'EXPIRES: '+fmtDate(a.expires)];
+ if(op?.source)fields.push('NWS SOURCE: '+op.source);
+ if(op?.hazard)fields.push('NWS HAZARD: '+op.hazard);
+ if(op?.impact)fields.push('NWS IMPACT: '+op.impact);
+ if(op?.move)fields.push('NWS BULLETIN MOTION: '+op.move.direction+' at '+op.move.mph+' mph');
+ fields.push('',a.headline||'National Weather Service Warning','',
+  a.instruction||'Read the official NWS bulletin for safety instructions.','',
+  a.description||'Full bulletin description is unavailable.','',
+  a.geometry?'Warning boundary mapped — NOT a storm/tornado position.':'No official warning polygon supplied.');
+ $('detail').textContent=fields.join('\n');
  $('official').href=E.officialUrl(a);
+ warningCountdown();updateWarningLock();
+}
+function warningCountdown(){
+ const el=$('warningExpiresCountdown');if(!el)return;
+ const a=alerts.find(x=>x.id===selectedWarningId);
+ const count=a?window.NewsWireWarningOps?.countdown(a.expires):'No selected active warning';
+ el.textContent=count||'Expiration unknown';
+ el.className=String(count||'').startsWith('EXPIRED')?'warningCountdown expired':'warningCountdown';
+}
+function updateWarningLock(){
+ const b=$('warningLockToggle');if(!b)return;
+ const on=Boolean(lockedWarningId&&lockedWarningId===selectedWarningId);
+ b.textContent=on?'🔒 Locked to Warning: ON':'🔓 Lock Selected Warning';
+ b.setAttribute('aria-pressed',String(on));
+ $('warningFocus').disabled=!selectedWarningId;
+}
+function releaseInactiveLock(){
+ if(!lockedWarningId)return;
+ if(!window.NewsWireWarningOps?.activeById(alerts,lockedWarningId)){
+  lockedWarningId=null;updateWarningLock();
+  setText('mapHint','Warning lock released: selected NWS alert expired or is no longer in the active feed.');
+ }
 }
 function select(a,userClicked=false){
  detail(a);
@@ -170,7 +202,7 @@ function draw(){
   const a=alerts.find(x=>x.id===f.properties.id);if(!a)return;
   const div=document.createElement('div'),b=document.createElement('b'),p=document.createElement('p');
   b.textContent='NWS TORNADO WARNING';p.textContent=a.area+' · Expires '+fmtDate(a.expires);
-  div.append(b,p);layer.bindPopup(div);layer.on('click',()=>detail(a));
+  div.append(b,p);layer.bindPopup(div);layer.on('click',()=>select(a,true));
  }}).addTo(map);
  drawMotionGuides();
 }
@@ -316,6 +348,7 @@ function showLocal(){
 function maybeFly(fresh){
  if(!auto||!map)return;
  if(home&&(!localVerified||localAlerts.length))return; // Never pan away while local threats are active or status is unknown.
+ if(lockedWarningId)return;
  if(Date.now()<pauseUntil)return;
  if(Date.now()-lastFly<AUTO_GAP_MS)return;
  const c=fresh.find(a=>a.geometry&&a.center)||null;
@@ -341,6 +374,15 @@ async function refresh(){
    if(newlyLocal){speech('Tornado warning affecting your selected location. Follow National Weather Service instructions.');}
   }
   alerts=next;draw();render();lastChecked=new Date();feedOk=true;initialized=true;deckSelectedIndex=-1;
+  releaseInactiveLock();
+  if(lockedWarningId){
+   const active=window.NewsWireWarningOps?.activeById(alerts,lockedWarningId);
+   if(active)detail(active);
+  }else if(selectedWarningId){
+   const active=alerts.find(a=>a.id===selectedWarningId);
+   if(active)detail(active);
+  }
+  warningCountdown();
   const currentIds=new Set(next.map(a=>a.id)); // Keep IDs seen across updates in this session.
   for(const id of currentIds)seen.add(id);
   if(seen.size>1000)seen=new Set(currentIds);
@@ -377,6 +419,20 @@ function bind(){
    {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
  });
  $('refresh').addEventListener('click',refresh);
+ $('warningLockToggle').addEventListener('click',()=>{
+  if(!selectedWarningId)return setText('mapHint','Choose an active NWS warning first.');
+  const a=window.NewsWireWarningOps?.activeById(alerts,selectedWarningId);
+  if(!a)return setText('mapHint','Selected warning is not currently active.');
+  lockedWarningId=lockedWarningId===selectedWarningId?null:selectedWarningId;
+  if(lockedWarningId&&a.geometry)warningCenter(a);
+  updateWarningLock();
+  setText('mapHint',lockedWarningId?'Locked to selected warning: nationwide auto-fly paused. Local threats still take priority.':'Warning unlocked. Auto-fly may resume.');
+ });
+ $('warningFocus').addEventListener('click',()=>{
+  const a=alerts.find(x=>x.id===selectedWarningId);
+  if(a?.geometry)warningCenter(a);
+  else setText('mapHint','No NWS polygon is available for this warning.');
+ });
  $('locationPinToggle')?.addEventListener('click',()=>{
   showLocationPin=!showLocationPin;setting('location-pin',String(showLocationPin));
   markHome();setButtons();
@@ -429,7 +485,8 @@ window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
 window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
  loadHome();showLocationPin=setting('location-pin')!=='false';auto=setting('auto')!=='false';mapMode=MV?.normalize(setting('map-mode'));satellite=mapMode==='satellite';
- setButtons();mapInit();bind();deckBind();markHome();
+ setButtons();mapInit();bind();deckBind();markHome();updateWarningLock();
+ setInterval(()=>{warningCountdown();releaseInactiveLock()},1000);
  if(window.NewsWireDesktopBridge){
   const bridge=window.NewsWireDesktopBridge;
   if(typeof bridge.onRequestTrack==='function')bridge.onRequestTrack((slot,id)=>{

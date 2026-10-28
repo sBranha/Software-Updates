@@ -186,3 +186,12 @@ body.studioMode .leaflet-container{width:100%!important;height:100%!important}
 #locationPinToggle[aria-pressed="false"]{border-color:#6a7386;color:#cad0dc;opacity:.88}
 body.studioMode .mainRadarStudio{scrollbar-width:none}
 body.studioMode .mainRadarStudio::-webkit-scrollbar{display:none}
+
+/* v0.8.7 selected warning, official bulletin and lock controls */
+.warningCountdown{font-weight:800;font-size:14px;color:#ffce8e;padding:8px 4px;letter-spacing:.3px}
+.warningCountdown.expired{color:#ff6778}
+.warningLockActions{display:flex;gap:5px;flex-wrap:wrap;margin:4px 0 9px}
+.warningLockActions button{min-height:32px;background:#0e3b52;border:1px solid #419ab1;color:#e6fdff;border-radius:7px;padding:6px;font-weight:700;font-size:11px}
+#warningLockToggle[aria-pressed="true"]{background:#86363d;border-color:#ff7687;color:#fff}
+.selectedCard #detail{white-space:pre-wrap;overflow:auto;scrollbar-width:none;max-height:345px;line-height:1.45}
+.selectedCard #detail::-webkit-scrollbar{display:none}

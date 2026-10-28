@@ -113,7 +113,9 @@
    <span class="twister" aria-hidden="true">⚠</span><span><b id="bannerTitle">NWS STATUS UNKNOWN</b><small id="bannerSub">Waiting for official warning feed</small></span>
   </button>
   <div class="rightCard localSafety"><div class="sectionHeading">YOUR LOCATION — SAFETY FIRST</div><div id="localStatus" class="unknown" role="status">Set a ZIP or GPS to check local NWS warnings.</div></div>
-  <div class="rightCard selectedCard"><div class="sectionHeading">SELECTED WARNING DETAILS</div>
+  <div class="rightCard selectedCard"><div class="sectionHeading">SELECTED WARNING · OFFICIAL NWS</div>
+   <div id="warningExpiresCountdown" class="warningCountdown" role="status">No selected active warning</div>
+   <div class="warningLockActions"><button id="warningLockToggle" type="button" aria-pressed="false">🔓 Lock Selected Warning</button><button id="warningFocus" type="button" disabled>◎ Focus Warning</button></div>
    <div id="detail">Select an issued warning to view its affected area, expiration, and official NWS instructions.</div>
    <a id="official" target="_blank" rel="noopener noreferrer" href="https://www.weather.gov/alerts">Read Official NWS Alert ↗</a>
   </div>
@@ -129,5 +131,5 @@
  <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / MULTI-STORM RADAR</div><div class="miniTitle">▦ Track 4 Radar Areas</div><p id="trackedState">Pick Track 1–4 beside a warning, or pin any location.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button><button type="button" data-open-panel="storm-3">Storm 3 ↗</button><button type="button" data-open-panel="storm-4">Storm 4 ↗</button></div></div>
 </div>
 <footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="radar-sites.js"></script><script src="radar-site-picker.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="auto-echo-ui.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="radar-sites.js"></script><script src="radar-site-picker.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="auto-echo-ui.js"></script><script src="main-radar-desk.js"></script><script src="warning-operations.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
 </body></html>
