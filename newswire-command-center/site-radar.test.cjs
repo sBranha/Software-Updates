@@ -59,7 +59,7 @@ test('four detachables get individual site/product and saved polygon keys',()=>{
 });
 test('only Windows is built; no product falsely promises 3D or Level II decoder',()=>{
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.6');
+ assert.equal(pkg.version,'0.8.7');
  assert.ok(pkg.build.files.includes('site-radar.js'));
  const w=fs.readFileSync(path.join(__dirname,'..','.github/workflows/build-newswire-streamdeck-v0.7.1.yml'),'utf8');
  assert.match(w,/windows-latest/);assert.doesNotMatch(w,/macos-latest/);

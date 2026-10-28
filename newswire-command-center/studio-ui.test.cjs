@@ -63,7 +63,7 @@ test('site selectors, NWS alerts and drawing panels are not removed in radar-fir
  assert.match(main,/views\.get\('map'\)===owner/);
  assert.match(main,/newswire:exit-window-fullscreen/);
  assert.match(preload,/exitFullscreen/);
- const pkg=require('./package.json');assert.equal(pkg.version,'0.8.6');
+ const pkg=require('./package.json');assert.equal(pkg.version,'0.8.7');
  assert.ok(pkg.build.files.includes('studio-ui.js'));
- assert.match(pkg.build.win.artifactName,/0\.8\.6/);
+ assert.match(pkg.build.win.artifactName,/0\.8\.7/);
 });

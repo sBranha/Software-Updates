@@ -51,7 +51,7 @@ test('four independent warning windows, separate position persistence and all IP
  assert.match(source['desktop-concept3.html'],/data-open-panel="storm-1"/);
  assert.match(source['desktop-concept3.html'],/data-open-panel="storm-2"/);
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.6');
+ assert.equal(pkg.version,'0.8.7');
  for(const f of ['radar.js','radar-loop.js','drawn-tracks.js','polygon-ui.js','tracking-engine.js','storm.html','storm.css','storm.js'])assert.ok(pkg.build.files.includes(f),f);
  for(const f of ['radar.js','tracking-engine.js','storm.js','main.cjs','app.js','preload.cjs'])new Function(source[f]||fs.readFileSync(path.join(__dirname,f),'utf8'));
 });
