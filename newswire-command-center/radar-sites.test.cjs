@@ -39,7 +39,7 @@ test('enter picks site while preserving selected station when filtering',()=>{
  }finally{global.document=old}
 });
 test('native radar requests accept ICAO station codes while rejecting arbitrary IDs',()=>{
- const pkg=require('./package.json');a.equal(pkg.version,'0.8.6');
+ const pkg=require('./package.json');a.equal(pkg.version,'0.8.7');
  const preload=fs.readFileSync(__dirname+'/preload.cjs','utf8');
  const main=fs.readFileSync(__dirname+'/main.cjs','utf8');
  a.match(preload,/requestRadarScans/);
