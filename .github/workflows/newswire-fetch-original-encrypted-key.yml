@@ -1,0 +1,29 @@
+name: NewsWire fetch public encrypted legacy upload key backup
+on:
+  push:
+    branches: [newswire-ford-style-drive-v0.7.0]
+    paths:
+      - .github/workflows/newswire-fetch-original-encrypted-key.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fetch-encrypted-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download public encrypted backup from existing NewsWire v0.4.5 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 40 --silent --show-error \
+            'https://github.com/sBranha/Software-Updates/releases/download/newswire-play-internal-v0.4.5/NewsWire-Upload-Key-Backup-ENCRYPTED.p7m' \
+            --output NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+          test "$(wc -c < NewsWire-Upload-Key-Backup-ENCRYPTED.p7m)" -eq 4491
+          sha256sum NewsWire-Upload-Key-Backup-ENCRYPTED.p7m > ENCRYPTED-BACKUP-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-Original-ENCRYPTED-Backup
+          path: |
+            NewsWire-Upload-Key-Backup-ENCRYPTED.p7m
+            ENCRYPTED-BACKUP-SHA256SUMS.txt
+          retention-days: 1
