@@ -143,6 +143,10 @@ public final class NewsWireDriveActivity extends Activity {
         LinearLayout.LayoutParams half2=new LinearLayout.LayoutParams(0,-2,1);
         half2.leftMargin=dp(5);row.addView(gps,half2);
         main.addView(row);
+        TextView drivingMap=button("➤  3D DRIVING MAP  ·  FORD-INSPIRED",()->
+            startActivity(new Intent(this,NewsWireDrivingMapActivity.class)));
+        LinearLayout.LayoutParams dm=new LinearLayout.LayoutParams(-1,-2);
+        dm.topMargin=dp(10);dm.bottomMargin=dp(9);main.addView(drivingMap,dm);
         TextView map=button("◎  SATELLITE WEATHER RADAR",()->
             startActivity(new Intent(this,RadarActivity.class)));
         LinearLayout.LayoutParams ml=new LinearLayout.LayoutParams(-1,-2);
