@@ -140,7 +140,6 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean warningsEnabled=true;
         private String mapStyle="road";
         private boolean perspective3d=true;
-        private boolean perspective3d=true;
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
@@ -521,6 +520,7 @@ public final class NewsWaveCarService extends CarAppService {
         private int lastDisplayedZoom=15;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
+        private boolean perspective3d=true;
         static String styleName(String style){
             if("road".equals(style))return "Midnight Roads";
             if("terrain".equals(style))return "Terrain";
