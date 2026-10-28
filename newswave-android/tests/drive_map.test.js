@@ -20,7 +20,7 @@ const activity=fs.readFileSync(root+'java/com/newswave/live/NewsWireDriveActivit
 const manifest=fs.readFileSync(root+'AndroidManifest.xml','utf8');
 const build=fs.readFileSync('newswave-android/app/build.gradle','utf8');
 for(const required of ["MAP_DARK","tiles.openfreemap.org/styles/dark","pitch:pitched?58:0","map.easeTo","updateNewsWireDrivePosition","pitchBtn","styleBtn","followBtn"])assert.ok(html.includes(required),required);
-for(const required of ["class NewsWireDrivingMapActivity","requestLocationUpdates(provider,1600L,3f","lastGoodCourse","file:///android_asset/drive_map.html"])assert.ok(java.includes(required),required);
+for(const required of ["class NewsWireDrivingMapActivity","requestLocationUpdates(provider,1600L,3f","lastGoodCourse","https://appassets.androidplatform.net/assets/drive_map.html"])assert.ok(java.includes(required),required);
 for(const required of ['https://basemaps.cartocdn.com/dark_all/','Matrix tilt=null','tilt.setPolyToPoly','canvas.concat(tilt)','perspective_3d','3D map perspective:','mapStyle="road"'])assert.ok(car.includes(required),required);
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));

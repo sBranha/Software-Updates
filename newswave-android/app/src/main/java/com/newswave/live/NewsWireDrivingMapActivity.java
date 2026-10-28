@@ -17,6 +17,8 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceResponse;
+import androidx.webkit.WebViewAssetLoader;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.view.Gravity;
@@ -62,18 +64,24 @@ public final class NewsWireDrivingMapActivity extends Activity {
         WebSettings settings=view.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccess(false);
         settings.setLoadsImagesAutomatically(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         view.setWebChromeClient(new WebChromeClient());
+        final WebViewAssetLoader localAssets=new WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
         view.setWebViewClient(new WebViewClient(){
+            @Override public WebResourceResponse shouldInterceptRequest(WebView web,android.webkit.WebResourceRequest request){
+                return localAssets.shouldInterceptRequest(request.getUrl());
+            }
             @Override public void onPageFinished(WebView web,String url){
                 pageReady=true;
                 if(lastFix!=null)push(lastFix);
             }
             @Override public boolean shouldOverrideUrlLoading(WebView web,android.webkit.WebResourceRequest request){
                 Uri uri=request.getUrl();
-                if("file".equalsIgnoreCase(uri.getScheme()))return false;
+                if("https".equalsIgnoreCase(uri.getScheme())&&
+                   "appassets.androidplatform.net".equalsIgnoreCase(uri.getHost()))return false;
                 if("https".equalsIgnoreCase(uri.getScheme())){
                     try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(Exception ignored){}
                 }
@@ -82,7 +90,7 @@ public final class NewsWireDrivingMapActivity extends Activity {
         });
         shell.addView(view,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(shell);
-        view.loadUrl("file:///android_asset/drive_map.html");
+        view.loadUrl("https://appassets.androidplatform.net/assets/drive_map.html");
     }
 
     @Override protected void onResume(){
