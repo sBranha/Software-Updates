@@ -12,12 +12,12 @@ contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
  openPanel:type=>{if(['map','local','warnings','storm-1','storm-2','storm-3','storm-4'].includes(type))ipcRenderer.send('newswire:open-panel',type)},
  arrangePanels:()=>ipcRenderer.send('newswire:arrange-panels'),
  requestAutoEcho:site=>{
-  if(!['KHTX','KOHX','KFFC','KMRX'].includes(site))
+  if(!/^[A-Z]{4}$/.test(String(site)))
    return Promise.resolve({ok:false,error:'Unsupported NEXRAD site'});
   return ipcRenderer.invoke('newswire:auto-echo',site);
  },
  requestRadarScans:(site,product)=>{
-  if(!/^K[A-Z0-9]{3}$/.test(String(site))||!/^(N0B|N0U|N0S|NET)$/.test(String(product)))
+  if(!/^[A-Z]{4}$/.test(String(site))||!/^(N0B|N0U|N0S|NET)$/.test(String(product)))
    return Promise.resolve({ok:false,error:'Unsupported radar selection'});
   return ipcRenderer.invoke('newswire:radar-scans',site,product);
  },

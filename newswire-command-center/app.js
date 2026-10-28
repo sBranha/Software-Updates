@@ -5,6 +5,7 @@ const E=window.NewsWireNationwide, $=id=>document.getElementById(id);
 const EVERY_MS=90000, AUTO_GAP_MS=45000, MANUAL_PAUSE_MS=120000;
 const NOAA='https://api.weather.gov/alerts/active';
 let map,polygonLayer,homePin,alerts=[],seen=new Set(),initialized=false,checking=false;
+let showLocationPin=true;
 let motionGuideLayer=null,motionGuidesOn=false;
 let auto=true,voice=false,satellite=true,mapMode='satellite',streetPick=false,lastFly=0,pauseUntil=0;
 let deckSelectedIndex=-1,feedOk=false;
@@ -92,7 +93,10 @@ function mapInit(){
  if(home)markHome(); else $('mapHint').textContent='Red outlines mark official warning areas, not an observed tornado path.';
 }
 function markHome(){
- if(!map||!home)return;
+ if(!map||!home||!showLocationPin){
+  if(homePin&&map){map.removeLayer(homePin);homePin=null;}
+  return;
+ }
  if(!homePin)homePin=L.circleMarker([home.lat,home.lon],{radius:8,color:'#fff',weight:3,fillColor:'#298fff',fillOpacity:1}).addTo(map).bindTooltip('Your selected location');
  else homePin.setLatLng([home.lat,home.lon]);
 }
@@ -113,6 +117,8 @@ function speech(text){
  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=1.03;u.pitch=1;u.lang='en-US';speechSynthesis.speak(u)}catch(e){}
 }
 function setButtons(){
+ const pinButton=$('locationPinToggle');
+ if(pinButton){pinButton.setAttribute('aria-pressed',String(showLocationPin));pinButton.textContent='⌖ Location Pin: '+(showLocationPin?'ON':'OFF');}
  $('auto').setAttribute('aria-pressed',String(auto));$('auto').textContent='Auto-fly: '+(auto?'ON':'OFF');
  $('voice').setAttribute('aria-pressed',String(voice));$('voice').textContent='Voice: '+(voice?'ON':'OFF');
 }
@@ -371,6 +377,10 @@ function bind(){
    {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
  });
  $('refresh').addEventListener('click',refresh);
+ $('locationPinToggle')?.addEventListener('click',()=>{
+  showLocationPin=!showLocationPin;setting('location-pin',String(showLocationPin));
+  markHome();setButtons();
+ });
  $('home').addEventListener('click',()=>{if(!home){setText('localStatus','Enter a ZIP or allow GPS to set home first.');return}pauseUntil=Date.now()+MANUAL_PAUSE_MS;map&&map.flyTo([home.lat,home.lon],8)});
  $('country').addEventListener('click',()=>{pauseUntil=Date.now()+MANUAL_PAUSE_MS;map&&map.flyTo([39,-97],4)});
  $('resume').addEventListener('click',restoreAuto);
@@ -418,7 +428,7 @@ window.updateNewsWirePosition=(lat,lon)=>{if(!E.validLocation(lat,lon))return;
  setHome(lat,lon,'Device GPS','gps')};
 window.NewsWireLocationError=message=>{setText('localStatus',String(message||'GPS unavailable. Enter ZIP instead.'))};
 function start(){
- loadHome();auto=setting('auto')!=='false';mapMode=MV?.normalize(setting('map-mode'));satellite=mapMode==='satellite';
+ loadHome();showLocationPin=setting('location-pin')!=='false';auto=setting('auto')!=='false';mapMode=MV?.normalize(setting('map-mode'));satellite=mapMode==='satellite';
  setButtons();mapInit();bind();deckBind();markHome();
  if(window.NewsWireDesktopBridge){
   const bridge=window.NewsWireDesktopBridge;

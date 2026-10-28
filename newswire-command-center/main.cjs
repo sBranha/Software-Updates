@@ -4,6 +4,7 @@ const path=require('node:path');
 const {createBridge}=require('./deck-bridge.cjs');
 const W=require('./window-layout.cjs');
 const T=require('./tracking-engine.js');
+const {siteFor}=require('./site-radar.js');
 const {lookupCommunities}=require('./communities-service.cjs');
 const {fetchScans}=require('./radar-data/scan-service.cjs');
 const {scan:scanAutoEcho}=require('./radar-data/auto-echo.cjs');
@@ -216,7 +217,7 @@ app.whenReady().then(()=>{
   const owner=BrowserWindow.fromWebContents(event.sender);
   if(!owner||owner.isDestroyed()||!isTrusted(event.sender)||owner!==views.get('map'))
    return {ok:false,error:'Automatic echo analysis requires the active main radar'};
-  if(!['KHTX','KOHX','KFFC','KMRX'].includes(site))
+  if(!siteFor(site))
    return {ok:false,error:'Unsupported radar station'};
   const clock=Date.now(),cached=echoCache.get(site);
   if(cached&&clock-cached.when<90000)return {...cached.data,cached:true};

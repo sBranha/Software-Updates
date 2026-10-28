@@ -145,6 +145,8 @@ for(const site of R.SITES){
  const opt=document.createElement('option');opt.value=site.id;opt.textContent=site.id+' · '+site.name;
  $('radarSite').append(opt);
 }
+window.NewsWireRadarSitePicker?.attach({input:$('stormRadarSearch'),select:$('radarSite'),
+ sites:R.SITES,getSelected:()=>selectedSite,onChoose:id=>{chooseRadar('site',id,selectedProduct);zoomToSite(id)}});
 for(const product of R.PRODUCTS){
  const opt=document.createElement('option');opt.value=product.id;opt.textContent=product.name;
  $('radarProduct').append(opt);

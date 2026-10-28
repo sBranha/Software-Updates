@@ -58,7 +58,7 @@
   <div class="mainRadarStudio" role="group" aria-label="Complete meteorology station and product controls on main radar">
    <label for="mainSource">RADAR SOURCE</label>
    <select id="mainSource"><option value="mosaic">National mosaic</option><option value="site">Single-site Doppler</option></select>
-   <label for="mainSite">NWS RADAR</label><select id="mainSite" aria-label="Select Hytop KHTX or another NEXRAD site"></select>
+   <label for="mainSite">NWS RADAR (161 SITES)</label><input id="mainRadarSearch" type="search" placeholder="Search site / city / state" aria-label="Search all NEXRAD radar sites"><select id="mainSite" aria-label="Select any NEXRAD radar station"></select>
    <button id="mainFocusSite" type="button">⌖ Go To Radar</button>
    <label for="mainProduct">PRODUCT</label><select id="mainProduct" aria-label="Reflectivity, radial velocity or storm-relative velocity"></select>
    <button id="mainPrev" title="Previous observed radar scan" disabled>◀</button><button id="mainNext" title="Next observed radar scan" disabled>▶</button>
@@ -104,7 +104,7 @@
     </div>
    </section>
    <div class="mapLabel"><b>OFFICIAL WARNING BOUNDARIES</b><div id="mapHint">Warning polygons show issued NWS alert areas, not current tornado positions.</div></div>
-   <div class="mapActions"><button id="home">⌖ My Location</button><button id="resume">⟳ Resume Auto-Fly</button><button id="pinStorm1" type="button">⌖ Pin Storm 1</button><button id="pinStorm2" type="button">⌖ Pin Storm 2</button><button id="pinStorm3" type="button">⌖ Pin 3</button><button id="pinStorm4" type="button">⌖ Pin 4</button></div>
+   <div class="mapActions"><button id="home">⌖ My Location</button><button id="locationPinToggle" type="button" aria-pressed="true" title="Hide or show your blue location pin; local NWS safety checking stays active">⌖ Location Pin: ON</button><button id="resume">⟳ Resume Auto-Fly</button><button id="pinStorm1" type="button">⌖ Pin Storm 1</button><button id="pinStorm2" type="button">⌖ Pin Storm 2</button><button id="pinStorm3" type="button">⌖ Pin 3</button><button id="pinStorm4" type="button">⌖ Pin 4</button></div>
   </section>
   <div class="mapFooter"><div><span class="liveDot"></span><b id="mapFooterState">NWS FEED NOT VERIFIED</b></div><span id="radarFeed" aria-live="polite">Live reflectivity: connecting to IEM / NOAA NWS…</span><span><span id="baseMapLabel">Satellite</span> basemap · <span id="mapFooterCount">—</span> tornado warnings</span></div>
  </main>
@@ -129,5 +129,5 @@
  <div class="miniPanel dualPanel"><div class="miniEyebrow">04 / MULTI-STORM RADAR</div><div class="miniTitle">▦ Track 4 Radar Areas</div><p id="trackedState">Pick Track 1–4 beside a warning, or pin any location.</p><div class="dualButtons"><button type="button" data-open-panel="storm-1">Storm 1 ↗</button><button type="button" data-open-panel="storm-2">Storm 2 ↗</button><button type="button" data-open-panel="storm-3">Storm 3 ↗</button><button type="button" data-open-panel="storm-4">Storm 4 ↗</button></div></div>
 </div>
 <footer class="disclaimer">NewsWire is supplemental information, not a certified warning receiver. A warning polygon is not an observed tornado track. Do not rely solely on this app for life-safety decisions.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="auto-echo-ui.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="engine.js"></script><script src="map-views.js"></script><script src="radar.js"></script><script src="radar-loop.js"></script><script src="tracking-engine.js"></script><script src="storm-motion.js"></script><script src="radar-sites.js"></script><script src="radar-site-picker.js"></script><script src="site-radar.js"></script><script src="drawn-tracks.js"></script><script src="velocity-couplet.js"></script><script src="main-motion-ui.js"></script><script src="auto-echo-ui.js"></script><script src="main-radar-desk.js"></script><script src="app.js"></script><script src="workspace-ui.js"></script><script src="concept3-ui.js"></script><script src="studio-ui.js"></script>
 </body></html>

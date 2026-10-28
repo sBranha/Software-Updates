@@ -279,6 +279,8 @@ function init({map,L,composite,setActive,onWarningToggle,onInteraction}){
    onInteraction?.();map.flyTo([radar.lat,radar.lng],Math.max(7,map.getZoom()),{animate:true});
   });
  }
+ window.NewsWireRadarSitePicker?.attach({input:$('mainRadarSearch'),select:$('mainSite'),
+  sites:R().SITES,getSelected:()=>site,onChoose:id=>{activate('site',id,product);focusSite()}});
  for(const product of R().PRODUCTS){
   const opt=document.createElement('option');opt.value=product.id;opt.textContent=product.name;
   $('mainProduct').append(opt);
