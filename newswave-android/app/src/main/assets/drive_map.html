@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>NewsWire · Drive Map</title>
+<link href="maplibre-gl.css" rel="stylesheet">
+<style>
+:root{color-scheme:dark;font-family:system-ui,Roboto,Arial,sans-serif;background:#04101a;color:#e9fbff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}#map{position:absolute;inset:0;background:#061622}
+#map::after{content:"";position:absolute;pointer-events:none;inset:0;background:linear-gradient(180deg,#030e19a8 0%,transparent 27%,transparent 70%,#020d15a0 100%);z-index:1}
+.frame{position:absolute;z-index:10;pointer-events:none;left:12px;right:12px;display:flex;align-items:center;gap:8px}
+.frame>*{pointer-events:auto}.top{top:12px;justify-content:space-between}.bottom{bottom:15px;flex-wrap:wrap}
+.brand{border:1px solid #47768b;background:#071b2ddd;box-shadow:0 12px 30px #0009;border-radius:14px;padding:9px 12px;min-width:140px;backdrop-filter:blur(8px)}
+.brand b{letter-spacing:1.2px;font-size:14px;color:#78eafb}.brand span{display:block;font-size:10px;color:#a9c2d1;margin-top:1px}
+.controls{display:flex;align-items:center;gap:6px}
+button{touch-action:manipulation;border:1px solid #42748e;border-radius:10px;background:#0b2942ee;color:#efffff;min-width:44px;min-height:45px;padding:8px 11px;font:700 13px system-ui;box-shadow:0 4px 16px #0006}
+button[aria-pressed="true"]{background:#086e83;border-color:#3be5f3}
+button:active{transform:scale(.97)}
+#styleBtn{min-width:92px}#pitchBtn{min-width:62px}
+.pill{border:1px solid #426579;border-radius:13px;padding:10px 12px;background:#071b2ae6;box-shadow:0 12px 26px #000a;backdrop-filter:blur(9px);font-size:12px}
+#status{flex:1;min-width:140px}#heading{font-weight:800;color:#c1faff;letter-spacing:.8px}
+#nwsLink{font-size:12px;color:#ffe6aa;text-decoration:none;padding:12px;background:#283d4adc;border-radius:12px;border:1px solid #998357}
+.arrow{width:64px;height:76px;pointer-events:none;filter:drop-shadow(0 6px 4px #000a)}
+.arrow svg{width:100%;height:100%}.maplibregl-marker{z-index:5}
+.maplibregl-ctrl-bottom-left{bottom:95px}.maplibregl-ctrl-bottom-right{bottom:100px}
+.maplibregl-ctrl-attrib{font-size:9px!important;background:#091a27b9!important;color:#dbedfa!important}
+.maplibregl-ctrl-attrib a{color:#9de6f3!important}
+#fallback{display:none;position:absolute;z-index:15;top:23%;left:8%;right:8%;text-align:center;padding:20px;background:#122d40ed;border:1px solid #68a8bc;border-radius:18px}
+@media(max-width:390px){.brand{min-width:100px;padding:7px 9px}.brand b{font-size:12px}button{min-width:41px;padding:8px}.top{left:6px;right:6px}.bottom{left:6px;right:6px}.arrow{width:54px}}
+</style></head><body>
+<div id="map" role="img" aria-label="Interactive Ford-inspired NewsWire GPS driving map"></div>
+<div class="frame top"><div class="brand"><b>NEWSWIRE / DRIVE</b><span>Dark roads · real GPS · weather</span></div>
+<div class="controls"><button id="pitchBtn" aria-pressed="true" aria-label="Switch 3D perspective">3D</button>
+<button id="styleBtn" aria-label="Change map style">Roads</button><button id="followBtn" aria-pressed="true" aria-label="Follow my GPS location">◎</button></div></div>
+<div id="fallback" role="status">Map is unavailable. Check your internet connection. GPS and official NWS warnings should be checked separately.</div>
+<div class="frame bottom"><div id="status" class="pill" role="status">◎ Waiting for a GPS fix…</div>
+<div id="heading" class="pill" aria-live="off">— · — mph</div>
+<a id="nwsLink" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">⚠ NWS alerts ↗</a></div>
+<script src="maplibre-gl.js"></script>
+<script src="drive_map_math.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),Maths=window.NewsWireDriveMath;
+const MAP_DARK='https://tiles.openfreemap.org/styles/dark';
+const MAP_SAT={version:8,sources:{imagery:{type:'raster',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Tiles © Esri and contributors'}},layers:[{id:'satellite',type:'raster',source:'imagery'}]};
+const MAP_STYLE={dark:'Roads',satellite:'Satellite'};
+function saved(key,otherwise){try{return localStorage.getItem('nw-drive-'+key)||otherwise}catch(_){return otherwise}}
+function save(key,value){try{localStorage.setItem('nw-drive-'+key,String(value))}catch(_){}}
+let style=saved('style','dark');if(!MAP_STYLE[style])style='dark';
+let pitched=saved('perspective','true')!=='false',follow=saved('follow','true')!=='false';
+let gps=null,course=null,speed=0,initialized=false,marker=null,map=null,lastCenter=0;
+$('pitchBtn').textContent=pitched?'3D':'2D';$('pitchBtn').setAttribute('aria-pressed',String(pitched));
+$('styleBtn').textContent=MAP_STYLE[style];$('followBtn').setAttribute('aria-pressed',String(follow));
+function ready(){
+ if(typeof maplibregl!=='object'){ $('fallback').style.display='block';return }
+ try{
+  map=new maplibregl.Map({container:'map',style:style==='dark'?MAP_DARK:MAP_SAT,
+   center:[-98.2,39.1],zoom:3.6,pitch:pitched?58:0,bearing:0,
+   maxPitch:65,attributionControl:true,antialias:true});
+  map.on('load',()=>{initialized=true;camera(true);});
+  map.on('error',error=>{if(!initialized){$('fallback').style.display='block';}console.warn('NewsWire drive map:',error?.error?.message||error)});
+  map.on('dragstart',()=>{follow=false;save('follow',false);$('followBtn').setAttribute('aria-pressed','false')});
+  map.on('zoomstart',()=>{lastCenter=Date.now()});
+  const arrow=document.createElement('div');arrow.className='arrow';
+  arrow.innerHTML='<svg viewBox="0 0 64 76" xmlns="http://www.w3.org/2000/svg"><path d="M32 3L57 65 32 53 7 65Z" fill="#fa4c20" stroke="#ffe39a" stroke-width="3" stroke-linejoin="round"/><path d="M32 3v50L7 65Z" fill="#ff9d31" opacity=".95"/><path d="M32 8v42" stroke="#fff4cf" opacity=".65" stroke-width="2.5"/></svg>';
+  marker=new maplibregl.Marker({element:arrow,anchor:'center',rotationAlignment:'viewport',pitchAlignment:'viewport'}).setLngLat([-98.2,39.1]);
+  marker.addTo(map);arrow.style.display='none';
+  window.addEventListener('resize',()=>map?.resize());
+ }catch(error){$('fallback').style.display='block';console.warn('NewsWire map initialization unavailable',error)}
+}
+function camera(instant){
+ if(!map||!gps||!follow)return;
+ const opts={center:[gps.lng,gps.lat],zoom:Math.max(map.getZoom(),14.7),
+  pitch:pitched?58:0,bearing:course===null?map.getBearing():course,
+  duration:instant?0:850,essential:true};
+ map.easeTo(opts);lastCenter=Date.now();
+}
+function setGps(lat,lng,newBearing,newSpeed,accuracy){
+ lat=Number(lat);lng=Number(lng);
+ if(!Maths.validFix(lat,lng))return;
+ const goodSpeed=Number.isFinite(newSpeed)?Math.max(0,newSpeed):0;
+ const moving=goodSpeed>=1.5;
+ if(moving&&Number.isFinite(newBearing))course=Maths.smoothBearing(course,newBearing,.62);
+ speed=goodSpeed;gps={lat,lng};
+ if(marker){marker.setLngLat([lng,lat]);marker.getElement().style.display='';}
+ $('status').textContent=(Number.isFinite(accuracy)&&accuracy>70?'⚠ Approximate GPS · ':'◎ GPS · ')+
+    (follow?'Following':'Free map')+' · '+lat.toFixed(4)+', '+lng.toFixed(4);
+ $('heading').textContent=Maths.compass(course)+' · '+Math.round(speed*2.236936)+' mph';
+ if(follow&&map){camera(!initialized||Date.now()-lastCenter>15000);}
+}
+window.updateNewsWireDrivePosition=setGps;
+$('pitchBtn').addEventListener('click',()=>{
+ pitched=!pitched;save('perspective',pitched);
+ $('pitchBtn').textContent=pitched?'3D':'2D';
+ $('pitchBtn').setAttribute('aria-pressed',String(pitched));
+ map?.easeTo({pitch:pitched?58:0,duration:450});
+});
+$('styleBtn').addEventListener('click',()=>{
+ style=style==='dark'?'satellite':'dark';save('style',style);
+ $('styleBtn').textContent=MAP_STYLE[style];
+ if(map){map.setStyle(style==='dark'?MAP_DARK:MAP_SAT);map.once('styledata',()=>camera(true))}
+});
+$('followBtn').addEventListener('click',()=>{
+ follow=!follow;save('follow',follow);$('followBtn').setAttribute('aria-pressed',String(follow));
+ if(follow)camera(true);
+});
+ready();
+})();
+</script></body></html>
