@@ -180,3 +180,9 @@ body.studioMode .leaflet-container{width:100%!important;height:100%!important}
 .autoEchoSection #mainAutoEchoList::-webkit-scrollbar{display:none}
 .autoEchoSection #mainAutoEchoList li{margin:4px 0;font-size:11px;color:#cfdef5}
 .autoEchoSection #mainAutoEchoList button.autoEchoSelect{width:100%;text-align:left;font-size:11px;min-height:30px;color:#d5ffff;background:#134a58;border:1px solid #388393;padding:6px}
+
+/* v0.8.6 nationwide NEXRAD station finder */
+#mainRadarSearch{width:180px;max-width:26vw;min-width:104px;background:#092a42;border:1px solid #5089b1;border-radius:6px;color:#f5fbff;padding:7px;font:600 11px system-ui}
+#locationPinToggle[aria-pressed="false"]{border-color:#6a7386;color:#cad0dc;opacity:.88}
+body.studioMode .mainRadarStudio{scrollbar-width:none}
+body.studioMode .mainRadarStudio::-webkit-scrollbar{display:none}

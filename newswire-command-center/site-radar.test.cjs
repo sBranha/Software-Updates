@@ -2,7 +2,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const S=require('./site-radar.js');
 test('officially located NEXRAD stations include Hytop KHTX and independent nearby sites',()=>{
- assert.deepEqual(S.SITES.map(x=>x.id),['KHTX','KOHX','KFFC','KMRX']);
+ assert.equal(S.SITES.length,161);
+ for(const id of ['KHTX','KOHX','KFFC','KMRX','KBMX','PABC','TJUA'])assert.ok(S.siteFor(id),id);
  const k=S.siteFor('KHTX');
  assert.ok(Math.abs(k.lat-34.930556)<.0001);
  assert.ok(Math.abs(k.lng+86.083611)<.0001);
@@ -58,7 +59,7 @@ test('four detachables get individual site/product and saved polygon keys',()=>{
 });
 test('only Windows is built; no product falsely promises 3D or Level II decoder',()=>{
  const pkg=require('./package.json');
- assert.equal(pkg.version,'0.8.5');
+ assert.equal(pkg.version,'0.8.6');
  assert.ok(pkg.build.files.includes('site-radar.js'));
  const w=fs.readFileSync(path.join(__dirname,'..','.github/workflows/build-newswire-streamdeck-v0.7.1.yml'),'utf8');
  assert.match(w,/windows-latest/);assert.doesNotMatch(w,/macos-latest/);
