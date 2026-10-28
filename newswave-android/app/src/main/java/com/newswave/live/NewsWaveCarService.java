@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -137,15 +138,20 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationListener locationListener;
         private final RadarRenderer renderer=new RadarRenderer();
         private boolean warningsEnabled=true;
-        private String mapStyle="satellite";
+        private String mapStyle="road";
+        private boolean perspective3d=true;
+        private boolean perspective3d=true;
         RadarScreen(CarContext context){
             super(context);
             stations=readStations(context);
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
             mapStyle=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
-                .getString("map_style","satellite");
+                .getString("map_style","road");
+            perspective3d=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
+                .getBoolean("perspective_3d",true);
             renderer.setMapStyle(mapStyle);
+            renderer.setPerspective(perspective3d);
             try{context.getCarService(AppManager.class).setSurfaceCallback(renderer);}catch(Exception e){Log.w(LOG,"No map surface yet",e);}
             renderer.change(chosen,mode,nationwide);
             renderer.setWarningVisibility(true);
@@ -308,6 +314,16 @@ public final class NewsWaveCarService extends CarAppService {
                 .addText("GPS location, NWS warnings and refresh")
                 .setOnClickListener(()->getScreenManager().push(
                     new SafetyDashboardScreen(getCarContext(),radar))).build());
+            list.addItem(new Row.Builder()
+                .setTitle("3D map perspective: "+(radar.perspective3d?"ON":"OFF"))
+                .addText("Ford-inspired tilted road view, or flat 2D map")
+                .setOnClickListener(()->{
+                    radar.perspective3d=!radar.perspective3d;
+                    radar.getCarContext().getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
+                        .edit().putBoolean("perspective_3d",radar.perspective3d).apply();
+                    radar.renderer.setPerspective(radar.perspective3d);
+                    invalidate();radar.invalidate();
+                }).build());
             list.addItem(new Row.Builder()
                 .setTitle("Map type: "+RadarRenderer.styleName(radar.mapStyle))
                 .addText("Satellite, terrain, or road map")
@@ -491,7 +507,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.6.9 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.0 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
@@ -506,13 +522,17 @@ public final class NewsWaveCarService extends CarAppService {
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
         static String styleName(String style){
-            if("road".equals(style))return "Road Map";
+            if("road".equals(style))return "Midnight Roads";
             if("terrain".equals(style))return "Terrain";
             return "Satellite";
         }
         void setMapStyle(String style){
             if(!"road".equals(style)&&!"terrain".equals(style)&&!"satellite".equals(style))style="satellite";
             synchronized(lock){mapStyle=style;}
+            refresh();
+        }
+        void setPerspective(boolean on){
+            synchronized(lock){perspective3d=on;}
             refresh();
         }
         private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(80,.75f,true){
@@ -691,20 +711,20 @@ public final class NewsWaveCarService extends CarAppService {
         void refresh(){
             fetchWarningsIfDue();
             final Station s;final String p;final boolean national;final int rev,w,h,z;
-            final boolean auto,drawWarnings;
+            final boolean auto,drawWarnings,tiltRoads;
             final String selectedStyle;
             final double mLat,mLon;
             synchronized(lock){
                 s=station;p=product;national=usa;rev=++revision;
                 w=width;h=height;z=zoom;
-                auto=followGps;drawWarnings=warningsOn;
+                auto=followGps;drawWarnings=warningsOn;tiltRoads=perspective3d;
                 mLat=manualLat;mLon=manualLon;
                 selectedStyle=mapStyle;
             }
             executor.execute(()->{
                 synchronized(lock){if(rev!=revision)return;}
                 render(s,p,national,rev,Math.max(480,w),Math.max(320,h),
-                       z,auto,mLat,mLon,drawWarnings,selectedStyle);
+                       z,auto,mLat,mLon,drawWarnings,selectedStyle,tiltRoads);
             });
         }
         @Override public void onSurfaceAvailable(@NonNull SurfaceContainer c){
@@ -744,7 +764,7 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
             String server;
-            if("road".equals(style))server="https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png";
+            if("road".equals(style))server="https://basemaps.cartocdn.com/dark_all/"+z+"/"+x+"/"+y+".png";
             else {
                 String service="terrain".equals(style)?"World_Topo_Map":"World_Imagery";
                 server="https://services.arcgisonline.com/ArcGIS/rest/services/"+service
@@ -780,7 +800,7 @@ public final class NewsWaveCarService extends CarAppService {
         }
         private void render(Station s,String p,boolean national,int rev,int w,int h,
                             int z,boolean auto,double manualLatitude,double manualLongitude,
-                            boolean drawWarnings,String style){
+                            boolean drawWarnings,String style,boolean perspective){
             Bitmap out=null;
             try{
                 Double gLat,gLon;Float bearing;
@@ -794,13 +814,19 @@ public final class NewsWaveCarService extends CarAppService {
 
                 // Rotate the entire weather map (roads, radar and warning boundaries),
                 // not just the position arrow. Cover all corners after rotation.
-                float left=0,top=0,right=w,bottom=h;
+                // For a perspective projection, sample beyond the horizon's visible
+                // rectangle. The source trapezoid maps onto the full car display.
+                boolean drivingPerspective=perspective&&auto&&gLat!=null;
+                float left=drivingPerspective?-w*.27f:0f;
+                float top=drivingPerspective?-h*.22f:0f;
+                float right=drivingPerspective?w*1.27f:w;
+                float bottom=h;
                 if(headingUp){
                     double radians=Math.toRadians(degrees);
                     double cs=Math.cos(radians),sn=Math.sin(radians);
                     float minX=Float.MAX_VALUE,minY=Float.MAX_VALUE;
                     float maxX=-Float.MAX_VALUE,maxY=-Float.MAX_VALUE;
-                    float[] corners={0,0,w,0,w,h,0,h};
+                    float[] corners={left,top,right,top,right,bottom,left,bottom};
                     for(int i=0;i<corners.length;i+=2){
                         double dx=corners[i]-anchorX,dy=corners[i+1]-anchorY;
                         float ux=(float)(anchorX+cs*dx-sn*dy);
@@ -820,7 +846,17 @@ public final class NewsWaveCarService extends CarAppService {
                 Canvas canvas=new Canvas(out);
                 canvas.drawColor(Color.rgb(13,26,39));
                 Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+                // Android Canvas supports a real four-corner projective transform.
+                // This is a tilted raster view, NOT 3D buildings or Ford's maps.
+                Matrix tilt=null;
+                if(drivingPerspective){
+                    tilt=new Matrix();
+                    float[] source={-w*.27f,-h*.22f,w*1.27f,-h*.22f,w,h,0,h};
+                    float[] target={0,0,w,0,w,h,0,h};
+                    if(!tilt.setPolyToPoly(source,0,target,0,4))tilt=null;
+                }
                 canvas.save();
+                if(tilt!=null)canvas.concat(tilt);
                 if(headingUp)canvas.rotate(-degrees,anchorX,anchorY);
                 canvas.translate(left,top);
 
@@ -882,10 +918,14 @@ public final class NewsWaveCarService extends CarAppService {
                 if(gLat!=null){
                     float pinX=headingUp?anchorX:(float)(mx(gLon,z)-x0);
                     float pinY=headingUp?anchorY:(float)(my(gLat,z)-y0);
+                    if(tilt!=null){
+                        float[] projected={pinX,pinY};tilt.mapPoints(projected);
+                        pinX=projected[0];pinY=projected[1];
+                    }
                     Paint pin=new Paint(Paint.ANTI_ALIAS_FLAG);
                     pin.setColor(0x99ffffff);
                     canvas.drawCircle(pinX,pinY,18,pin);
-                    pin.setColor(0xff2389ff);
+                    pin.setColor(0xfffc652c);
                     canvas.drawCircle(pinX,pinY,13,pin);
                     pin.setColor(Color.WHITE);
                     pin.setStyle(Paint.Style.STROKE);
@@ -893,7 +933,7 @@ public final class NewsWaveCarService extends CarAppService {
                     canvas.drawCircle(pinX,pinY,13,pin);
                     if(headingUp){
                         pin.setStyle(Paint.Style.FILL);
-                        pin.setColor(Color.WHITE);
+                        pin.setColor(0xffff9f30);
                         android.graphics.Path pointer=new android.graphics.Path();
                         pointer.moveTo(pinX,pinY-36);
                         pointer.lineTo(pinX-12,pinY-9);
@@ -959,7 +999,7 @@ public final class NewsWaveCarService extends CarAppService {
                 brush.setColor(0xca09111b);
                 canvas.drawRoundRect(8,h-30,Math.min(w-8,490),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
-                canvas.drawText("Imagery Esri / OSM · Radar and warnings NOAA/NWS",14,h-13,brush);
+                canvas.drawText("Maps CARTO / OSM / Esri · Weather NOAA/NWS",14,h-13,brush);
                 synchronized(lock){
                     if(rev!=revision){out.recycle();return;}
                     finished=out;
