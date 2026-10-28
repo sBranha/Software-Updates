@@ -3,6 +3,8 @@
  'use strict';
  const $=id=>document.getElementById(id);
  const bridge=window.NewsWireDesktopBridge;
+ if($('appVersionLabel')&&/^\d+\.\d+\.\d+$/.test(String(bridge?.appVersion||'')))
+  $('appVersionLabel').textContent='v'+bridge.appVersion;
  function click(id){const button=$(id);if(button)button.click()}
  function openPanel(view){if(bridge&&typeof bridge.openPanel==='function')bridge.openPanel(view);}
  $('nav-map')?.addEventListener('click',()=>click('country'));
