@@ -65,7 +65,9 @@ jobs:
               assert required in car, required
           assert 'private boolean nationwide=true' in car
           assert "locationManager.requestLocationUpdates(provider,1500,3" in car
-          assert 'private String mapStyle="satellite"' in car
+          assert 'private String mapStyle="road"' in car
+          assert 'setPerspective(perspective3d)' in car
+          assert 'Matrix tilt=null' in car
           assert 'redraw=drift[0]>=5f || angular>=2f' in car
           assert 'worldX=(float)(Math.cos(rad)*dx-Math.sin(rad)*dy)' in car
           drive=(root/"DriveWarningService.java").read_text()
