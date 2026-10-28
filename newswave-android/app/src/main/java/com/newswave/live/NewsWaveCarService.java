@@ -506,7 +506,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.7.0 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.1 (https://github.com/sBranha/Software-Updates)";
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();

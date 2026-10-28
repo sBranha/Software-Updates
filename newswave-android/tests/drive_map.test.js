@@ -24,6 +24,6 @@ for(const required of ["class NewsWireDrivingMapActivity","requestLocationUpdate
 for(const required of ['https://basemaps.cartocdn.com/dark_all/','Matrix tilt=null','tilt.setPolyToPoly','canvas.concat(tilt)','perspective_3d','3D map perspective:','mapStyle="road"'])assert.ok(car.includes(required),required);
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 35"));
-assert.ok(build.includes("versionName '0.7.0'"));
+assert.ok(build.includes("versionCode 36"));
+assert.ok(build.includes("versionName '0.7.1'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
