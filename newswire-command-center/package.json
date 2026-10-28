@@ -1,12 +1,12 @@
 {
   "name": "newswire-command-center",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "description": "Free nationwide storm warning command center using official NWS alert data",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs radar-data/scan-service.test.cjs velocity-couplet.test.cjs main-radar-desk.test.cjs studio-ui.test.cjs storm-motion.test.cjs radar-data/auto-echo.test.cjs radar-sites.test.cjs",
+    "test": "node --test test.js deck-bridge.test.cjs window-layout.test.cjs radar-tracking.test.cjs draw-loop.test.cjs communities-service.test.cjs offline-cities.test.cjs polygon-focus.test.cjs studio-map.test.cjs site-radar.test.cjs radar-data/level2-volume.test.cjs radar-data/scan-service.test.cjs velocity-couplet.test.cjs main-radar-desk.test.cjs studio-ui.test.cjs storm-motion.test.cjs radar-data/auto-echo.test.cjs radar-sites.test.cjs warning-operations.test.cjs",
     "package:windows": "electron-builder --win nsis --x64 --publish never",
     "package:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
@@ -62,7 +62,8 @@
       "auto-echo-ui.js",
       "radar-data/auto-echo.cjs",
       "radar-sites.js",
-      "radar-site-picker.js"
+      "radar-site-picker.js",
+      "warning-operations.js"
     ],
     "asar": true,
     "win": {
@@ -74,7 +75,7 @@
           ]
         }
       ],
-      "artifactName": "NewsWire-Command-Center-0.8.6-Windows-Setup.${ext}"
+      "artifactName": "NewsWire-Command-Center-0.8.7-Windows-Setup.${ext}"
     },
     "mac": {
       "target": [

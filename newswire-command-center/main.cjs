@@ -143,6 +143,9 @@ function menu(){
  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 app.whenReady().then(()=>{
+ ipcMain.on('newswire:app-version',event=>{
+  event.returnValue=isTrusted(event.sender)?app.getVersion():null;
+ });
  layoutFile=path.join(app.getPath('userData'),'newswire-window-layout.json');
  layout=W.readLayout(layoutFile);
  ipcMain.on('newswire:deck-state',(event,s)=>{

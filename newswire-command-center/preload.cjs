@@ -1,7 +1,7 @@
 'use strict';
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
- appVersion:require('./package.json').version,
+ appVersion:ipcRenderer.sendSync('newswire:app-version'),
  reportState:s=>{if(s&&typeof s==='object')ipcRenderer.send('newswire:deck-state',s)},
  lookupCommunities:(points,expand=false)=>{
   if(!Array.isArray(points)||points.length<3||points.length>40)return Promise.resolve({ok:false,error:'Draw 3 to 40 corners.'});
@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('NewsWireDesktopBridge',{
   return ipcRenderer.invoke('newswire:auto-echo',site);
  },
  requestRadarScans:(site,product)=>{
-  if(!/^[A-Z]{4}$/.test(String(site))||!/^(N0B|N0U|N0S|NET)$/.test(String(product)))
+  if(!/^[A-Z]{4}$/.test(String(site))||!/^(N0B|N0Q|N0U|N0S|N0X|N0C|N0K|N0H)$/.test(String(product)))
    return Promise.resolve({ok:false,error:'Unsupported radar selection'});
   return ipcRenderer.invoke('newswire:radar-scans',site,product);
  },

@@ -11,8 +11,13 @@ if(!RadarSites)throw Error('Offline NEXRAD station directory is missing');
 const SITES=RadarSites.SITES;
 const PRODUCTS=Object.freeze([
  Object.freeze({id:'N0B',name:'Base Reflectivity (dBZ)',kind:'reflectivity',units:'dBZ'}),
+ Object.freeze({id:'N0Q',name:'Long-Range Reflectivity',kind:'reflectivity',units:'dBZ'}),
  Object.freeze({id:'N0U',name:'Base Radial Velocity',kind:'velocity',units:'radial velocity'}),
- Object.freeze({id:'N0S',name:'Storm-Relative Velocity',kind:'storm-relative',units:'radial velocity'})
+ Object.freeze({id:'N0S',name:'Storm-Relative Velocity',kind:'storm-relative',units:'radial velocity'}),
+ Object.freeze({id:'N0X',name:'Differential Reflectivity (ZDR)',kind:'dualpol',units:'dB'}),
+ Object.freeze({id:'N0C',name:'Correlation Coefficient (CC)',kind:'dualpol',units:'ratio'}),
+ Object.freeze({id:'N0K',name:'Specific Differential Phase (KDP)',kind:'dualpol',units:'degrees/km'}),
+ Object.freeze({id:'N0H',name:'Hydrometeor Classification',kind:'hydrometeor',units:'category'})
 ]);
 function siteFor(id){return RadarSites.siteFor(id)}
 function productFor(id){return PRODUCTS.find(x=>x.id===id)||null}
