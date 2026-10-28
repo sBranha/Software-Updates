@@ -60,9 +60,9 @@ test('shared controls exist in both active main dashboard and separate tracking 
  }
 });
 test('packaging and Windows-only workflow reference no Mac build',()=>{
- const pkg=require('./package.json');assert.equal(pkg.version,'0.8.5');
+ const pkg=require('./package.json');assert.equal(pkg.version,'0.8.6');
  assert.ok(pkg.build.files.includes('map-views.js'));
- assert.match(pkg.build.win.artifactName,/0\.8\.5/);
+ assert.match(pkg.build.win.artifactName,/0\.8\.6/);
  const ci=fs.readFileSync(path.join(__dirname,'..','.github/workflows/build-newswire-streamdeck-v0.7.1.yml'),'utf8');
  assert.doesNotMatch(ci,/macos-latest/);
  assert.match(ci,/windows-latest/);

@@ -41,11 +41,11 @@ test('NWS motion guide is anchored to WARNING AREA, not represented as actual st
  assert.equal(M.bulletinGuide({description:'MOVING WEST AT 20 MPH',geometry:null}),null);
  assert.equal(M.geometryCenter({type:'Point',coordinates:[-86,35]}),null);
 });
-test('new v0.8.5 controls preserve radar source selection and packaged module',()=>{
+test('new v0.8.6 controls preserve radar source selection and packaged module',()=>{
  const pkg=require('./package.json'),main=fs.readFileSync(path.join(__dirname,'main-radar-desk.js'),'utf8'),
  html=fs.readFileSync(path.join(__dirname,'desktop-concept3.html'),'utf8'),
  storm=fs.readFileSync(path.join(__dirname,'storm.js'),'utf8');
- assert.equal(pkg.version,'0.8.5');
+ assert.equal(pkg.version,'0.8.6');
  assert.ok(pkg.build.files.includes('storm-motion.js'));
  for(const id of ['mainMotionPick','mainMotionClear','mainMotionFocus','mainMotionStatus','mainMotionGuide'])
   assert.match(html,new RegExp('id="'+id+'"'));
