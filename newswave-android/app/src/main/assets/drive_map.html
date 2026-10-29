@@ -7,7 +7,11 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}#map{position:absolute;inset:0;background:#061622}
 #map::after{content:"";position:absolute;pointer-events:none;inset:0;background:linear-gradient(180deg,#030e19a8 0%,transparent 27%,transparent 70%,#020d15a0 100%);z-index:1}
 .frame{position:absolute;z-index:10;pointer-events:none;left:12px;right:12px;display:flex;align-items:center;gap:8px}
-.frame>*{pointer-events:auto}.top{top:12px;justify-content:space-between}.bottom{bottom:15px;flex-wrap:wrap}
+.frame>*{pointer-events:auto}.top{top:12px;justify-content:flex-end}.bottom{bottom:15px;flex-wrap:wrap}
+.frame{transition:opacity .24s ease,transform .24s ease}
+.controls-hidden .frame{opacity:0;pointer-events:none;transform:translateY(-5px)}
+.controls-hidden .frame>*{pointer-events:none}
+@media(prefers-reduced-motion:reduce){.frame{transition:none}}
 .brand{border:1px solid #47768b;background:#071b2ddd;box-shadow:0 12px 30px #0009;border-radius:14px;padding:9px 12px;min-width:140px;backdrop-filter:blur(8px)}
 .brand b{letter-spacing:1.2px;font-size:14px;color:#78eafb}.brand span{display:block;font-size:10px;color:#a9c2d1;margin-top:1px}
 .controls{display:flex;align-items:center;gap:6px}
@@ -27,8 +31,7 @@ button:active{transform:scale(.97)}
 @media(max-width:390px){.brand{min-width:100px;padding:7px 9px}.brand b{font-size:12px}button{min-width:41px;padding:8px}.top{left:6px;right:6px}.bottom{left:6px;right:6px}.arrow{width:54px}}
 </style></head><body>
 <div id="map" role="img" aria-label="Interactive Ford-inspired NewsWire GPS driving map"></div>
-<div class="frame top"><div class="brand"><b>NEWSWIRE / DRIVE</b><span>Dark roads · real GPS · weather</span></div>
-<div class="controls"><button id="pitchBtn" aria-pressed="true" aria-label="Switch 3D perspective">3D</button>
+<div class="frame top"><div class="controls"><button id="pitchBtn" aria-pressed="true" aria-label="Switch 3D perspective">3D</button>
 <button id="styleBtn" aria-label="Change map style">Roads</button><button id="followBtn" aria-pressed="true" aria-label="Follow my GPS location">◎</button></div></div>
 <div id="fallback" role="status">Map is unavailable. Check your internet connection. GPS and official NWS warnings should be checked separately.</div>
 <div class="frame bottom"><div id="status" class="pill" role="status">◎ Waiting for a GPS fix…</div>
@@ -48,6 +51,24 @@ function save(key,value){try{localStorage.setItem('nw-drive-'+key,String(value))
 let style=saved('style','dark');if(!MAP_STYLE[style])style='dark';
 let pitched=saved('perspective','true')!=='false',follow=saved('follow','true')!=='false';
 let gps=null,course=null,speed=0,initialized=false,marker=null,map=null,lastCenter=0;
+// Keep the map unobstructed while idle. A tap reveals controls for 7 seconds;
+// do not hide while a keyboard or accessibility user is focused on a control.
+let hideTimer=null;
+function revealControls(){
+ document.body.classList.remove('controls-hidden');
+ if(hideTimer!==null)clearTimeout(hideTimer);
+ hideTimer=setTimeout(()=>{
+  if(!document.querySelector('.frame:focus-within')){
+   document.body.classList.add('controls-hidden');
+  }
+ },7000);
+}
+document.addEventListener('pointerdown',revealControls,{passive:true});
+document.addEventListener('keydown',revealControls);
+document.addEventListener('focusin',revealControls);
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden)revealControls();
+});
 $('pitchBtn').textContent=pitched?'3D':'2D';$('pitchBtn').setAttribute('aria-pressed',String(pitched));
 $('styleBtn').textContent=MAP_STYLE[style];$('followBtn').setAttribute('aria-pressed',String(follow));
 function ready(){
@@ -104,5 +125,6 @@ $('followBtn').addEventListener('click',()=>{
  if(follow)camera(true);
 });
 ready();
+revealControls();
 })();
 </script></body></html>
