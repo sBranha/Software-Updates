@@ -1,0 +1,136 @@
+name: NewsWire v0.7.3 dark 3D car map
+on:
+  push:
+    branches: [newswire-dark-3d-car-v0.7.3]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Bundle map assets
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' --output newswave-android/app/src/main/assets/leaflet.js
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' --output newswave-android/app/src/main/assets/leaflet.css
+          curl --fail --location --silent --show-error --retry 3 --max-time 60 'https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.js' --output newswave-android/app/src/main/assets/maplibre-gl.js
+          curl --fail --location --silent --show-error --retry 3 --max-time 60 'https://unpkg.com/maplibre-gl@5.7.0/dist/maplibre-gl.css' --output newswave-android/app/src/main/assets/maplibre-gl.css
+          test "$(wc -c < newswave-android/app/src/main/assets/maplibre-gl.js)" -gt 400000
+          test "$(wc -c < newswave-android/app/src/main/assets/maplibre-gl.css)" -gt 20000
+          python newswave-android/build_radar_stations.py
+      - name: Version, GPS, radio, news, safety and map smoke checks
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          root=Path("newswave-android/app/src/main/java/com/newswave/live")
+          build=Path("newswave-android/app/build.gradle").read_text()
+          home=(root/"MainActivity.java").read_text()
+          service=(root/"DriveWarningService.java").read_text()
+          radio=(root/"NewsRadioActivity.java").read_text()
+          voice=(root/"DrivingAlertSpeaker.java").read_text()
+          directory=(root/"NoaaRadioDirectory.java").read_text()
+          assert "versionCode 38" in build and "versionName '0.7.3'" in build
+          assert "applicationId 'com.newswire.live'" in build
+          for term in ('LOCAL NEWS','NATIONAL NEWS','dashboardGroup','renderNationalNews','nationalHeadlines()',
+                       'LIVE SATELLITE MAP','EMERGENCY CENTER','NEWSWIRE RADIO'):
+              assert term in home,term
+          for term in ('NoaaRadioDirectory.nearby','OFFICIAL NOAA RADIO STATION DIRECTORY','renderNoaaStations'):
+              assert term in radio,term
+          assert 'https://' in directory and 'is_https=true' in directory
+          for term in ('Use extreme caution','String spoken','voice.announce(spoken)','not a route or storm-track'):
+              assert term in service,term
+          for term in ('AUDIOFOCUS_GAIN_TRANSIENT','abandonAudioFocusRequest','UtteranceProgressListener'):
+              assert term in voice,term
+          assert 'api.weather.gov/alerts/active?point=' in service
+          assert 'WeatherWarningOverlay.draw' in (root/"NewsWaveCarService.java").read_text()
+          car=(root/"NewsWaveCarService.java").read_text()
+          for required in ("canvas.rotate(-degrees,anchorX,anchorY)",
+                           "suspiciousRadarOverlay", "getSpeed()>=1.5f",
+                           "userBearing=(userBearing+alpha*difference+360f)%360f",
+                           "Radar unavailable · Map and NWS warnings remain",
+                           "WeatherWarningOverlay.draw(canvas,warnings,z,mapLeft,mapTop,mapWidth,mapHeight)"):
+              assert required in car, required
+          assert 'private boolean nationwide=true' in car
+          assert "locationManager.requestLocationUpdates(provider,1500,3" in car
+          assert 'private String mapStyle="road"' in car
+          assert 'setPerspective(perspective3d)' in car
+          assert 'Matrix tilt=null' in car
+          assert 'redraw=drift[0]>=5f || angular>=2f' in car
+          # Drive UX: compact host panel, gear icon, dark street tiles, closer 3D.
+          assert 'setTitle("●")' in car
+          assert 'setIcon(settingsIcon())' in car
+          assert 'new android.graphics.ColorMatrixColorFilter' in car
+          assert 'private int zoom=16' in car
+          assert 'float left=drivingPerspective?-w*.34f:0f' in car
+          assert 'setTitle("Map")' not in car
+          assert 'setTitle("Options")' not in car
+
+          assert 'worldX=(float)(Math.cos(rad)*dx-Math.sin(rad)*dy)' in car
+          drive=(root/"DriveWarningService.java").read_text()
+          for check in ('sideSample(fix,meters,1200,true)',
+                        'sideSample(fix,meters,1200,false)',
+                        'new double[]{1609,4828,9656}',
+                        'This is not a road route or tornado location',
+                        'private static final long POLL_MS=90L*1000'):
+              assert check in drive,check
+          speaker=(root/"DrivingAlertSpeaker.java").read_text()
+          for check in ('setWillPauseWhenDucked(true)',
+                        'AUDIOFOCUS_LOSS_TRANSIENT',
+                        'AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK',
+                        'setSpeechRate(1.06f)'):
+              assert check in speaker,check
+          print("Android Auto moving heading, parked stability, radar artifacts smoke checks passed")
+          print("News, NOAA radio, opt-in spoken warnings, GPS and map smoke checks passed")
+          PY
+      - name: Run storm-tracking JavaScript regression checks
+        run: |
+          set -euo pipefail
+          node newswave-android/tests/storm_tracking.test.js
+          node newswave-android/tests/drive_map.test.js
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('newswave-android/app/src/main/assets/radar.html').read_text()
+          Path('/tmp/newswire-radar.js').write_text(html.split('<script>')[-1].split('</script>')[0])
+          PY
+          node --check /tmp/newswire-radar.js
+          python - <<'PY'
+          from pathlib import Path
+          html=Path("newswave-android/app/src/main/assets/drive_map.html").read_text()
+          Path("/tmp/newswire-drive-map.js").write_text(html.split("<script>")[-1].split("</script>")[0])
+          PY
+          node --check /tmp/newswire-drive-map.js
+      - name: Build app for phone testing and unsigned Google Play preparation
+        run: gradle -p newswave-android :app:assembleDebug :app:bundleRelease --no-daemon
+      - name: Verify archive integrity and package files
+        run: |
+          set -euo pipefail
+          cp newswave-android/app/build/outputs/apk/debug/app-debug.apk NewsWire-v0.7.3-TEST.apk
+          cp newswave-android/app/build/outputs/bundle/release/app-release.aab NewsWire-v0.7.3-UNSIGNED.aab
+          test -s NewsWire-v0.7.3-TEST.apk
+          test -s NewsWire-v0.7.3-UNSIGNED.aab
+          unzip -t NewsWire-v0.7.3-TEST.apk >/dev/null
+          unzip -l NewsWire-v0.7.3-TEST.apk | grep 'assets/drive_map.html'
+          unzip -l NewsWire-v0.7.3-TEST.apk | grep 'assets/maplibre-gl.js'
+          unzip -t NewsWire-v0.7.3-UNSIGNED.aab >/dev/null
+          sha256sum NewsWire-v0.7.3-TEST.apk NewsWire-v0.7.3-UNSIGNED.aab > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-v0.7.3-APK-and-UNSIGNED-AAB
+          path: |
+            NewsWire-v0.7.3-TEST.apk
+            NewsWire-v0.7.3-UNSIGNED.aab
+            SHA256SUMS.txt
+          retention-days: 15
