@@ -289,12 +289,12 @@ public final class NewsWaveCarService extends CarAppService {
             invalidate();
         }
         @NonNull @Override public Template onGetTemplate() {
-            // Weather-category MapWithContentTemplate requires a content pane:
-            // one tiny row is the minimum Google-approved host overlay.
-            // The car host owns its panel, so show a small status dot, not a title.
-            Pane status=new Pane.Builder()
-                .addRow(new Row.Builder().setTitle("●").build())
-                .build();
+            // A WEATHER app cannot use the navigation-only full-screen template.
+            // Keep the required MapWithContentTemplate, but use a headerless,
+            // empty pane instead of manufacturing a label or dot. On hosts that
+            // collapse empty panes this reveals the whole map; other hosts may
+            // still reserve panel space. Never claim or force host UI ownership.
+            Pane status=new Pane.Builder().build();
             PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
                 .addAction(new Action.Builder(Action.PAN).setIcon(mapIcon("↔")).build())
