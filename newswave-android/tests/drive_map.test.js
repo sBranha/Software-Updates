@@ -28,12 +28,12 @@ assert.ok(car.includes('setIcon(settingsIcon())'),'Options should be an icon-onl
 assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
 assert.ok(car.includes('private int zoom=16'),'Car map should start closer');
 assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
-assert.ok(!car.includes('setTitle("●")'),'Remove the placeholder status dot');
-assert.ok(car.includes('Pane status=new Pane.Builder().build()'),'Use minimal headerless car content pane');
+assert.ok(car.includes('.addRow(new Row.Builder().setTitle("●").build())'),'Car weather pane must retain required row to avoid host crash');
+assert.ok(!car.includes('Pane status=new Pane.Builder().build()'),'Never build an empty weather pane');
 assert.ok(html.includes('controls-hidden')&&html.includes('revealControls()'),'Phone map must auto-hide its controls');
 assert.ok(!html.includes('NEWSWIRE / DRIVE</b>'),'Remove phone map brand banner');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 39"));
-assert.ok(build.includes("versionName '0.7.4'"));
+assert.ok(build.includes("versionCode 40"));
+assert.ok(build.includes("versionName '0.7.5'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
