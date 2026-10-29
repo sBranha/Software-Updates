@@ -262,6 +262,24 @@ public final class NewsWaveCarService extends CarAppService {
             c.drawText(symbol,24,35,paint);
             return new CarIcon.Builder(IconCompat.createWithBitmap(bmp)).build();
         }
+        // Icon-only settings action keeps the host controls compact and legible.
+        private CarIcon settingsIcon(){
+            Bitmap bmp=Bitmap.createBitmap(48,48,Bitmap.Config.ARGB_8888);
+            Canvas canvas=new Canvas(bmp);
+            Paint gear=new Paint(Paint.ANTI_ALIAS_FLAG);
+            gear.setColor(Color.WHITE);
+            gear.setStyle(Paint.Style.STROKE);
+            gear.setStrokeWidth(4.5f);
+            gear.setStrokeCap(Paint.Cap.ROUND);
+            for(int n=0;n<8;n++){
+                double radians=Math.toRadians(n*45.);
+                float cos=(float)Math.cos(radians),sin=(float)Math.sin(radians);
+                canvas.drawLine(24+16*cos,24+16*sin,24+21*cos,24+21*sin,gear);
+            }
+            canvas.drawCircle(24,24,14,gear);
+            canvas.drawCircle(24,24,5,gear);
+            return new CarIcon.Builder(IconCompat.createWithBitmap(bmp)).build();
+        }
         private void setFollow(boolean enabled){
             follow=enabled;
             if(enabled){
@@ -273,9 +291,9 @@ public final class NewsWaveCarService extends CarAppService {
         @NonNull @Override public Template onGetTemplate() {
             // Weather-category MapWithContentTemplate requires a content pane:
             // one tiny row is the minimum Google-approved host overlay.
-            // No header and no radar controls/details here; those live in Options.
+            // The car host owns its panel, so show a small status dot, not a title.
             Pane status=new Pane.Builder()
-                .addRow(new Row.Builder().setTitle("Map").build())
+                .addRow(new Row.Builder().setTitle("●").build())
                 .build();
             PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
@@ -292,7 +310,7 @@ public final class NewsWaveCarService extends CarAppService {
                 .setPanModeListener(isPanning->{ if(isPanning)setFollow(false); })
                 .build();
             ActionStrip settings=new ActionStrip.Builder()
-                .addAction(new Action.Builder().setTitle("Options")
+                .addAction(new Action.Builder().setIcon(settingsIcon())
                     .setOnClickListener(()->getScreenManager().push(
                         new RadarOptionsScreen(getCarContext(),this))).build())
                 .build();
@@ -509,7 +527,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.7.2 (+https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.3 (+https://github.com/sBranha/Software-Updates)";
         private static final long ROAD_CACHE_MS=7L*24*60*60*1000;
         private final File roadCacheDir;
         RadarRenderer(File cacheRoot){
@@ -526,8 +544,8 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private float scaleAccum=1f;
-        private int zoom=15; // Default close-up road view; zoom remains adjustable.
-        private int lastDisplayedZoom=15;
+        private int zoom=16; // Closer, forward-looking driving view; zoom remains adjustable.
+        private int lastDisplayedZoom=16;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
         private boolean perspective3d=true;
@@ -606,7 +624,7 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
                 // Return to close-up navigation view after regional radar browsing.
-                if(zoom<14)zoom=15;
+                if(zoom<15)zoom=16;
             }
             refresh();
         }
@@ -848,9 +866,9 @@ public final class NewsWaveCarService extends CarAppService {
                 // For a perspective projection, sample beyond the horizon's visible
                 // rectangle. The source trapezoid maps onto the full car display.
                 boolean drivingPerspective=perspective&&auto&&gLat!=null;
-                float left=drivingPerspective?-w*.27f:0f;
-                float top=drivingPerspective?-h*.22f:0f;
-                float right=drivingPerspective?w*1.27f:w;
+                float left=drivingPerspective?-w*.34f:0f;
+                float top=drivingPerspective?-h*.28f:0f;
+                float right=drivingPerspective?w*1.34f:w;
                 float bottom=h;
                 if(headingUp){
                     double radians=Math.toRadians(degrees);
@@ -877,12 +895,26 @@ public final class NewsWaveCarService extends CarAppService {
                 Canvas canvas=new Canvas(out);
                 canvas.drawColor(Color.rgb(13,26,39));
                 Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+                // Darken only the street basemap tiles; radar colors and warning
+                // polygons must remain true to the official hazard products.
+                // Color matrix transforms OSM's light tiles to a dark neutral
+                // palette while retaining bright road names and route boundaries.
+                Paint streetBrush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+                if("road".equals(style)){
+                    streetBrush.setColorFilter(new android.graphics.ColorMatrixColorFilter(
+                        new float[]{
+                            -.15945f,-.53640f,-.05415f,0f,218f,
+                            -.16583f,-.55786f,-.05631f,0f,225f,
+                            -.17221f,-.57931f,-.05848f,0f,236f,
+                            0f,0f,0f,1f,0f
+                        }));
+                }
                 // Android Canvas supports a real four-corner projective transform.
                 // This is a tilted raster view, NOT 3D buildings or Ford's maps.
                 Matrix tilt=null;
                 if(drivingPerspective){
                     tilt=new Matrix();
-                    float[] source={-w*.27f,-h*.22f,w*1.27f,-h*.22f,w,h,0,h};
+                    float[] source={-w*.34f,-h*.28f,w*1.34f,-h*.28f,w,h,0,h};
                     float[] target={0,0,w,0,w,h,0,h};
                     if(!tilt.setPolyToPoly(source,0,target,0,4))tilt=null;
                 }
@@ -913,7 +945,7 @@ public final class NewsWaveCarService extends CarAppService {
                         Bitmap t=pendingTiles.get(n).get(15,java.util.concurrent.TimeUnit.SECONDS);
                         int[] txy=grid.get(n);
                         if(t!=null)canvas.drawBitmap(t,(float)(txy[0]*256-mapLeft),
-                            (float)(txy[1]*256-mapTop),brush);
+                            (float)(txy[1]*256-mapTop),"road".equals(style)?streetBrush:brush);
                     }catch(Exception err){
                         pendingTiles.get(n).cancel(true);
                         Log.w(LOG,"Map tile unavailable: "+err.getMessage());
