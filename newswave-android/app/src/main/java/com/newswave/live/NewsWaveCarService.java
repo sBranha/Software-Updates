@@ -46,6 +46,8 @@ import androidx.car.app.validation.HostValidator;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -136,12 +138,13 @@ public final class NewsWaveCarService extends CarAppService {
         private volatile Location lastFix;
         private LocationManager locationManager;
         private LocationListener locationListener;
-        private final RadarRenderer renderer=new RadarRenderer();
+        private final RadarRenderer renderer;
         private boolean warningsEnabled=true;
         private String mapStyle="road";
         private boolean perspective3d=true;
         RadarScreen(CarContext context){
             super(context);
+            renderer=new RadarRenderer(context.getCacheDir());
             stations=readStations(context);
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
@@ -506,7 +509,14 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.7.1 (https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.2 (+https://github.com/sBranha/Software-Updates)";
+        private static final long ROAD_CACHE_MS=7L*24*60*60*1000;
+        private final File roadCacheDir;
+        RadarRenderer(File cacheRoot){
+            roadCacheDir=new File(cacheRoot,"newswire-road-tiles-v2");
+            if(!roadCacheDir.isDirectory() && !roadCacheDir.mkdirs())
+                Log.w(LOG,"Road tile cache unavailable");
+        }
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
@@ -522,7 +532,7 @@ public final class NewsWaveCarService extends CarAppService {
         private String mapStyle="road";
         private boolean perspective3d=true;
         static String styleName(String style){
-            if("road".equals(style))return "Midnight Roads";
+            if("road".equals(style))return "Street Map";
             if("terrain".equals(style))return "Terrain";
             return "Satellite";
         }
@@ -759,20 +769,41 @@ public final class NewsWaveCarService extends CarAppService {
             }catch(Exception e){Log.w(LOG,"Weather tile unavailable: "+e.getMessage());return null;}
             finally{if(connection!=null)connection.disconnect();}
         }
+        // The public OSM tile service requires attribution, an identifiable
+        // User-Agent and a seven-day local cache. Fetch only visible tiles.
+        private Bitmap osmRoadTile(int x,int y,int z){
+            File file=new File(roadCacheDir,z+"-"+x+"-"+y+".png");
+            if(file.isFile()){
+                if(System.currentTimeMillis()-file.lastModified()<ROAD_CACHE_MS){
+                    Bitmap saved=BitmapFactory.decodeFile(file.getAbsolutePath());
+                    if(saved!=null)return saved;
+                }
+                if(!file.delete())Log.w(LOG,"Old road tile could not be removed");
+            }
+            Bitmap image=download("https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png");
+            if(image!=null && roadCacheDir.isDirectory()){
+                try(FileOutputStream stream=new FileOutputStream(file)){
+                    if(!image.compress(Bitmap.CompressFormat.PNG,100,stream)){
+                        Log.w(LOG,"Road tile cache write failed");
+                        if(!file.delete())Log.w(LOG,"Failed cache file cleanup");
+                    }
+                }catch(Exception ex){Log.w(LOG,"Road tile cache unavailable",ex);}
+            }
+            return image;
+        }
         private Bitmap tile(int x,int y,int z,String style){
             String key=style+"/"+z+"/"+x+"/"+y;
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
-            String server;
-            if("road".equals(style))server="https://basemaps.cartocdn.com/dark_all/"+z+"/"+x+"/"+y+".png";
+            Bitmap b;
+            if("road".equals(style))b=osmRoadTile(x,y,z);
             else {
                 String service="terrain".equals(style)?"World_Topo_Map":"World_Imagery";
-                server="https://services.arcgisonline.com/ArcGIS/rest/services/"+service
+                String server="https://services.arcgisonline.com/ArcGIS/rest/services/"+service
                     +"/MapServer/tile/"+z+"/"+y+"/"+x;
+                b=download(server);
+                if(b==null)b=osmRoadTile(x,y,z);
             }
-            Bitmap b=download(server);
-            if(b==null && !"road".equals(style))
-                b=download("https://tile.openstreetmap.org/"+z+"/"+x+"/"+y+".png");
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
         }
@@ -999,7 +1030,7 @@ public final class NewsWaveCarService extends CarAppService {
                 brush.setColor(0xca09111b);
                 canvas.drawRoundRect(8,h-30,Math.min(w-8,490),h-5,5,5,brush);
                 brush.setColor(Color.WHITE);brush.setTextSize(12);
-                canvas.drawText("Maps CARTO / OSM / Esri · Weather NOAA/NWS",14,h-13,brush);
+                canvas.drawText("Map © OpenStreetMap contributors / Esri · Weather NOAA/NWS",14,h-13,brush);
                 synchronized(lock){
                     if(rev!=revision){out.recycle();return;}
                     finished=out;
