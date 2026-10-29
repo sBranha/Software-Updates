@@ -24,8 +24,12 @@ for(const required of ["class NewsWireDrivingMapActivity","requestLocationUpdate
 for(const required of ['https://tile.openstreetmap.org/','newswire-road-tiles-v2','ROAD_CACHE_MS=7L*24*60*60*1000','© OpenStreetMap contributors','Matrix tilt=null','tilt.setPolyToPoly','canvas.concat(tilt)','perspective_3d','3D map perspective:','mapStyle="road"'])assert.ok(car.includes(required),required);
 assert.ok(!car.includes('basemaps.cartocdn.com'), 'No API-key-required CARTO road tiles');
 assert.ok(car.includes('World_Imagery')&&car.includes('World_Topo_Map'),'Keep working satellite and terrain maps');
+assert.ok(car.includes('setIcon(settingsIcon())'),'Options should be an icon-only gear');
+assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
+assert.ok(car.includes('private int zoom=16'),'Car map should start closer');
+assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 37"));
-assert.ok(build.includes("versionName '0.7.2'"));
+assert.ok(build.includes("versionCode 38"));
+assert.ok(build.includes("versionName '0.7.3'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
