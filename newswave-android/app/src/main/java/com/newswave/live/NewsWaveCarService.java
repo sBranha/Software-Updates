@@ -289,12 +289,14 @@ public final class NewsWaveCarService extends CarAppService {
             invalidate();
         }
         @NonNull @Override public Template onGetTemplate() {
-            // A WEATHER app cannot use the navigation-only full-screen template.
-            // Keep the required MapWithContentTemplate, but use a headerless,
-            // empty pane instead of manufacturing a label or dot. On hosts that
-            // collapse empty panes this reveals the whole map; other hosts may
-            // still reserve panel space. Never claim or force host UI ownership.
-            Pane status=new Pane.Builder().build();
+            // MapWithContentTemplate requires genuine pane content. The empty
+            // pane introduced in v0.7.4 violates the host template contract and
+            // can trigger "NewsWire has encountered an unexpected error" on Auto.
+            // Keep one minimal valid row until a supported map-only weather
+            // template is available. Do not disguise this as NavigationTemplate.
+            Pane status=new Pane.Builder()
+                .addRow(new Row.Builder().setTitle("●").build())
+                .build();
             PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
                 .addAction(new Action.Builder(Action.PAN).setIcon(mapIcon("↔")).build())
