@@ -51,7 +51,7 @@ function save(key,value){try{localStorage.setItem('nw-drive-'+key,String(value))
 let style=saved('style','dark');if(!MAP_STYLE[style])style='dark';
 let pitched=saved('perspective','true')!=='false',follow=saved('follow','true')!=='false';
 let gps=null,course=null,speed=0,initialized=false,marker=null,map=null,lastCenter=0;
-// Keep the map unobstructed while idle. A tap reveals controls for 7 seconds;
+// Keep the map unobstructed while idle. A tap reveals controls for 15 seconds;
 // do not hide while a keyboard or accessibility user is focused on a control.
 let hideTimer=null;
 function revealControls(){
@@ -61,7 +61,7 @@ function revealControls(){
   if(!document.querySelector('.frame:focus-within')){
    document.body.classList.add('controls-hidden');
   }
- },7000);
+ },15000);
 }
 document.addEventListener('pointerdown',revealControls,{passive:true});
 document.addEventListener('keydown',revealControls);
