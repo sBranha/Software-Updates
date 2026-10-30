@@ -25,6 +25,10 @@ for(const required of ['https://tile.openstreetmap.org/','newswire-road-tiles-v2
 assert.ok(!car.includes('basemaps.cartocdn.com'), 'No API-key-required CARTO road tiles');
 assert.ok(car.includes('World_Imagery')&&car.includes('World_Topo_Map'),'Keep working satellite and terrain maps');
 assert.ok(car.includes('setIcon(settingsIcon())'),'Options should be an icon-only gear');
+assert.ok(car.includes('setIcon(infoIcon())'),'Map screen must have an information icon');
+assert.ok(car.includes('new RadarInfoScreen(getCarContext(),this)'),'Info action opens information screen');
+assert.ok(car.includes('class RadarInfoScreen extends Screen'),'Info screen must be present');
+assert.ok(car.includes('new SafetyDashboardScreen(getCarContext(),radar)'),'Info screen links to official NWS warnings');
 assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
 assert.ok(car.includes('private int zoom=16'),'Car map should start closer');
 assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
@@ -34,6 +38,6 @@ assert.ok(html.includes('controls-hidden')&&html.includes('revealControls()'),'P
 assert.ok(!html.includes('NEWSWIRE / DRIVE</b>'),'Remove phone map brand banner');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 40"));
-assert.ok(build.includes("versionName '0.7.5'"));
+assert.ok(build.includes("versionCode 41"));
+assert.ok(build.includes("versionName '0.7.6'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
