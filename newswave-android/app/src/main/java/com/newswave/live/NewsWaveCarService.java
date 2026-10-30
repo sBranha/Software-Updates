@@ -280,6 +280,21 @@ public final class NewsWaveCarService extends CarAppService {
             canvas.drawCircle(24,24,5,gear);
             return new CarIcon.Builder(IconCompat.createWithBitmap(bmp)).build();
         }
+        // The host decides whether icon actions sit beside or below each other.
+        // Draw the information glyph directly, avoiding font-dependent Unicode.
+        private CarIcon infoIcon(){
+            Bitmap bmp=Bitmap.createBitmap(48,48,Bitmap.Config.ARGB_8888);
+            Canvas canvas=new Canvas(bmp);
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.WHITE);
+            paint.setStrokeWidth(3.7f);
+            paint.setStyle(Paint.Style.STROKE);
+            canvas.drawCircle(24,24,18,paint);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(24,15,2.4f,paint);
+            canvas.drawRoundRect(22,21,26,35,2,2,paint);
+            return new CarIcon.Builder(IconCompat.createWithBitmap(bmp)).build();
+        }
         private void setFollow(boolean enabled){
             follow=enabled;
             if(enabled){
@@ -315,6 +330,9 @@ public final class NewsWaveCarService extends CarAppService {
                 .addAction(new Action.Builder().setIcon(settingsIcon())
                     .setOnClickListener(()->getScreenManager().push(
                         new RadarOptionsScreen(getCarContext(),this))).build())
+                .addAction(new Action.Builder().setIcon(infoIcon())
+                    .setOnClickListener(()->getScreenManager().push(
+                        new RadarInfoScreen(getCarContext(),this))).build())
                 .build();
             return new MapWithContentTemplate.Builder()
                 .setContentTemplate(pane)
@@ -324,6 +342,44 @@ public final class NewsWaveCarService extends CarAppService {
         }
     }
 
+
+    // On-demand information screen opened by the ⓘ action beside settings.
+    // Four short rows avoid cluttering the car display while driving.
+    // The NWS status is UNKNOWN until the official point-based lookup runs.
+    private static final class RadarInfoScreen extends Screen {
+        private final RadarScreen radar;
+        RadarInfoScreen(CarContext context,RadarScreen radar){
+            super(context);this.radar=radar;
+        }
+        @NonNull @Override public Template onGetTemplate(){
+            ItemList.Builder items=new ItemList.Builder();
+            items.addItem(new Row.Builder().setTitle("NWS warning information")
+                .addText("Tap to check active official alerts for your GPS location")
+                .setOnClickListener(()->getScreenManager().push(
+                    new SafetyDashboardScreen(getCarContext(),radar))).build());
+            Location fix=radar.lastFix;
+            boolean fresh=fix!=null&&fix.hasAccuracy()
+                &&System.currentTimeMillis()-fix.getTime()<120000L;
+            items.addItem(new Row.Builder()
+                .setTitle(fresh?"GPS available":"GPS unavailable or stale")
+                .addText(fresh
+                    ?(radar.follow?"Following vehicle":"Map panning")+
+                        " · Fix "+Math.max(0,(System.currentTimeMillis()-fix.getTime())/1000)+"s old"
+                    :"Enable phone location; current position not confirmed")
+                .build());
+            items.addItem(new Row.Builder()
+                .setTitle("Radar: "+radar.chosen.id)
+                .addText((radar.nationwide?"National mosaic":"Local station")+
+                    " · "+radar.productName()).build());
+            items.addItem(new Row.Builder()
+                .setTitle("Map: "+RadarRenderer.styleName(radar.mapStyle))
+                .addText((radar.perspective3d?"3D driving view":"Flat view")+
+                    " · Weather NOAA/NWS; not a route forecast").build());
+            return new ListTemplate.Builder().setSingleList(items.build())
+                .setHeader(new Header.Builder().setTitle("Map information")
+                    .setStartHeaderAction(Action.BACK).build()).build();
+        }
+    }
 
     // Settings are a separate screen: the main radar map is no longer hidden
     // behind five interactive list rows.
