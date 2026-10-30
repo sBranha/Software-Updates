@@ -35,6 +35,7 @@ assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
 assert.ok(car.includes('.addRow(new Row.Builder().setTitle("●").build())'),'Car weather pane must retain required row to avoid host crash');
 assert.ok(!car.includes('Pane status=new Pane.Builder().build()'),'Never build an empty weather pane');
 assert.ok(html.includes('controls-hidden')&&html.includes('revealControls()'),'Phone map must auto-hide its controls');
+assert.ok(html.includes('},15000);'),'Phone map auto-hide delay should be 15 seconds');
 assert.ok(!html.includes('NEWSWIRE / DRIVE</b>'),'Remove phone map brand banner');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
