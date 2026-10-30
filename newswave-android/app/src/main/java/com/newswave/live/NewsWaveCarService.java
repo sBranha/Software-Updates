@@ -371,6 +371,15 @@ public final class NewsWaveCarService extends CarAppService {
                 .setTitle("Radar: "+radar.chosen.id)
                 .addText((radar.nationwide?"National mosaic":"Local station")+
                     " · "+radar.productName()).build());
+            String selectedStream=getCarContext()
+                .getSharedPreferences("newswire-car-stream",Context.MODE_PRIVATE)
+                .getString("title","");
+            if(!selectedStream.isEmpty()){
+                items.addItem(new Row.Builder()
+                    .setTitle("Phone-selected: "+selectedStream)
+                    .addText("Video plays on phone; standard Android Auto weather view cannot play videos")
+                    .build());
+            }
             items.addItem(new Row.Builder()
                 .setTitle("Map: "+RadarRenderer.styleName(radar.mapStyle))
                 .addText((radar.perspective3d?"3D driving view":"Flat view")+
