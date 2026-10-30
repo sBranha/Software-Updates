@@ -45,6 +45,7 @@ public final class LiveTVActivity extends Activity {
     private ScrollView scroll;
     private EditText search;
     private TextView status,filterAction;
+    private EditText streamLink;
     private FrameLayout playerBox,videoFullscreen;
     private WebView player;
     private View customView;
@@ -98,6 +99,15 @@ public final class LiveTVActivity extends Activity {
             "National · live news",false,false,0,0);
         register("foxweather","FOX Weather","FOX Weather","https://www.foxweather.com/live",
             "National · weather",false,false,0,0);
+        // Ryan Hall publishes live weather coverage only during active events.
+        // A channel /live URL may show past content when the channel is offline.
+        // The publisher's own page determines real live status and playback.
+        register("ryanhall-youtube","Ryan Hall Y'all · YouTube","Ryan Hall Y'all",
+            "https://www.youtube.com/@RyanHallYall/live",
+            "Official channel · live when broadcasting",false,true,0,0);
+        register("ryanhall-facebook","Ryan Hall Y'all · Facebook","Ryan Hall Y'all",
+            "https://www.facebook.com/ryanhallyall/videos/",
+            "Official page · live when broadcasting",false,true,0,0);
 
         // Regional entries point to the broadcaster's own site. A site-only
         // entry is not misrepresented as continuous video.
@@ -175,6 +185,29 @@ public final class LiveTVActivity extends Activity {
         add(root,button("■  CLOSE TV PLAYER",this::closePlayer),8);
         add(root,text("Official broadcaster pages may require a Play tap, sign-in, or "+
             "external browser; NewsWire does not bypass broadcast rights.",11,MUTED,false),8);
+
+        add(root,text("STORM CHASER LIVE LINK",15,CYAN,true),17);
+        add(root,text("Paste a YouTube, Facebook or Twitch live-video link. "+
+            "The phone opens the official source; the selected channel is saved "+
+            "for the Android Auto information screen. Standard Android Auto "+
+            "cannot display this video on the dashboard.",11,MUTED,false),6);
+        streamLink=new EditText(this);
+        streamLink.setSingleLine(true);
+        streamLink.setInputType(android.text.InputType.TYPE_CLASS_TEXT|
+            android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        streamLink.setTextColor(WHITE);streamLink.setHintTextColor(MUTED);
+        streamLink.setHint("https://www.youtube.com/watch?v=...");
+        streamLink.setText(getSharedPreferences(PREF,MODE_PRIVATE)
+            .getString("last_stream_url",""));
+        streamLink.setPadding(dp(12),dp(13),dp(12),dp(13));
+        streamLink.setBackground(surface(0xff123047,0xff0b2032));
+        add(root,streamLink,9);
+        add(root,button("▶  OPEN LIVE LINK ON PHONE",this::watchCustomLink),9);
+        add(root,button("↗  OPEN STREAM IN ITS OFFICIAL APP",()->{
+            String link=streamLink.getText().toString().trim();
+            if(isApprovedVideoLink(link))openBrowser(link);
+            else status.setText("Use an HTTPS YouTube, Facebook or Twitch URL.");
+        }),8);
 
         LinearLayout filters=new LinearLayout(this);filters.setOrientation(0);
         for(String type:new String[]{"all","local","national","saved"}){
@@ -258,9 +291,51 @@ public final class LiveTVActivity extends Activity {
             "No verified live TV stations for this area. Use FIND OTHER TV STATIONS "+
             "to search nearby broadcasters.",12,GOLD,false),10);
     }
+    private boolean isApprovedVideoLink(String address){
+        try{
+            Uri uri=Uri.parse(address);
+            if(!"https".equalsIgnoreCase(uri.getScheme()))return false;
+            if(uri.getUserInfo()!=null)return false;
+            String host=uri.getHost();
+            if(host==null)return false;
+            host=host.toLowerCase(Locale.US);
+            for(String domain:new String[]{"youtube.com","youtu.be","facebook.com",
+                "fb.watch","twitch.tv"}){
+                if(host.equals(domain)||host.endsWith("."+domain))return true;
+            }
+        }catch(RuntimeException ignored){}
+        return false;
+    }
+    private void watchCustomLink(){
+        String link=streamLink.getText().toString().trim();
+        if(!isApprovedVideoLink(link)){
+            status.setText("Only HTTPS links from YouTube, Facebook or Twitch are supported.");
+            return;
+        }
+        Uri uri=Uri.parse(link);
+        String host=uri.getHost()==null?"Storm video":uri.getHost();
+        getSharedPreferences(PREF,MODE_PRIVATE).edit()
+            .putString("last_stream_url",link).apply();
+        watch(new TVChannel("custom","My storm stream",host,link,
+            "User-selected official streaming link",false,true,0,0));
+    }
+    // This saves the user's selection for Android Auto but does not claim
+    // video projection: video is not available in the weather-map template.
+    private void saveForCar(TVChannel channel){
+        getSharedPreferences("newswire-car-stream",MODE_PRIVATE).edit()
+            .putString("title",channel.name)
+            .putString("url",channel.url)
+            .putLong("selected_at",System.currentTimeMillis())
+            .apply();
+    }
     private void watch(TVChannel channel){
-        selected=channel;closeWebView();
-        status.setText("Opening "+channel.name+" · official publisher page");
+        if(!isApprovedVideoLink(channel.url)&&channel.id.equals("custom"))return;
+        selected=channel;
+        saveForCar(channel);
+        closeWebView();
+        status.setText("Opening "+channel.name+
+            " on the phone · saved for car info. Dashboard video requires a "+
+            "compatible parked-video system or external adapter.");
         playerBox.setVisibility(View.VISIBLE);
         player=new WebView(this);
         player.setBackgroundColor(Color.BLACK);
