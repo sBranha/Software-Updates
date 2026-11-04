@@ -611,8 +611,8 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private float scaleAccum=1f;
-        private int zoom=16; // Closer, forward-looking driving view; zoom remains adjustable.
-        private int lastDisplayedZoom=16;
+        private int zoom=12; // Regional radar with town labels, like WeatherWise; +/- remains adjustable.
+        private int lastDisplayedZoom=12;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
         private boolean perspective3d=true;
@@ -691,7 +691,7 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
                 // Return to close-up navigation view after regional radar browsing.
-                if(zoom<15)zoom=16;
+                if(zoom<11)zoom=12;
             }
             refresh();
         }
@@ -906,31 +906,35 @@ public final class NewsWaveCarService extends CarAppService {
          */
         private static boolean suspiciousRadarOverlay(Bitmap image){
             if(image==null || image.isRecycled())return true;
-            int samples=0,opaqueBlue=0,opaqueCyan=0;
+            int samples=0,cyanOrBlue=0,largestSolidBand=0;
+            java.util.HashMap<Integer,Integer> colorBuckets=new java.util.HashMap<>();
             int sx=Math.max(1,image.getWidth()/44);
             int sy=Math.max(1,image.getHeight()/28);
             for(int y=sy/2;y<image.getHeight();y+=sy){
                 for(int x=sx/2;x<image.getWidth();x+=sx){
                     int pixel=image.getPixel(x,y);
-                    int a=Color.alpha(pixel),r=Color.red(pixel),
+                    int alpha=Color.alpha(pixel),r=Color.red(pixel),
                         g=Color.green(pixel),b=Color.blue(pixel);
                     samples++;
-                    // Station WMS / national export occasionally replaces
-                    // transparent 'no data' with a SOLID cyan/blue canvas.
-                    // The old blue-only detector missed teal, producing the
-                    // featureless turquoise map visible on some car hosts.
-                    if(a>=190 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
-                        opaqueBlue++;
-                    if(a>=190 && g>125 && b>110 && g>r*1.28f
-                        && b>r*1.25f && b>=g*.68f && r<155)
-                        opaqueCyan++;
+                    boolean blue=b>110 && b>r*1.3f && b>g*1.12f && r<145;
+                    boolean cyan=g>125 && b>110 && g>r*1.28f &&
+                        b>r*1.25f && b>=g*.68f && r<155;
+                    if(alpha>=200 && (blue||cyan)){
+                        cyanOrBlue++;
+                        int colorKey=((r>>5)<<6)|((g>>5)<<3)|(b>>5);
+                        int count=colorBuckets.containsKey(colorKey)?
+                            colorBuckets.get(colorKey)+1:1;
+                        colorBuckets.put(colorKey,count);
+                        largestSolidBand=Math.max(largestSolidBand,count);
+                    }
                 }
             }
-            // Active precipitation occupies isolated colored regions; a
-            // significant opaque blue/teal area is not safe to draw over
-            // roads. Skip the overlay entirely, preserving the basemap.
-            return samples>0 && (opaqueBlue>samples*.12f ||
-                                 opaqueCyan>samples*.15f);
+            // Only reject near-uniform opaque 'no data' blue/teal sheets.
+            // Real rain can have extensive blue/green regions, but varied
+            // intensities and transparency; rejecting by color area alone
+            // would incorrectly remove widespread storms.
+            return samples>0 && cyanOrBlue>samples*.72f &&
+                largestSolidBand>samples*.58f;
         }
         private void render(Station s,String p,boolean national,int rev,int w,int h,
                             int z,boolean auto,double manualLatitude,double manualLongitude,
@@ -1063,7 +1067,12 @@ public final class NewsWaveCarService extends CarAppService {
                 Bitmap radar=download(url);
                 boolean radarAvailable=radar!=null&&!suspiciousRadarOverlay(radar);
                 if(radarAvailable){
-                    canvas.drawBitmap(radar,null,new Rect(0,0,mapWidth,mapHeight),brush);
+                    // WeatherWise-style overlay: radar precipitation remains
+                    // visible, but streets, place names and the underlying
+                    // map should show through even during heavy rain.
+                    Paint radarBrush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+                    radarBrush.setAlpha(180);
+                    canvas.drawBitmap(radar,null,new Rect(0,0,mapWidth,mapHeight),radarBrush);
                 }else if(radar!=null){
                     Log.w(LOG,"Skipped invalid NOAA radar overlay (opaque cyan/blue no-data)");
                 }
