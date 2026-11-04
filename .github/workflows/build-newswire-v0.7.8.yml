@@ -1,7 +1,7 @@
 name: NewsWire v0.7.8 car map recovery from cyan radar overlays
 on:
   push:
-    branches: [newswire-live-storm-tv-v0.7.8]
+    branches: [newswire-car-map-recovery-v0.7.8]
   workflow_dispatch:
 permissions:
   contents: read
