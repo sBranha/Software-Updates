@@ -611,7 +611,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.7.8 (+https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.9 (+https://github.com/sBranha/Software-Updates)";
         private static final long ROAD_CACHE_MS=7L*24*60*60*1000;
         private final File roadCacheDir;
         RadarRenderer(File cacheRoot){
@@ -647,8 +647,8 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(lock){perspective3d=on;}
             refresh();
         }
-        private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(80,.75f,true){
-            @Override protected boolean removeEldestEntry(Map.Entry<String,Bitmap> eldest){return size()>80;}
+        private final Map<String,Bitmap> cache=new LinkedHashMap<String,Bitmap>(120,.75f,true){
+            @Override protected boolean removeEldestEntry(Map.Entry<String,Bitmap> eldest){return size()>120;}
         };
         private Surface surface;
         private int width=1024,height=600,revision=0;
@@ -898,7 +898,16 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
             Bitmap b;
-            if("road".equals(style)){
+            if("places".equals(style)||"transport".equals(style)){
+                // Esri's TRANSPARENT reference map tiles sit ABOVE the rain.
+                // They keep cities, road names and highways readable without
+                // washing out precipitation. Never draw an opaque tile here.
+                String reference="places".equals(style)?"World_Boundaries_and_Places":
+                    "World_Transportation";
+                b=download("https://services.arcgisonline.com/ArcGIS/rest/services/"
+                    +"Reference/"+reference+"/MapServer/tile/"+z+"/"+y+"/"+x);
+                if(b!=null&&!isTransparentReference(b))b=null;
+            }else if("road".equals(style)){
                 b=osmRoadTile(x,y,z);
                 // A single provider outage or HTTP throttling must not leave
                 // the driver looking at an empty colored weather surface.
@@ -915,6 +924,52 @@ public final class NewsWaveCarService extends CarAppService {
             }
             if(b!=null){synchronized(cache){cache.put(key,b);}}
             return b;
+        }
+        /**
+         * Fail closed if a reference provider returns a missing-tile placeholder
+         * or an opaque response. Reference tiles should contain transparent
+         * pixels; otherwise they could cover rain and create a false clear sky.
+         */
+        private static boolean isTransparentReference(Bitmap image){
+            if(image==null||image.isRecycled()||!image.hasAlpha())return false;
+            int transparent=0,total=0;
+            int sx=Math.max(1,image.getWidth()/16);
+            int sy=Math.max(1,image.getHeight()/16);
+            for(int y=sy/2;y<image.getHeight();y+=sy){
+                for(int x=sx/2;x<image.getWidth();x+=sx){
+                    total++;
+                    if(Color.alpha(image.getPixel(x,y))<80)transparent++;
+                }
+            }
+            return total>0 && transparent>=total*.15f;
+        }
+        /**
+         * Render transparent road and city labels above the NOAA raster,
+         * using the identical tile grid/transform as the underlying map.
+         * The bitmap canvas already carries the GPS rotation and 3D tilt.
+         */
+        private void drawReferenceTiles(Canvas canvas,ArrayList<int[]> grid,
+                ArrayList<Future<Bitmap>> jobs,double mapLeft,double mapTop,int rev){
+            Paint referencePaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+            for(int n=0;n<jobs.size();n++){
+                synchronized(lock){
+                    if(rev!=revision){
+                        for(Future<Bitmap> pending:jobs)pending.cancel(true);
+                        return;
+                    }
+                }
+                try{
+                    Bitmap tile=jobs.get(n).get(10,java.util.concurrent.TimeUnit.SECONDS);
+                    if(tile!=null && !tile.isRecycled()){
+                        int[] xy=grid.get(n);
+                        canvas.drawBitmap(tile,(float)(xy[0]*256-mapLeft),
+                            (float)(xy[1]*256-mapTop),referencePaint);
+                    }
+                }catch(Exception error){
+                    jobs.get(n).cancel(true);
+                    Log.w(LOG,"Car map reference overlay unavailable: "+error.getMessage());
+                }
+            }
         }
         /**
          * A valid transparent NOAA radar image can be laid over roads.
@@ -1062,6 +1117,17 @@ public final class NewsWaveCarService extends CarAppService {
                         Log.w(LOG,"Map tile unavailable: "+err.getMessage());
                     }
                 }
+                // Begin loading reference tiles while the NOAA mosaic loads.
+                // Draw them only AFTER radar, so map labels remain crisp on top.
+                ArrayList<Future<Bitmap>> transportReference=new ArrayList<>();
+                ArrayList<Future<Bitmap>> placeReference=new ArrayList<>();
+                for(int[] xy:grid){
+                    final int x=xy[0],y=xy[1];
+                    transportReference.add(tileWorkers.submit(
+                        ()->tile(x,y,z,"transport")));
+                    placeReference.add(tileWorkers.submit(
+                        ()->tile(x,y,z,"places")));
+                }
                 double west=lon(mapLeft,z),east=lon(mapLeft+mapWidth,z);
                 double north=lat(mapTop,z),south=lat(mapTop+mapHeight,z);
                 String bbox=String.format(Locale.US,"%.6f,%.6f,%.6f,%.6f",west,south,east,north);
@@ -1093,6 +1159,10 @@ public final class NewsWaveCarService extends CarAppService {
                 }else if(radar!=null){
                     Log.w(LOG,"Skipped invalid NOAA radar overlay (opaque cyan/blue no-data)");
                 }
+                // Layer order: basemap -> NOAA rain -> transparent road reference
+                // -> transparent city/place reference -> NWS warnings -> GPS.
+                drawReferenceTiles(canvas,grid,transportReference,mapLeft,mapTop,rev);
+                drawReferenceTiles(canvas,grid,placeReference,mapLeft,mapTop,rev);
                 int warningsVisible=drawWarnings?
                     WeatherWarningOverlay.draw(canvas,warnings,z,mapLeft,mapTop,mapWidth,mapHeight):-2;
                 canvas.restore();
