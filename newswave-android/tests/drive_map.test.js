@@ -41,7 +41,8 @@ assert.ok(!html.includes('NEWSWIRE / DRIVE</b>'),'Remove phone map brand banner'
 assert.ok(live.includes('Ryan Hall Y\'all · YouTube')&&live.includes('Ryan Hall Y\'all · Facebook'),'Include Ryan Hall live stream links');
 assert.ok(live.includes('isApprovedVideoLink')&&live.includes('watchCustomLink()'),'Validate user-submitted storm video links');
 assert.ok(live.includes('newswire-car-stream')&&car.includes('newswire-car-stream'),'Sync phone selection to car info');
-assert.ok(car.includes('opaqueCyan>samples*.15f'),'Cyan NOAA nodata must not cover roads');
+assert.ok(car.includes('largestSolidBand>samples*.58f'),'Solid cyan NOAA nodata must not cover roads');
+assert.ok(car.includes('radarBrush.setAlpha(180)'),'Radar must remain translucent above the basemap');
 assert.ok(car.includes('World_Street_Map/MapServer/tile/'),'Street map fallback required');
 assert.ok(car.includes('Street map unavailable - check connection'),'Do not silently render blank map');
 assert.ok(car.includes('standard Android Auto weather view cannot play videos'),'Do not misrepresent car video as supported');
