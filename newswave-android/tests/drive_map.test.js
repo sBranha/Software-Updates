@@ -43,6 +43,20 @@ assert.ok(live.includes('isApprovedVideoLink')&&live.includes('watchCustomLink()
 assert.ok(live.includes('newswire-car-stream')&&car.includes('newswire-car-stream'),'Sync phone selection to car info');
 assert.ok(car.includes('largestSolidBand>samples*.58f'),'Solid cyan NOAA nodata must not cover roads');
 assert.ok(car.includes('radarBrush.setAlpha(180)'),'Radar must remain translucent above the basemap');
+assert.ok(car.includes('Reference/"+reference+"/MapServer/tile/'),
+  'Reference tiles must be independent transparent place/road overlays');
+assert.ok(car.includes('"World_Boundaries_and_Places"')&&car.includes('"World_Transportation"'),
+  'Show both city names and highways above precipitation');
+assert.ok(car.includes('isTransparentReference(b)'),
+  'Reject opaque reference images that could hide dangerous radar');
+assert.ok(car.indexOf('canvas.drawBitmap(radar,null')<car.indexOf('drawReferenceTiles(canvas,grid,transportReference'),
+  'Draw roads after radar, not before');
+assert.ok(car.indexOf('drawReferenceTiles(canvas,grid,transportReference')<
+  car.indexOf('drawReferenceTiles(canvas,grid,placeReference'),
+  'Draw city names above roads');
+assert.ok(car.indexOf('drawReferenceTiles(canvas,grid,placeReference')<
+  car.indexOf('WeatherWarningOverlay.draw(canvas,warnings,'),
+  'Keep warning polygons above map labels');
 assert.ok(car.includes('radarRefreshHandler.postDelayed(radarRefreshTask,5L*60*1000)'),
   'Radar must update automatically every five minutes even when car is parked');
 assert.ok(car.includes('World_Street_Map/MapServer/tile/'),'Street map fallback required');
@@ -50,6 +64,6 @@ assert.ok(car.includes('Street map unavailable - check connection'),'Do not sile
 assert.ok(car.includes('standard Android Auto weather view cannot play videos'),'Do not misrepresent car video as supported');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 43"));
-assert.ok(build.includes("versionName '0.7.8'"));
+assert.ok(build.includes("versionCode 44"));
+assert.ok(build.includes("versionName '0.7.9'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
