@@ -310,7 +310,7 @@ public final class NewsWaveCarService extends CarAppService {
             // Keep one minimal valid row until a supported map-only weather
             // template is available. Do not disguise this as NavigationTemplate.
             Pane status=new Pane.Builder()
-                .addRow(new Row.Builder().setTitle("NewsWire Radar").build())
+                .addRow(new Row.Builder().setTitle("●").build())
                 .build();
             PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
@@ -919,9 +919,9 @@ public final class NewsWaveCarService extends CarAppService {
                     // transparent 'no data' with a SOLID cyan/blue canvas.
                     // The old blue-only detector missed teal, producing the
                     // featureless turquoise map visible on some car hosts.
-                    if(a>=230 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
+                    if(a>=190 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
                         opaqueBlue++;
-                    if(a>=230 && g>125 && b>110 && g>r*1.28f
+                    if(a>=190 && g>125 && b>110 && g>r*1.28f
                         && b>r*1.25f && b>=g*.68f && r<155)
                         opaqueCyan++;
                 }
