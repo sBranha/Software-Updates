@@ -82,6 +82,9 @@ jobs:
             nikon-auto-upload/app/src/main/java/com/nikonautoupload/DirectTransferService.java
             nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java
 
+      - name: Apply 0.8.7 camera burst and screen awake fixes
+        run: python3 nikon-auto-upload/tools/patch_087.py
+
       - name: Set 0.8.7 reliability-test version
         shell: bash
         run: |
