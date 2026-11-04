@@ -31,7 +31,7 @@ assert.ok(car.includes('new RadarInfoScreen(getCarContext(),this)'),'Info action
 assert.ok(car.includes('class RadarInfoScreen extends Screen'),'Info screen must be present');
 assert.ok(car.includes('new SafetyDashboardScreen(getCarContext(),radar)'),'Info screen links to official NWS warnings');
 assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
-assert.ok(car.includes('private int zoom=16'),'Car map should start closer');
+assert.ok(car.includes('private int zoom=12'),'Car weather map should show regional towns under radar');
 assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
 assert.ok(car.includes('.addRow(new Row.Builder().setTitle("●").build())'),'Car weather pane must retain required row to avoid host crash');
 assert.ok(!car.includes('Pane status=new Pane.Builder().build()'),'Never build an empty weather pane');
