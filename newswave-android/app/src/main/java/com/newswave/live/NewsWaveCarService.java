@@ -142,6 +142,14 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean warningsEnabled=true;
         private String mapStyle="road";
         private boolean perspective3d=true;
+        private final android.os.Handler radarRefreshHandler=
+            new android.os.Handler(Looper.getMainLooper());
+        private final Runnable radarRefreshTask=new Runnable(){
+            @Override public void run(){
+                renderer.refresh();
+                radarRefreshHandler.postDelayed(this,5L*60*1000);
+            }
+        };
         RadarScreen(CarContext context){
             super(context);
             renderer=new RadarRenderer(context.getCacheDir());
@@ -159,6 +167,15 @@ public final class NewsWaveCarService extends CarAppService {
             renderer.setWarningVisibility(true);
             startFollowing();
             getLifecycle().addObserver((androidx.lifecycle.LifecycleEventObserver)(source,event)->{
+              if(event==Lifecycle.Event.ON_START){
+                // NWS MRMS updates about every five minutes. Refresh even
+                // when the vehicle is parked and the GPS has not moved.
+                radarRefreshHandler.removeCallbacks(radarRefreshTask);
+                radarRefreshHandler.postDelayed(radarRefreshTask,5L*60*1000);
+              }
+              if(event==Lifecycle.Event.ON_STOP || event==Lifecycle.Event.ON_DESTROY){
+                radarRefreshHandler.removeCallbacks(radarRefreshTask);
+              }
               if(event==Lifecycle.Event.ON_DESTROY&&locationManager!=null&&locationListener!=null){
                 locationManager.removeUpdates(locationListener);
               }
