@@ -31,6 +31,16 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Restore migration-compatible 0.8.6 Java baseline
+        shell: bash
+        run: |
+          for path in \
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/SimpleFtpServer.java \
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/DirectTransferService.java \
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java; do
+            git show a04d2e4be121228462efd0c4b76c3d5c3e5eb484:"$path" > "$path"
+          done
+
       - name: Prepare 0.8.6 baseline camera systems and photo-first editor
         shell: bash
         run: |
@@ -60,6 +70,15 @@ jobs:
           python3 nikon-auto-upload/tools/prepare_patch_086.py
           python3 nikon-auto-upload/tools/prepare_patch_086_compile.py
           python3 nikon-auto-upload/tools/patch_086.py
+
+      - name: Save baseline-post-migration Java for 0.8.7 integration
+        uses: actions/upload-artifact@v4
+        with:
+          name: CameraAutoUpload-0.8.6-post-migration-sources
+          path: |
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/SimpleFtpServer.java
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/DirectTransferService.java
+            nikon-auto-upload/app/src/main/java/com/nikonautoupload/MainActivity.java
 
       - name: Set 0.8.7 reliability-test version
         shell: bash
