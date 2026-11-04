@@ -310,7 +310,7 @@ public final class NewsWaveCarService extends CarAppService {
             // Keep one minimal valid row until a supported map-only weather
             // template is available. Do not disguise this as NavigationTemplate.
             Pane status=new Pane.Builder()
-                .addRow(new Row.Builder().setTitle("●").build())
+                .addRow(new Row.Builder().setTitle("NewsWire Radar").build())
                 .build();
             PaneTemplate pane=new PaneTemplate.Builder(status).build();
             ActionStrip controls=new ActionStrip.Builder()
@@ -594,7 +594,7 @@ public final class NewsWaveCarService extends CarAppService {
     }
 
     private static final class RadarRenderer implements SurfaceCallback {
-        private static final String USER_AGENT="NewsWire/0.7.3 (+https://github.com/sBranha/Software-Updates)";
+        private static final String USER_AGENT="NewsWire/0.7.8 (+https://github.com/sBranha/Software-Updates)";
         private static final long ROAD_CACHE_MS=7L*24*60*60*1000;
         private final File roadCacheDir;
         RadarRenderer(File cacheRoot){
@@ -881,7 +881,14 @@ public final class NewsWaveCarService extends CarAppService {
             synchronized(cache){Bitmap cached=cache.get(key);if(cached!=null&&!cached.isRecycled())return cached;}
             if(x<0||y<0||y>=(1<<z)||x>=(1<<z))return null;
             Bitmap b;
-            if("road".equals(style))b=osmRoadTile(x,y,z);
+            if("road".equals(style)){
+                b=osmRoadTile(x,y,z);
+                // A single provider outage or HTTP throttling must not leave
+                // the driver looking at an empty colored weather surface.
+                // Esri is already credited in the map attribution.
+                if(b==null)b=download("https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    +"World_Street_Map/MapServer/tile/"+z+"/"+y+"/"+x);
+            }
             else {
                 String service="terrain".equals(style)?"World_Topo_Map":"World_Imagery";
                 String server="https://services.arcgisonline.com/ArcGIS/rest/services/"+service
@@ -899,7 +906,7 @@ public final class NewsWaveCarService extends CarAppService {
          */
         private static boolean suspiciousRadarOverlay(Bitmap image){
             if(image==null || image.isRecycled())return true;
-            int samples=0,opaqueBlue=0;
+            int samples=0,opaqueBlue=0,opaqueCyan=0;
             int sx=Math.max(1,image.getWidth()/44);
             int sy=Math.max(1,image.getHeight()/28);
             for(int y=sy/2;y<image.getHeight();y+=sy){
@@ -908,11 +915,22 @@ public final class NewsWaveCarService extends CarAppService {
                     int a=Color.alpha(pixel),r=Color.red(pixel),
                         g=Color.green(pixel),b=Color.blue(pixel);
                     samples++;
-                    if(a>=235 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
+                    // Station WMS / national export occasionally replaces
+                    // transparent 'no data' with a SOLID cyan/blue canvas.
+                    // The old blue-only detector missed teal, producing the
+                    // featureless turquoise map visible on some car hosts.
+                    if(a>=230 && b>75 && b>r*1.30f && b>g*1.12f && r<145)
                         opaqueBlue++;
+                    if(a>=230 && g>125 && b>110 && g>r*1.28f
+                        && b>r*1.25f && b>=g*.68f && r<155)
+                        opaqueCyan++;
                 }
             }
-            return samples>0 && opaqueBlue>samples*.12f;
+            // Active precipitation occupies isolated colored regions; a
+            // significant opaque blue/teal area is not safe to draw over
+            // roads. Skip the overlay entirely, preserving the basemap.
+            return samples>0 && (opaqueBlue>samples*.12f ||
+                                 opaqueCyan>samples*.15f);
         }
         private void render(Station s,String p,boolean national,int rev,int w,int h,
                             int z,boolean auto,double manualLatitude,double manualLongitude,
@@ -1001,6 +1019,7 @@ public final class NewsWaveCarService extends CarAppService {
                         pendingTiles.add(tileWorkers.submit(()->tile(px,py,z,style)));
                     }
                 }
+                int tilesDrawn=0;
                 for(int n=0;n<pendingTiles.size();n++){
                     synchronized(lock){
                         if(rev!=revision){
@@ -1011,8 +1030,12 @@ public final class NewsWaveCarService extends CarAppService {
                     try{
                         Bitmap t=pendingTiles.get(n).get(15,java.util.concurrent.TimeUnit.SECONDS);
                         int[] txy=grid.get(n);
-                        if(t!=null)canvas.drawBitmap(t,(float)(txy[0]*256-mapLeft),
-                            (float)(txy[1]*256-mapTop),"road".equals(style)?streetBrush:brush);
+                        if(t!=null){
+                            canvas.drawBitmap(t,(float)(txy[0]*256-mapLeft),
+                                (float)(txy[1]*256-mapTop),
+                                "road".equals(style)?streetBrush:brush);
+                            tilesDrawn++;
+                        }
                     }catch(Exception err){
                         pendingTiles.get(n).cancel(true);
                         Log.w(LOG,"Map tile unavailable: "+err.getMessage());
@@ -1034,12 +1057,15 @@ public final class NewsWaveCarService extends CarAppService {
                        +"&width="+mapWidth+"&height="+mapHeight
                        +"&format=image%2Fpng&transparent=true";
                 }
+                // Never paint radar until the map tile layer has been drawn.
+                // In particular, opaque NOAA no-data pixels must not replace
+                // the street map with a large cyan rectangle.
                 Bitmap radar=download(url);
                 boolean radarAvailable=radar!=null&&!suspiciousRadarOverlay(radar);
                 if(radarAvailable){
                     canvas.drawBitmap(radar,null,new Rect(0,0,mapWidth,mapHeight),brush);
                 }else if(radar!=null){
-                    Log.w(LOG,"Skipped invalid NOAA radar overlay (opaque blue no-data blocks)");
+                    Log.w(LOG,"Skipped invalid NOAA radar overlay (opaque cyan/blue no-data)");
                 }
                 int warningsVisible=drawWarnings?
                     WeatherWarningOverlay.draw(canvas,warnings,z,mapLeft,mapTop,mapWidth,mapHeight):-2;
@@ -1117,6 +1143,15 @@ public final class NewsWaveCarService extends CarAppService {
                     banner.setColor(Color.WHITE);
                     banner.setTextSize(16);
                     canvas.drawText(warningsVisible+" NWS warning areas",22,32,banner);
+                }
+                if(tilesDrawn==0){
+                    Paint missing=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    missing.setColor(0xed13283b);
+                    canvas.drawRoundRect(12,h/2f-23,w-12,h/2f+35,8,8,missing);
+                    missing.setColor(Color.WHITE);
+                    missing.setTextSize(19);
+                    canvas.drawText("Street map unavailable - check connection",24,h/2f+4,missing);
+                    Log.w(LOG,"No basemap tiles loaded for "+style+" at zoom "+z);
                 }
                 if(!radarAvailable){
                     Paint unavailable=new Paint(Paint.ANTI_ALIAS_FLAG);
