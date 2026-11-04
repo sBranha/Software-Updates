@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
             String s=i.getStringExtra("status");
             if(s!=null)p.edit().putString("last_status",s).apply();
             refreshLiveViews(s);
+            applyKeepAwake();
         }
     };
 
@@ -305,7 +306,7 @@ public class MainActivity extends Activity {
     String displayName(Uri u){try(Cursor c=getContentResolver().query(u,new String[]{MediaStore.Images.Media.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())return c.getString(0);}catch(Exception ignored){}return "Nikon Z8 photo";}
     String formatBytes(long n){if(n<0)return "—";if(n<1024)return n+" B";double v=n;String[]u={"B","KB","MB","GB","TB"};int i=0;while(v>=1024&&i<u.length-1){v/=1024;i++;}return String.format(Locale.US,i>=3?"%.1f %s":"%.0f %s",v,u[i]);}
     String formatTime(long t){return new SimpleDateFormat("MMM d, yyyy  h:mm:ss a",Locale.US).format(new Date(t));}
-    void applyKeepAwake(){if(p!=null&&p.getBoolean("keep_screen_awake",false))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}
+    void applyKeepAwake(){if(p!=null&&(p.getBoolean("keep_screen_awake",false)||p.getBoolean("camera_ftp_session_active",false)))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}
     void toggleSet(String key,String value){Set<String>s=new HashSet<>(p.getStringSet(key,Collections.emptySet()));if(!s.add(value))s.remove(value);p.edit().putStringSet(key,s).apply();}
     String clean(String s){return s==null?"":s.replace('\t',' ').replace('\n',' ').replace('\r',' ').trim();}
 

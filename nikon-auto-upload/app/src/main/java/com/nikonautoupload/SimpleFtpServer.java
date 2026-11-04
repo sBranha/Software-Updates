@@ -49,7 +49,7 @@ public class SimpleFtpServer {
         while (running) {
             try {
                 Socket s = controlServer.accept();
-                s.setSoTimeout(120000);
+                s.setSoTimeout(900000);
                 s.setTcpNoDelay(true);
                 listener.onStatus("Z8 TCP connected from " + s.getInetAddress().getHostAddress());
                 clients.submit(() -> handleClient(s));
@@ -153,8 +153,9 @@ public class SimpleFtpServer {
                         if (dataServer == null && activeTarget == null) { reply(out, "425 Use PASV/EPSV or PORT/EPRT first"); break; }
                         String safeName = sanitize(arg);
                         if (safeName.isEmpty()) safeName = "DSC_" + System.currentTimeMillis() + ".JPG";
-                        File part = new File(tempDir, safeName + ".part");
-                        File done = new File(tempDir, safeName);
+                        String transferId = java.util.UUID.randomUUID().toString();
+                        File part = new File(tempDir, transferId + "__" + safeName + ".part");
+                        File done = new File(tempDir, transferId + "__" + safeName + ".ready");
                         reply(out, "150 Opening binary data connection");
                         listener.onStatus("Receiving from Z8: " + safeName);
                         try (Socket data = openDataSocket(dataServer, activeTarget);
@@ -165,11 +166,7 @@ public class SimpleFtpServer {
                             while ((n = din.read(buf)) != -1) fout.write(buf, 0, n);
                         }
                         closeQuietly(dataServer); dataServer = null; activeTarget = null;
-                        if (done.exists()) done.delete();
-                        if (!part.renameTo(done)) {
-                            copy(part, done);
-                            part.delete();
-                        }
+                        if (!part.renameTo(done)) throw new IOException("Could not finalize received photo: " + safeName);
                         reply(out, "226 Transfer complete");
                         listener.onStatus("Z8 transfer complete: " + safeName);
                         listener.onPhotoReceived(done, safeName);
@@ -188,6 +185,7 @@ public class SimpleFtpServer {
             listener.onStatus("Camera FTP session ended: " + e.getMessage());
         } finally {
             closeQuietly(dataServer);
+            if (running) listener.onStatus("Z8 FTP session ended — waiting for camera reconnection");
         }
     }
 
@@ -201,7 +199,7 @@ public class SimpleFtpServer {
             try {
                 ss.setReuseAddress(true);
                 ss.bind(new InetSocketAddress(bindAddress, p), 1);
-                ss.setSoTimeout(30000);
+                ss.setSoTimeout(120000);
                 return ss;
             } catch (IOException e) {
                 last = e;
@@ -216,7 +214,7 @@ public class SimpleFtpServer {
         if (active != null) {
             Socket s = new Socket();
             s.connect(active, 30000);
-            s.setSoTimeout(120000);
+            s.setSoTimeout(900000);
             return s;
         }
         throw new IOException("No FTP data connection configured");

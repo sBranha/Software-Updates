@@ -23,6 +23,7 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     private SharedPreferences p;
     private SimpleFtpServer ftp;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
+    private final ExecutorService saves=Executors.newSingleThreadExecutor();
     private final ScheduledExecutorService retry=Executors.newSingleThreadScheduledExecutor();
     private volatile boolean processing;
     private volatile Network cellularNetwork;
@@ -34,7 +35,8 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
 
     @Override public void onCreate(){
         super.onCreate();p=getSharedPreferences("settings",MODE_PRIVATE);migrateStableSettings();createChannel();cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
-        p.edit().putBoolean("receiver_running",true).putString("ftp_state",p.getBoolean("receiver_paused",false)?"Receiver paused":"Waiting for Z8").apply();
+        p.edit().putBoolean("receiver_running",true).putBoolean("camera_ftp_session_active",false).putString("ftp_state",p.getBoolean("receiver_paused",false)?"Receiver paused":"Waiting for Z8").apply();
+        recoverBufferedTransfers();
         startForeground(71,mainNotification("Z8 direct receiver is starting"));
         if(flickrEnabled())requestCellular();
         retry.scheduleWithFixedDelay(()->{
@@ -79,15 +81,15 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
 
     private synchronized void startFtp() throws IOException {
         if(ftp!=null||p.getBoolean("receiver_paused",false))return;
-        File temp=new File(getCacheDir(),"nikon_ftp");ftp=new SimpleFtpServer(FTP_PORT,FTP_USER,p.getString("ftp_password",DEFAULT_FTP_PASSWORD),temp,this);ftp.start();
+        File temp=new File(getCacheDir(),"nikon_ftp");SimpleFtpServer server=new SimpleFtpServer(FTP_PORT,FTP_USER,p.getString("ftp_password",DEFAULT_FTP_PASSWORD),temp,this);server.start();ftp=server;
     }
 
     private synchronized void pauseReceiver(){
-        p.edit().putBoolean("receiver_paused",true).putString("ftp_state","Receiver paused").apply();
+        p.edit().putBoolean("receiver_paused",true).putBoolean("camera_ftp_session_active",false).putString("ftp_state","Receiver paused").apply();
         if(ftp!=null){ftp.stop();ftp=null;}broadcast("Z8 receiving paused — Flickr retries can continue",findBestLocalIp());
     }
     private synchronized void resumeReceiver(){
-        p.edit().putBoolean("receiver_paused",false).putString("ftp_state","Waiting for Z8").apply();startServerOnly();broadcast("Z8 receiving resumed",findBestLocalIp());
+        p.edit().putBoolean("receiver_paused",false).putString("ftp_state","Waiting for Z8").apply();recoverBufferedTransfers();startServerOnly();broadcast("Z8 receiving resumed",findBestLocalIp());
     }
 
     private synchronized void requestCellular(){
@@ -104,10 +106,25 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
 
     private synchronized void releaseCellular(){if(cm!=null&&cellularCallback!=null){try{cm.unregisterNetworkCallback(cellularCallback);}catch(Exception ignored){}}cellularCallback=null;cellularNetwork=null;cellularRequestActive=false;}
 
+    // Receive queue is independent from slow/failed Flickr network uploads.
+    // A process restart rescans safely completed camera files awaiting MediaStore.
+    private void recoverBufferedTransfers(){
+        File folder=new File(getCacheDir(),"nikon_ftp");
+        File[] ready=folder.listFiles((dir,name)->name.endsWith(".ready")&&name.contains("__"));
+        if(ready==null)return;
+        Arrays.sort(ready,Comparator.comparing(File::getName));
+        for(File file:ready){
+            String filename=file.getName();
+            int split=filename.indexOf("__");
+            String original=filename.substring(split+2,filename.length()-".ready".length());
+            onPhotoReceived(file,original);
+        }
+    }
+
     @Override public void onPhotoReceived(File file,String originalName){
-        io.submit(()->{
+        saves.submit(()->{
             try{
-                if(p.getBoolean("receiver_paused",false)){file.delete();broadcast("Z8 receiving is paused",findBestLocalIp());return;}
+                if(p.getBoolean("receiver_paused",false)){addEvent("Incoming photo saved for resume: "+originalName);broadcast("Receiver paused — pending photo retained",findBestLocalIp());return;}
                 String hash=sha256(file);
                 if(p.getBoolean("duplicate_protection",true)&&isKnownHash(hash)){file.delete();addEvent("Duplicate ignored: "+originalName);broadcast("Duplicate Z8 photo ignored: "+originalName,findBestLocalIp());return;}
                 Uri uri=saveToGallery(file,originalName);rememberHash(hash);file.delete();
@@ -117,18 +134,18 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
                 long now=System.currentTimeMillis();p.edit().putInt("total_received",p.getInt("total_received",0)+1).putString("last_received_name",originalName).putLong("last_received_time",now).putString("ftp_state","Photo received").apply();
                 addEvent(send?"Received from Z8: "+originalName+" — queued for Flickr":"Received from Z8: "+originalName+" — phone only");notifyEvent("Photo received from Nikon Z8",originalName);
                 if(send){broadcast("Received "+originalName+" — saved on phone and queued for Flickr",findBestLocalIp());processPending();}else broadcast("Received "+originalName+" — saved on phone; Flickr upload is OFF",findBestLocalIp());
-            }catch(Exception e){notifyEvent("Photo receive error",shortMessage(e));addEvent("Receive error: "+shortMessage(e));broadcast("Photo receive error: "+shortMessage(e),findBestLocalIp());}
+            }catch(Exception e){notifyEvent("Photo receive error",shortMessage(e));addEvent("Photo staged for retry: "+originalName+" — "+shortMessage(e));broadcast("Phone photo save deferred — retry after receiver restart",findBestLocalIp());}
         });
     }
 
     @Override public void onStatus(String text){
         String low=text==null?"":text.toLowerCase(Locale.US);
-        if(low.contains("tcp connected")){p.edit().putString("ftp_state","Z8 connected").apply();addEvent("Z8 connected to FTP receiver");}
-        else if(low.contains("login accepted")){p.edit().putString("ftp_state","Z8 logged in").apply();addEvent("Z8 FTP login accepted");}
+        if(low.contains("tcp connected")){p.edit().putBoolean("camera_ftp_session_active",true).putString("ftp_state","Z8 connected").apply();addEvent("Z8 connected to FTP receiver");}
+        else if(low.contains("login accepted")){p.edit().putBoolean("camera_ftp_session_active",true).putString("ftp_state","Z8 logged in").apply();addEvent("Z8 FTP login accepted");}
         else if(low.contains("receiving from z8"))p.edit().putString("ftp_state","Receiving photo").apply();
         else if(low.contains("transfer complete"))p.edit().putString("ftp_state","Transfer complete").apply();
         else if(low.contains("waiting for z8"))p.edit().putString("ftp_state","Waiting for Z8").apply();
-        else if(low.contains("login rejected")||low.contains("session ended")){p.edit().putString("ftp_state",text).apply();addEvent(text);}
+        else if(low.contains("login rejected")||low.contains("session ended")){p.edit().putBoolean("camera_ftp_session_active",false).putString("ftp_state",text).apply();addEvent(text);}
         broadcast(text,findBestLocalIp());
     }
 
@@ -137,8 +154,11 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
         ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,name);v.put(MediaStore.Images.Media.MIME_TYPE,mime);
         if(Build.VERSION.SDK_INT>=29){v.put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/Nikon Auto Upload");v.put(MediaStore.Images.Media.IS_PENDING,1);}
         Uri u=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);if(u==null)throw new IOException("Could not create phone photo");
-        try(InputStream in=new FileInputStream(file);OutputStream out=getContentResolver().openOutputStream(u,"w")){if(out==null)throw new IOException("Could not open phone photo");byte[] b=new byte[128*1024];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}
-        if(Build.VERSION.SDK_INT>=29){ContentValues done=new ContentValues();done.put(MediaStore.Images.Media.IS_PENDING,0);getContentResolver().update(u,done,null,null);}return u;
+        try{
+            try(InputStream in=new FileInputStream(file);OutputStream out=getContentResolver().openOutputStream(u,"w")){if(out==null)throw new IOException("Could not open phone photo");byte[] b=new byte[128*1024];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}
+            if(Build.VERSION.SDK_INT>=29){ContentValues done=new ContentValues();done.put(MediaStore.Images.Media.IS_PENDING,0);getContentResolver().update(u,done,null,null);}
+            return u;
+        }catch(Exception e){try{getContentResolver().delete(u,null,null);}catch(Exception ignored){}throw e;}
     }
 
     private synchronized void addPending(Uri u){addToSet("pending_uploads",u.toString());}
@@ -245,6 +265,6 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     private void notifyEvent(String title,String text){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify((int)(System.currentTimeMillis()%100000),new Notification.Builder(this,CH).setSmallIcon(R.drawable.ic_camera).setContentTitle(title).setContentText(text==null?"":text).setAutoCancel(true).build());}
     private void createChannel(){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"Direct Nikon transfer",NotificationManager.IMPORTANCE_LOW));}
 
-    @Override public void onDestroy(){if(ftp!=null){ftp.stop();ftp=null;}releaseCellular();p.edit().putBoolean("receiver_running",false).putString("ftp_state","Receiver stopped").putString("last_status","Receiver stopped").apply();retry.shutdownNow();io.shutdownNow();super.onDestroy();}
+    @Override public void onDestroy(){if(ftp!=null){ftp.stop();ftp=null;}releaseCellular();p.edit().putBoolean("receiver_running",false).putString("ftp_state","Receiver stopped").putString("last_status","Receiver stopped").apply();p.edit().putBoolean("camera_ftp_session_active",false).apply();retry.shutdownNow();io.shutdownNow();saves.shutdownNow();super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }
