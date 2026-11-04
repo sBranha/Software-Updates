@@ -42,7 +42,7 @@ jobs:
           radio=(root/"NewsRadioActivity.java").read_text()
           voice=(root/"DrivingAlertSpeaker.java").read_text()
           directory=(root/"NoaaRadioDirectory.java").read_text()
-          assert "versionCode 43" in build and "versionName '0.7.7'" in build
+          assert "versionCode 43" in build and "versionName '0.7.8'" in build
           assert "applicationId 'com.newswire.live'" in build
           for term in ('LOCAL NEWS','NATIONAL NEWS','dashboardGroup','renderNationalNews','nationalHeadlines()',
                        'LIVE SATELLITE MAP','EMERGENCY CENTER','NEWSWIRE RADIO'):
@@ -57,7 +57,8 @@ jobs:
           assert 'api.weather.gov/alerts/active?point=' in service
           assert 'WeatherWarningOverlay.draw' in (root/"NewsWaveCarService.java").read_text()
           car_source=(root/"NewsWaveCarService.java").read_text()
-          assert "opaqueCyan>samples*.15f" in car_source
+          assert "largestSolidBand>samples*.58f" in car_source
+          assert "radarBrush.setAlpha(180)" in car_source
           assert "World_Street_Map/MapServer/tile/" in car_source
           assert "Street map unavailable - check connection" in car_source
           # Template must remain valid: removing its only row crashed Android Auto.
@@ -90,7 +91,7 @@ jobs:
           assert '.addRow(new Row.Builder().setTitle("●").build())' in car
           assert 'controls-hidden' in Path('newswave-android/app/src/main/assets/drive_map.html').read_text()
           assert 'new android.graphics.ColorMatrixColorFilter' in car
-          assert 'private int zoom=16' in car
+          assert 'private int zoom=12' in car
           assert 'float left=drivingPerspective?-w*.34f:0f' in car
           assert 'setTitle("Map")' not in car
           assert 'setTitle("Options")' not in car
