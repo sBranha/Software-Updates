@@ -628,8 +628,8 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private float scaleAccum=1f;
-        private static final int DRIVE_ZOOM=15; // Google Maps-like default: nearby intersections, not car-tight.
-        private int zoom=DRIVE_ZOOM; // In 3D follow mode, keep useful streets and upcoming turns visible.
+        private static final int DRIVE_ZOOM=17; // User screenshot #3: tight nearby streets/turns; two zoom steps closer than v0.7.12.
+        private int zoom=DRIVE_ZOOM; // Close, heading-up 3D driving follow view by default.
         private int lastDisplayedZoom=DRIVE_ZOOM;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
@@ -708,8 +708,8 @@ public final class NewsWaveCarService extends CarAppService {
         void recenter(){
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
-                // The user tapped recenter: return to the readable 3D
-                // driving scale, rather than leaving the citywide radar zoom.
+                // Recenter restores the same close 3D driving scale as launch.
+                // Keep manual zoom-out available for wider radar coverage.
                 zoom=DRIVE_ZOOM;
             }
             refresh();
