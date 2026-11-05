@@ -628,8 +628,9 @@ public final class NewsWaveCarService extends CarAppService {
         private boolean followGps=true;
         private double manualLat=Double.NaN,manualLon=Double.NaN;
         private float scaleAccum=1f;
-        private int zoom=12; // Regional radar with town labels, like WeatherWise; +/- remains adjustable.
-        private int lastDisplayedZoom=12;
+        private static final int DRIVE_ZOOM=15; // Google Maps-like default: nearby intersections, not car-tight.
+        private int zoom=DRIVE_ZOOM; // In 3D follow mode, keep useful streets and upcoming turns visible.
+        private int lastDisplayedZoom=DRIVE_ZOOM;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
         private String mapStyle="road";
         private boolean perspective3d=true;
@@ -707,8 +708,9 @@ public final class NewsWaveCarService extends CarAppService {
         void recenter(){
             synchronized(lock){
                 followGps=true;manualLat=Double.NaN;manualLon=Double.NaN;
-                // Return to close-up navigation view after regional radar browsing.
-                if(zoom<11)zoom=12;
+                // The user tapped recenter: return to the readable 3D
+                // driving scale, rather than leaving the citywide radar zoom.
+                zoom=DRIVE_ZOOM;
             }
             refresh();
         }
