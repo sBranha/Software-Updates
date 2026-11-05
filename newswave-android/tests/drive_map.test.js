@@ -31,7 +31,12 @@ assert.ok(car.includes('new RadarInfoScreen(getCarContext(),this)'),'Info action
 assert.ok(car.includes('class RadarInfoScreen extends Screen'),'Info screen must be present');
 assert.ok(car.includes('new SafetyDashboardScreen(getCarContext(),radar)'),'Info screen links to official NWS warnings');
 assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
-assert.ok(car.includes('private int zoom=12'),'Car weather map should show regional towns under radar');
+assert.ok(car.includes('private int zoom=DRIVE_ZOOM'),'Car follow mode starts at driving zoom');
+assert.ok(car.includes('private static final int DRIVE_ZOOM=15'),'Default zoom is street-level 15');
+assert.ok(car.includes('zoom=DRIVE_ZOOM;'),'Recenter restores the close driving scale');
+assert.ok(car.includes('float anchorX=w*.5f,anchorY=auto?h*.67f:h*.5f'),'Show more road ahead than behind GPS');
+assert.ok(car.includes('canvas.rotate(-degrees,anchorX,anchorY)'),'Heading-up map orientation remains');
+assert.ok(car.includes('tilt.setPolyToPoly'),'3D perspective remains enabled');
 assert.ok(!car.includes('setTitle("Map")'),'Remove redundant Map label');
 assert.ok(car.includes('.addRow(new Row.Builder().setTitle("●").build())'),'Car weather pane must retain required row to avoid host crash');
 assert.ok(!car.includes('Pane status=new Pane.Builder().build()'),'Never build an empty weather pane');
@@ -73,6 +78,6 @@ assert.ok(radio.includes('SOFT_INPUT_STATE_ALWAYS_HIDDEN'),
   'Keyboard must not obscure station results when entering radio page');
 assert.ok(radio.includes('station.stream.equals(playing.stream)'),
   'Saved station stop button must match by stream address');
-assert.ok(build.includes("versionCode 46"));
-assert.ok(build.includes("versionName '0.7.11'"));
+assert.ok(build.includes("versionCode 47"));
+assert.ok(build.includes("versionName '0.7.12'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
