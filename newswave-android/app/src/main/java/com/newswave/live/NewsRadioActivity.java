@@ -131,6 +131,15 @@ public final class NewsRadioActivity extends Activity {
         noaaStatus=text("Finding NOAA Weather Radio rebroadcasts for your area…",12,CYAN,false);
         add(root,noaaStatus,10);
         add(root,button("↻  FIND NOAA WEATHER RADIO STREAMS",this::loadNoaaStations),9);
+        add(root,button("▶  PLAY NEAREST NOAA WEATHER RADIO",()->{
+            if(noaaStations.isEmpty()){
+                noaaStatus.setText("No nearby NOAA stream listed. Search again or use a saved station.");
+            }else playNoaaStation(noaaStations.get(0));
+        }),9);
+        add(root,button("■  STOP NOAA WEATHER RADIO",()->{
+            stopNoaaService();
+            noaaStatus.setText("NOAA radio stopped.");
+        }),9);
         add(root,button("⌖  OFFICIAL NOAA RADIO STATION DIRECTORY",()->
             startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.weather.gov/nwr/stations")))),9);
         noaaList=new LinearLayout(this);noaaList.setOrientation(1);
@@ -224,6 +233,7 @@ public final class NewsRadioActivity extends Activity {
             status.setText("Waiting for the news and weather to load.");return;
         }
         stopStream(null);
+        stopNoaaService();
         if(!ready){pendingSpeak=true;status.setText("Preparing phone voice…");return;}
         StringBuilder script=new StringBuilder("NewsWire local briefing. ");
         if(!city.isEmpty())script.append("Around ").append(city).append(". ");
@@ -306,28 +316,81 @@ public final class NewsRadioActivity extends Activity {
             add(stationList,text(empty,12,MUTED,false),6);
         }
     }
+    /** NOAA favorites remain visible when the directory is offline or location changes. */
     private void renderNoaaStations(){
         if(noaaList==null)return;
         noaaList.removeAllViews();
-        if(noaaStations.isEmpty()){
+        List<LocalRadioDirectory.Station> displayed=new ArrayList<>();
+        HashSet<String> seen=new HashSet<>();
+        for(LocalRadioDirectory.Station favorite:RadioStationFavorites.list(this)){
+            if(favorite.genre.toLowerCase(Locale.US).contains("noaa")
+                &&seen.add(favorite.stream))displayed.add(favorite);
+        }
+        for(LocalRadioDirectory.Station station:noaaStations){
+            if(seen.add(station.stream))displayed.add(station);
+        }
+        if(displayed.isEmpty()){
             String message=noaaLoading?"Looking for rebroadcasts…":
                 "No nearby HTTPS NOAA radio rebroadcast listed. "+
-                "Use the official NOAA station directory for terrestrial frequencies. "+
-                "Official NewsWire NWS alerts work separately from audio.";
+                "Save a station to keep it visible when the directory is unavailable. "+
+                "Official NWS alerts work separately from audio.";
             add(noaaList,text(message,12,MUTED,false),6);
             return;
         }
-        for(LocalRadioDirectory.Station station:noaaStations){
+        for(LocalRadioDirectory.Station station:displayed){
             LinearLayout block=new LinearLayout(this);
             block.setOrientation(1);block.setPadding(dp(13),dp(12),dp(13),dp(12));
             block.setBackground(card());
-            String marker=playing!=null&&playing.stream.equals(station.stream)?"▶  ":"◉  ";
-            add(block,text(marker+station.name,15,INK,true),0);
-            add(block,text(station.subtitle()+" · Third-party internet stream",11,MUTED,false),5);
-            block.setOnClickListener(v->playStation(station));
+            LinearLayout row=new LinearLayout(this);
+            row.setOrientation(0);row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title=text("▶  "+station.name,15,INK,true);
+            row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+            title.setOnClickListener(v->playNoaaStation(station));
+            boolean saved=RadioStationFavorites.contains(this,station.stream);
+            TextView star=text(saved?"★":"☆",26,saved?GOLD:CYAN,true);
+            star.setContentDescription((saved?"Remove ":"Save ")+station.name+" NOAA favorite");
+            star.setPadding(dp(12),dp(4),dp(3),dp(4));
+            star.setOnClickListener(v->{
+                boolean added=RadioStationFavorites.toggle(this,station);
+                android.widget.Toast.makeText(this,
+                    added?"NOAA station saved":"NOAA station removed",0).show();
+                renderNoaaStations();
+            });
+            row.addView(star);block.addView(row);
+            TextView info=text(station.subtitle()+" · Internet rebroadcast",11,MUTED,false);
+            add(block,info,5);
+            info.setOnClickListener(v->playNoaaStation(station));
+            block.setOnClickListener(v->playNoaaStation(station));
             add(noaaList,block,8);
         }
     }
+
+    private void stopNoaaService(){
+        Intent intent=new Intent(this,NewsWireNoaaMediaService.class);
+        intent.setAction(NewsWireNoaaMediaService.ACTION_STOP_STREAM);
+        startService(intent);
+    }
+
+    private void playNoaaStation(LocalRadioDirectory.Station station){
+        if(station==null||!station.stream.startsWith("https://"))return;
+        pendingSpeak=false;
+        if(voice!=null)voice.stop();
+        stopStream(null); // Prevent two simultaneous radio streams.
+        Intent intent=new Intent(this,NewsWireNoaaMediaService.class);
+        intent.setAction(NewsWireNoaaMediaService.ACTION_PLAY_STREAM);
+        intent.putExtra(NewsWireNoaaMediaService.EXTRA_STREAM,station.stream);
+        intent.putExtra(NewsWireNoaaMediaService.EXTRA_NAME,station.name);
+        try{
+            if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(intent);
+            else startService(intent);
+            if(noaaStatus!=null)noaaStatus.setText(
+                "Connecting to "+station.name+" · playback continues with car media controls.");
+        }catch(RuntimeException error){
+            android.util.Log.w("NewsWireRadio","Could not start NOAA audio service",error);
+            if(noaaStatus!=null)noaaStatus.setText("NOAA playback could not start. Try another stream.");
+        }
+    }
+
     private void loadNoaaStations(){
         if(noaaLoading)return;
         noaaLoading=true;
@@ -415,6 +478,7 @@ public final class NewsRadioActivity extends Activity {
         }
         pendingSpeak=false;
         if(voice!=null)voice.stop();
+        stopNoaaService();
         stopStream(null);
         final int revision=++playerGeneration;
         try{
