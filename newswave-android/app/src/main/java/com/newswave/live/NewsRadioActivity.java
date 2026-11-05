@@ -110,7 +110,14 @@ public final class NewsRadioActivity extends Activity {
     private void draw(){
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(BG);
         root=new LinearLayout(this);root.setOrientation(1);
-        root.setPadding(dp(15),dp(19),dp(15),dp(28));sc.addView(root);setContentView(sc);
+        root.setPadding(dp(15),dp(19),dp(15),dp(28));
+        root.setFocusableInTouchMode(true);
+        sc.addView(root);setContentView(sc);
+        // Do not pop up the keyboard automatically and cover station results.
+        root.requestFocus();
+        getWindow().setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN |
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
         hero.setPadding(dp(20),dp(22),dp(20),dp(20));hero.setBackground(card());
         hero.addView(text("NEWSWIRE / AUDIO",11,CYAN,true));
@@ -140,6 +147,20 @@ public final class NewsRadioActivity extends Activity {
             "Tap a station to listen live; broadcaster availability varies.",12,MUTED,false),9);
         stationSearch=new EditText(this);
         stationSearch.setSingleLine(true);
+        stationSearch.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        stationSearch.setOnEditorActionListener((view,actionId,event)->{
+            if(actionId==android.view.inputmethod.EditorInfo.IME_ACTION_DONE){
+                android.view.inputmethod.InputMethodManager keyboard=
+                    (android.view.inputmethod.InputMethodManager)
+                    getSystemService(INPUT_METHOD_SERVICE);
+                if(keyboard!=null)keyboard.hideSoftInputFromWindow(stationSearch.getWindowToken(),0);
+                stationSearch.clearFocus();
+                root.requestFocus();
+                sc.post(()->sc.smoothScrollTo(0,stationStatus.getTop()));
+                return true;
+            }
+            return false;
+        });
         stationSearch.setTextColor(INK);
         stationSearch.setHintTextColor(MUTED);
         stationSearch.setTextSize(15);
@@ -161,10 +182,12 @@ public final class NewsRadioActivity extends Activity {
         add(root,favoritesButton,8);
         stationStatus=text("Finding nearby stations…",12,CYAN,false);
         add(root,stationStatus,9);
-        add(root,button("↻  FIND LOCAL STATIONS",this::loadLocalStations),9);
-        add(root,button("■  STOP LIVE RADIO",()->stopStream("Live station stopped.")),9);
+        // Keep playable stations immediately below the results count, where
+        // they are visible without scrolling past two large utility buttons.
         stationList=new LinearLayout(this);stationList.setOrientation(1);
-        add(root,stationList,12);
+        add(root,stationList,5);
+        add(root,button("↻  REFRESH LOCAL STATIONS",this::loadLocalStations),14);
+        add(root,button("■  STOP LIVE RADIO",()->stopStream("Live station stopped.")),9);
         add(root,button("←  BACK TO NEWSWIRE",this::finish),13);
         details=new LinearLayout(this);details.setOrientation(1);add(root,details,16);
         renderStations();renderNoaaStations();
@@ -281,6 +304,15 @@ public final class NewsRadioActivity extends Activity {
                 "▶  ":"◉  ")+station.name,16,INK,true);
             heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
             title.setOnClickListener(v->playStation(station));
+            boolean active=playing!=null && station.stream.equals(playing.stream)
+                && streamPlayer!=null;
+            TextView playButton=button(active?"■ STOP":"▶ PLAY",()->playStation(station));
+            playButton.setTextSize(12);
+            playButton.setPadding(dp(10),dp(10),dp(10),dp(10));
+            playButton.setContentDescription((active?"Stop ":"Play live ")+station.name);
+            LinearLayout.LayoutParams playParams=new LinearLayout.LayoutParams(-2,-2);
+            playParams.setMargins(dp(4),0,dp(4),0);
+            heading.addView(playButton,playParams);
             boolean saved=RadioStationFavorites.contains(this,station.stream);
             TextView star=text(saved?"★":"☆",26,saved?GOLD:CYAN,true);
             star.setContentDescription((saved?"Remove ":"Save ")+station.name+" favorite");
@@ -302,7 +334,7 @@ public final class NewsRadioActivity extends Activity {
             String empty=stationsLoading?"Finding stations near you…":
                 favoritesOnly?"No saved stations match. Tap the star to save a station.":
                 !term.isEmpty()?"No station matches your search.":
-                "No local stations listed. Tap FIND LOCAL STATIONS to retry.";
+                "No local stations listed. Tap REFRESH LOCAL STATIONS to retry.";
             add(stationList,text(empty,12,MUTED,false),6);
         }
     }
@@ -379,8 +411,8 @@ public final class NewsRadioActivity extends Activity {
                 localStations=stations==null?new ArrayList<>():stations;
                 stationStatus.setText(message!=null?message:
                     localStations.isEmpty()?"No HTTPS radio streams listed for this area.":
-                    localStations.size()+" station streams found near "+
-                        (city.isEmpty()?"your location":city)+". Tap to listen.");
+                    localStations.size()+" stations found near "+
+                        (city.isEmpty()?"your location":city)+". Tap PLAY below.");
                 renderStations();
             });
         },"newswire-radio-stations").start();
@@ -405,7 +437,7 @@ public final class NewsRadioActivity extends Activity {
         renderStations();renderNoaaStations();
     }
     private void playStation(LocalRadioDirectory.Station station){
-        if(station==playing&&streamPlayer!=null){
+        if(playing!=null && station.stream.equals(playing.stream) && streamPlayer!=null){
             stopStream("Live station stopped.");
             return;
         }
