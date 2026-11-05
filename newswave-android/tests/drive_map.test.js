@@ -32,8 +32,9 @@ assert.ok(car.includes('class RadarInfoScreen extends Screen'),'Info screen must
 assert.ok(car.includes('new SafetyDashboardScreen(getCarContext(),radar)'),'Info screen links to official NWS warnings');
 assert.ok(car.includes('ColorMatrixColorFilter'),'Car street map should be dark');
 assert.ok(car.includes('private int zoom=DRIVE_ZOOM'),'Car follow mode starts at driving zoom');
-assert.ok(car.includes('private static final int DRIVE_ZOOM=15'),'Default zoom is street-level 15');
+assert.ok(car.includes('private static final int DRIVE_ZOOM=17'),'Default zoom matches close-up screenshot #3 at level 17');
 assert.ok(car.includes('zoom=DRIVE_ZOOM;'),'Recenter restores the close driving scale');
+assert.ok(car.includes('Math.min(17,zoom+delta)'), 'Manual zoom must preserve the supported close-up upper bound');
 assert.ok(car.includes('float anchorX=w*.5f,anchorY=auto?h*.67f:h*.5f'),'Show more road ahead than behind GPS');
 assert.ok(car.includes('canvas.rotate(-degrees,anchorX,anchorY)'),'Heading-up map orientation remains');
 assert.ok(car.includes('tilt.setPolyToPoly'),'3D perspective remains enabled');
@@ -78,6 +79,6 @@ assert.ok(radio.includes('SOFT_INPUT_STATE_ALWAYS_HIDDEN'),
   'Keyboard must not obscure station results when entering radio page');
 assert.ok(radio.includes('station.stream.equals(playing.stream)'),
   'Saved station stop button must match by stream address');
-assert.ok(build.includes("versionCode 47"));
-assert.ok(build.includes("versionName '0.7.12'"));
+assert.ok(build.includes("versionCode 48"));
+assert.ok(build.includes("versionName '0.7.13'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
