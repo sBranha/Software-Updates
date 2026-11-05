@@ -64,6 +64,15 @@ assert.ok(car.includes('Street map unavailable - check connection'),'Do not sile
 assert.ok(car.includes('standard Android Auto weather view cannot play videos'),'Do not misrepresent car video as supported');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 45"));
-assert.ok(build.includes("versionName '0.7.10'"));
+const radio=fs.readFileSync(root+'java/com/newswave/live/NewsRadioActivity.java','utf8');
+assert.ok(radio.indexOf('add(root,stationList,5)')<radio.indexOf('REFRESH LOCAL STATIONS'),
+  'Station list must come before secondary radio controls');
+assert.ok(radio.includes('▶ PLAY')&&radio.includes('■ STOP'),
+  'Every station needs an obvious playback control');
+assert.ok(radio.includes('SOFT_INPUT_STATE_ALWAYS_HIDDEN'),
+  'Keyboard must not obscure station results when entering radio page');
+assert.ok(radio.includes('station.stream.equals(playing.stream)'),
+  'Saved station stop button must match by stream address');
+assert.ok(build.includes("versionCode 46"));
+assert.ok(build.includes("versionName '0.7.11'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
