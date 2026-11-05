@@ -1,0 +1,78 @@
+name: NewsWire 0.7.1 NOAA media and resilience test
+on:
+  push:
+    branches: [newswire-noaa-media-resilience-v0.7.1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Bundle map assets and radar resources
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' --output newswave-android/app/src/main/assets/leaflet.js
+          curl --fail --location --silent --show-error --retry 3 --max-time 45 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' --output newswave-android/app/src/main/assets/leaflet.css
+          python newswave-android/build_radar_stations.py
+      - name: Check existing app and NOAA integration
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('newswave-android/app/src/main')
+          build=Path('newswave-android/app/build.gradle').read_text()
+          manifest=(root/'AndroidManifest.xml').read_text()
+          audio=(root/'java/com/newswave/live/NewsWireNoaaMediaService.java').read_text()
+          radio=(root/'java/com/newswave/live/NewsRadioActivity.java').read_text()
+          car=(root/'java/com/newswave/live/NewsWaveCarService.java').read_text()
+          assert "applicationId 'com.newswire.live'" in build
+          assert 'versionCode 36' in build and "versionName '0.7.1'" in build
+          assert 'androidx.car.app.category.WEATHER' in manifest
+          assert 'android.media.browse.MediaBrowserService' in manifest
+          assert 'FOREGROUND_SERVICE_MEDIA_PLAYBACK' in manifest
+          assert 'NewsWireNoaaMediaService' in manifest
+          assert '<uses name="media"/>' in (root/'res/xml/automotive_app_desc.xml').read_text()
+          for expected in ('onLoadChildren','onPlayFromMediaId','MediaSession',
+                           'AudioFocusRequest','setSessionToken','startForeground'):
+              assert expected in audio,expected
+          for expected in ('PLAY NEAREST NOAA','stopNoaaService','RadioStationFavorites.toggle',
+                           'renderNoaaStations','NewsWireNoaaMediaService.ACTION_PLAY_STREAM'):
+              assert expected in radio,expected
+          for existing in ('WeatherWarningOverlay.draw','setMapController(mapControls)'):
+              assert existing in car,existing
+          assert (root/'java/com/newswave/live/FootballBoardActivity.java').exists()
+          assert (root/'java/com/newswave/live/LocalNewspapers.java').exists()
+          assert (root/'java/com/newswave/live/DriveWarningService.java').exists()
+          PY
+      - name: Compile installable Android test APK and unsigned Google Play bundle
+        run: gradle -p newswave-android :app:assembleDebug :app:bundleRelease --no-daemon
+      - name: Validate generated files
+        run: |
+          set -euo pipefail
+          APK=newswave-android/app/build/outputs/apk/debug/app-debug.apk
+          AAB=newswave-android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$APK"
+          test -s "$AAB"
+          unzip -t "$APK" >/dev/null
+          unzip -t "$AAB" >/dev/null
+          sha256sum "$APK" "$AAB" > newswire-0.7.1-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsWire-0.7.1-NOAA-test-APK-and-unsigned-AAB
+          path: |
+            newswave-android/app/build/outputs/apk/debug/app-debug.apk
+            newswave-android/app/build/outputs/bundle/release/app-release.aab
+            newswire-0.7.1-sha256.txt
+          if-no-files-found: error
