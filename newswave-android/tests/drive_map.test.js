@@ -64,6 +64,6 @@ assert.ok(car.includes('Street map unavailable - check connection'),'Do not sile
 assert.ok(car.includes('standard Android Auto weather view cannot play videos'),'Do not misrepresent car video as supported');
 assert.ok(activity.includes('NewsWireDrivingMapActivity.class'));
 assert.ok(manifest.includes('android:name=".NewsWireDrivingMapActivity"'));
-assert.ok(build.includes("versionCode 44"));
-assert.ok(build.includes("versionName '0.7.9'"));
+assert.ok(build.includes("versionCode 45"));
+assert.ok(build.includes("versionName '0.7.10'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
