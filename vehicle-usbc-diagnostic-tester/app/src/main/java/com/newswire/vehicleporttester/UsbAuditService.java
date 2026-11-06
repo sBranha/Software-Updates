@@ -1,6 +1,13 @@
 package com.newswire.vehicleporttester;
 
 import android.app.Service;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.pm.ServiceInfo;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.PowerManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -46,6 +53,60 @@ public final class UsbAuditService extends Service {
     private JSONObject result;
     private final Object fileLock = new Object();
     private long auditStarted;
+    private PowerManager.WakeLock auditWakeLock;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable workerCutoff;
+    private static final String CHANNEL_ID = "vehicle_usb_audit";
+    private static final int NOTIFICATION_ID = 7214;
+
+    private void beginForegroundAudit() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (nm != null && Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID,
+                "Vehicle Port Tester audit", NotificationManager.IMPORTANCE_LOW));
+        }
+        Notification n = new Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setContentTitle("Vehicle Port Tester: USB audit")
+            .setContentText("Running read-only USB checks. Return to the app to stop.")
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .build();
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
+        } else {
+            startForeground(NOTIFICATION_ID, n);
+        }
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm != null) {
+            auditWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VehiclePortTester:DeepAudit");
+            auditWakeLock.setReferenceCounted(false);
+            auditWakeLock.acquire(160000);
+        }
+        workerCutoff = () -> {
+            if (auditThread != null && auditThread.isAlive()) {
+                try {
+                    result.put("status", "worker_hard_timeout_155_seconds");
+                    result.put("timed_out_operation", result.optString("current_operation", "unknown"));
+                    checkpoint();
+                } catch (Exception ignored) {}
+                Process.killProcess(Process.myPid());
+            }
+        };
+        mainHandler.postDelayed(workerCutoff, 155000);
+    }
+
+    private void releaseAuditPower() {
+        if (workerCutoff != null) mainHandler.removeCallbacks(workerCutoff);
+        try {
+            if (auditWakeLock != null && auditWakeLock.isHeld()) auditWakeLock.release();
+        } catch (Exception ignored) {}
+    }
+
+    @Override public void onDestroy() {
+        releaseAuditPower();
+        super.onDestroy();
+    }
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
@@ -58,6 +119,14 @@ public final class UsbAuditService extends Service {
         }
         if (auditThread != null && auditThread.isAlive()) return START_NOT_STICKY;
         cancelled = false;
+        try {
+            beginForegroundAudit();
+        } catch (Exception ex) {
+            event("foreground_failed", 0,
+                "Could not keep audit active: " + ex.getClass().getSimpleName(), true);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         auditThread = new Thread(this::executeAudit, "IsolatedUsbAudit");
         auditThread.start();
         return START_NOT_STICKY;
@@ -240,6 +309,20 @@ public final class UsbAuditService extends Service {
         } catch (Exception ignored) {}
     }
 
+    // Saved before potentially blocking USB calls. The last checkpoint survives
+    // termination of this worker process and is included in the exported report.
+    private void markOperation(int attempt, String operation) {
+        if (result == null) return;
+        try {
+            result.put("current_test", "read_only_capture");
+            result.put("current_attempt", attempt);
+            result.put("current_operation", operation);
+            result.put("operation_entered_utc", utc());
+            result.put("status", "in_progress");
+            checkpoint();
+        } catch (Exception ignored) {}
+    }
+
     private JSONObject capture(int attempt) throws Exception {
         JSONObject out = new JSONObject();
         out.put("test", "read_only_capture");
@@ -265,12 +348,14 @@ public final class UsbAuditService extends Service {
                 if (!usb.hasPermission(aa[0])) outcome = "permission_required";
                 else {
                     stage = "open_accessory";
+                    markOperation(attempt, stage);
                     fd = usb.openAccessory(aa[0]);
                     out.put("connection_opened", fd != null);
                     if (fd == null) outcome = "open_returned_null";
                     else {
                         // We explicitly verify O_NONBLOCK before any read.
                         stage = "configure_nonblocking";
+                        markOperation(attempt, stage);
                         int flags = Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_GETFL, 0);
                         Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_SETFL, flags | OsConstants.O_NONBLOCK);
                         int verified = Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_GETFL, 0);
@@ -283,9 +368,14 @@ public final class UsbAuditService extends Service {
                             p.events = (short) (OsConstants.POLLIN | OsConstants.POLLERR | OsConstants.POLLHUP);
                             outcome = "no_data_before_timeout";
                             long until = SystemClock.elapsedRealtime() + ATTEMPT_MS;
+                            String lastSavedOperation = "";
                             while (!cancelled && SystemClock.elapsedRealtime() < until && bytesRead < CAPTURE_LIMIT) {
                                 int wait = (int) Math.min(250, Math.max(1, until - SystemClock.elapsedRealtime()));
                                 stage = "poll";
+                                if (!lastSavedOperation.equals(stage)) {
+                                    markOperation(attempt, stage);
+                                    lastSavedOperation = stage;
+                                }
                                 int n = Os.poll(new StructPollfd[] {p}, wait);
                                 if (n == 0) continue;
                                 int flagsSeen = p.revents;
@@ -294,6 +384,10 @@ public final class UsbAuditService extends Service {
                                     int r;
                                     try {
                                         stage = "read";
+                                        if (!lastSavedOperation.equals(stage)) {
+                                            markOperation(attempt, stage);
+                                            lastSavedOperation = stage;
+                                        }
                                         r = Os.read(fd.getFileDescriptor(), buffer, 0,
                                                 Math.min(buffer.length, CAPTURE_LIMIT - bytesRead));
                                     } catch (ErrnoException ex) {
@@ -352,6 +446,7 @@ public final class UsbAuditService extends Service {
         out.put("hex_capture", hex.toString());
         out.put("raw_capture_privacy", "Incoming data may contain private application content. Do not share unless you intend to disclose it.");
         out.put("protocol_analysis", UsbProtocolAnalyzer.analyze(data, bytesRead));
+        markOperation(attempt, "attempt_complete");
         return out;
     }
 
@@ -360,7 +455,10 @@ public final class UsbAuditService extends Service {
         try {
             result = new JSONObject();
             result.put("report_format", "Vehicle Port Tester deep communication audit v1");
-            result.put("app_version", "0.7.3");
+            result.put("app_version", "0.7.4");
+            result.put("foreground_short_service", true);
+            result.put("cpu_wake_lock", true);
+            result.put("screen_lock_does_not_cancel_audit", true);
             result.put("test_label", "comprehensive_usb_accessory_audit");
             result.put("started_utc", utc());
             result.put("status", "in_progress");
@@ -432,6 +530,8 @@ public final class UsbAuditService extends Service {
             checkpoint();
             event("finished", 100, "Deep audit: " + result.optString("status", "complete")
                     + ", " + totalRead + " bytes read", true);
+            releaseAuditPower();
+            stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
         }
     }
