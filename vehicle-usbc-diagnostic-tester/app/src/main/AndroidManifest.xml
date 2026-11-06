@@ -8,6 +8,9 @@
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Vehicle Port Tester" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <receiver android:name=".UsbPermissionReceiver" android:exported="false" />
+        <!-- Isolated process prevents a blocked native USB read from hanging the main app. -->
+        <service android:name=".UsbAuditService" android:process=":usb_audit"
+            android:exported="false" android:stopWithTask="true" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
