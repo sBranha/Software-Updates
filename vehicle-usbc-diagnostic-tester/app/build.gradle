@@ -4,7 +4,7 @@ android {
     namespace 'com.newswire.vehicleporttester'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.newswire.vehicleporttester.v2'
+        applicationId 'com.newswire.vehicleporttester.audit'
         minSdk 26
         targetSdk 34
         versionCode 12
