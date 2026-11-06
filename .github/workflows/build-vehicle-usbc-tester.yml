@@ -27,6 +27,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Restore the existing launcher JPEG
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("vehicle-usbc-diagnostic-tester/app/src/main/res/drawable/vehicle_explorer_icon.jpg"); b=p.read_bytes(); assert len(b)==2528; p.write_bytes(b[:155]+bytes([118,118,118])+b[155:])'
       - name: Build installable debug-signed APK
         run: gradle -p vehicle-usbc-diagnostic-tester --no-daemon --stacktrace assembleDebug
       - name: Verify APK signing and checksum
