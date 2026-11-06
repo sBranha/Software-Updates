@@ -2,7 +2,7 @@ name: Build Vehicle USB-C Tester APK
 on:
   push:
     branches:
-      - vehicle-usbc-diagnostic-tester-v0.2.0
+      - vehicle-usbc-diagnostic-tester-v0.3.0
     paths:
       - 'vehicle-usbc-diagnostic-tester/**'
       - '.github/workflows/build-vehicle-usbc-tester.yml'
@@ -35,10 +35,18 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           sha256sum "$APK"
-      - name: Upload APK
+      - name: Inspect package ID and include signer utility
+        run: |
+          APK=vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 4
+          mkdir -p signing-tools
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/apksigner.jar
+      - name: Upload unsigned-for-release dev APK and signing utility
         uses: actions/upload-artifact@v4
         with:
-          name: Vehicle-Port-Tester-v0.2.0-APK
-          path: vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
+          name: Vehicle-Port-Tester-v0.3.0-Build
+          path: |
+            vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
+            signing-tools/apksigner.jar
           if-no-files-found: error
           retention-days: 30
