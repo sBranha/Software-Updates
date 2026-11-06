@@ -433,14 +433,14 @@ public class MainActivity extends Activity {
                 + (found.length() > 0
                     ? "Android lists USB device interfaces. Details are saved in the report; they are not automatically vehicle diagnostics."
                     : "No USB-host devices listed. This is common when the vehicle acts as USB host. It does not mean the cable is broken.")
-                + "\\n\\nCapture all three labeled tests, then VIEW AND EXPORT COMPARISON."
-                + (deepReport == null ? "" : "\\n\\nDEEP USB DISCOVERY:"
-                    + "\\nHost devices: " + deepReport.optJSONArray("host_devices").length()
-                    + "\\nAccessory descriptors: " + deepReport.optJSONArray("accessories").length()
-                    + "\\nPhone apps with car/media services (visible subset): "
+                + "\n\nCapture all three labeled tests, then VIEW AND EXPORT COMPARISON."
+                + (deepReport == null ? "" : "\n\nDEEP USB DISCOVERY:"
+                    + "\nHost devices: " + deepReport.optJSONArray("host_devices").length()
+                    + "\nAccessory descriptors: " + deepReport.optJSONArray("accessories").length()
+                    + "\nPhone apps with car/media services (visible subset): "
                     + deepReport.optJSONArray("phone_apps_with_car_or_media_services").length()
-                    + "\\nFord SYNC internal apps: NOT ACCESSIBLE via standard Android USB"
-                    + "\\nNo vehicle control commands sent. Full details in JSON report.");
+                    + "\nFord SYNC internal apps: NOT ACCESSIBLE via standard Android USB"
+                    + "\nNo vehicle control commands sent. Full details in JSON report.");
             if (trigger.startsWith("Test: ")) {
                 getPreferences(MODE_PRIVATE).edit()
                     .putString(trigger.substring(6), report.toString()).apply();
@@ -502,7 +502,7 @@ public class MainActivity extends Activity {
             details.setText(describe("1 UNPLUGGED", unplug) + "\n\n" +
                 describe("2 USB-C", usbc) + "\n\n" +
                 describe("3 REGULAR USB", usba) +
-                (deep == null ? "" : "\\n\\n4 DEEP USB-C: last captured " + deep.optString("scanned_at_utc", "unknown")) +
+                (deep == null ? "" : "\n\n4 DEEP USB-C: last captured " + deep.optString("scanned_at_utc", "unknown")) +
                 "\n\nEngine trouble codes: NOT SCANNED\n" +
                 "Android Auto data link does not imply engine diagnostic access. " +
                 "Tap EXPORT JSON REPORT to save all available results in one file.");
