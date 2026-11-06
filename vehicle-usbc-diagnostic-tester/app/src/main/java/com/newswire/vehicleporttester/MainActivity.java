@@ -639,10 +639,10 @@ public class MainActivity extends Activity {
         latestFilename = "vehicle-deep-usb-audit-" + fileTimeUtc() + ".json";
         summary.setText("Deep audit: " + report.optString("status", "finished"));
         details.setText("Tests completed: " + (report.optJSONArray("tests") == null ? 0 : report.optJSONArray("tests").length())
-            + "\\nTotal bytes received: " + report.optInt("total_bytes_read", 0)
-            + "\\nWorker status: " + report.optString("status", "unknown")
-            + "\\nNo vehicle commands sent. Ford SYNC internal access has NOT been established."
-            + "\\nExport the detailed deep audit JSON to inspect each stage.");
+            + "\nTotal bytes received: " + report.optInt("total_bytes_read", 0)
+            + "\nWorker status: " + report.optString("status", "unknown")
+            + "\nNo vehicle commands sent. Ford SYNC internal access has NOT been established."
+            + "\nExport the detailed deep audit JSON to inspect each stage.");
         scanStatus.setText("Deep audit stopped/finished. EXPORT SAVED DEEP AUDIT REPORT.");
         try {
             java.io.File file = new java.io.File(getFilesDir(), UsbAuditService.REPORT_FILE);
