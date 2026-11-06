@@ -2,7 +2,7 @@ name: Build Vehicle USB-C Tester APK
 on:
   push:
     branches:
-      - vehicle-usbc-diagnostic-tester-v0.1.0
+      - vehicle-usbc-diagnostic-tester-v0.2.0
     paths:
       - 'vehicle-usbc-diagnostic-tester/**'
       - '.github/workflows/build-vehicle-usbc-tester.yml'
@@ -29,10 +29,16 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build installable debug-signed APK
         run: gradle -p vehicle-usbc-diagnostic-tester --no-daemon --stacktrace assembleDebug
+      - name: Verify APK signing and checksum
+        run: |
+          APK=vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          sha256sum "$APK"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Vehicle-USB-C-Tester-v0.1.0-APK
+          name: Vehicle-Port-Tester-v0.2.0-APK
           path: vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
