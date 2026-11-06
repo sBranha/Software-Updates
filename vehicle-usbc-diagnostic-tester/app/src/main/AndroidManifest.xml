@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <!-- Allows the active, user-initiated ~2 minute audit to keep running if
+         the screen locks or Android briefly backgrounds the activity. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <queries>
         <intent><action android:name="androidx.car.app.CarAppService"/></intent>
         <intent><action android:name="android.media.browse.MediaBrowserService"/></intent>
@@ -10,7 +14,8 @@
         <receiver android:name=".UsbPermissionReceiver" android:exported="false" />
         <!-- Isolated process prevents a blocked native USB read from hanging the main app. -->
         <service android:name=".UsbAuditService" android:process=":usb_audit"
-            android:exported="false" android:stopWithTask="true" />
+            android:exported="false" android:stopWithTask="false"
+            android:foregroundServiceType="shortService" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
