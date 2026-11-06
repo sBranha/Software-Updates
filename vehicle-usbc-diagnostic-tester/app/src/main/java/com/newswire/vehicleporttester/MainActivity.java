@@ -634,10 +634,22 @@ public class MainActivity extends Activity {
                     } else {
                         runOnUiThread(() -> scanStatus.setText("Opening the authorized USB accessory..."));
                         connection = manager.openAccessory(accessory);
+                        listenDescriptor = connection;
                         if (connection == null) {
                             outcome = "open_returned_null";
                         } else {
                             report.put("connection_opened", true);
+                            listenOpened = true;
+                            // Require kernel nonblocking reads. Poll alone is not a guarantee
+                            // that a subsequent USB accessory read cannot block indefinitely.
+                            int oldFlags = Os.fcntlInt(connection.getFileDescriptor(), OsConstants.F_GETFL, 0);
+                            Os.fcntlInt(connection.getFileDescriptor(), OsConstants.F_SETFL,
+                                    oldFlags | OsConstants.O_NONBLOCK);
+                            int confirmedFlags = Os.fcntlInt(connection.getFileDescriptor(), OsConstants.F_GETFL, 0);
+                            if ((confirmedFlags & OsConstants.O_NONBLOCK) == 0) {
+                                throw new IllegalStateException("USB accessory fd does not support nonblocking reads");
+                            }
+                            report.put("nonblocking_fd_verified", true);
                             long listenStarted = SystemClock.elapsedRealtime();
                             runOnUiThread(() -> scanStatus.setText("Connected. Listening for up to 10 seconds / 4,096 bytes..."));
                             long deadline = listenStarted + 10000;
@@ -646,22 +658,25 @@ public class MainActivity extends Activity {
                             pollDescriptor.fd = connection.getFileDescriptor();
                             pollDescriptor.events = (short) (OsConstants.POLLIN | OsConstants.POLLERR | OsConstants.POLLHUP);
                             outcome = "timed_out_no_data";
-                            while (SystemClock.elapsedRealtime() < deadline && bytesRead < capture.length) {
+                            while (!listenCancelRequested && SystemClock.elapsedRealtime() < deadline && bytesRead < capture.length) {
+                                updateListenProgress(SystemClock.elapsedRealtime() - listenStarted, bytesRead);
                                 long remaining = deadline - SystemClock.elapsedRealtime();
-                                int waitMs = (int) Math.min(1000L, remaining);
+                                int waitMs = (int) Math.min(250L, remaining);
                                 if (waitMs <= 0) break;
                                 int polls = Os.poll(new StructPollfd[]{pollDescriptor}, waitMs);
-                                if (polls == 0) {
-                                    long left = Math.max(0, deadline - SystemClock.elapsedRealtime());
-                                    int progressBytes = bytesRead;
-                                    runOnUiThread(() -> scanStatus.setText("Listening: " + progressBytes + " bytes, " + ((left + 999) / 1000) + " sec remaining"));
-                                    continue;
-                                }
+                                if (polls == 0) continue;
                                 int flags = pollDescriptor.revents;
                                 pollDescriptor.revents = 0;
                                 if ((flags & OsConstants.POLLIN) != 0) {
-                                    int received = Os.read(connection.getFileDescriptor(), buffer, 0,
-                                            Math.min(buffer.length, capture.length - bytesRead));
+                                    int received;
+                                    try {
+                                        received = Os.read(connection.getFileDescriptor(), buffer, 0,
+                                                Math.min(buffer.length, capture.length - bytesRead));
+                                    } catch (ErrnoException ex) {
+                                        if (ex.errno == OsConstants.EAGAIN || ex.errno == OsConstants.EWOULDBLOCK)
+                                            continue;
+                                        throw ex;
+                                    }
                                     if (received <= 0) {
                                         outcome = "connection_closed_by_peer";
                                         break;
@@ -671,6 +686,8 @@ public class MainActivity extends Activity {
                                     lastByteDelay = eventMs;
                                     System.arraycopy(buffer, 0, capture, bytesRead, received);
                                     bytesRead += received;
+                                    listenBytesObserved = bytesRead;
+                                    updateListenProgress(SystemClock.elapsedRealtime() - listenStarted, bytesRead);
                                     if (events.length() < 100) {
                                         JSONObject event = new JSONObject();
                                         event.put("at_ms", eventMs);
@@ -679,15 +696,15 @@ public class MainActivity extends Activity {
                                         events.put(event);
                                     }
                                     outcome = "received_unclassified_data";
-                                    int nowRead = bytesRead;
-                                    runOnUiThread(() -> scanStatus.setText("Captured " + nowRead + " / 4096 bytes; no vehicle commands sent"));
+                                    // Display is updated by updateListenProgress using real elapsed time and bytes.
                                 } else if ((flags & (OsConstants.POLLERR | OsConstants.POLLHUP)) != 0) {
                                     outcome = "accessory_disconnected_or_error";
                                     break;
                                 }
                             }
                             limitReached = bytesRead >= capture.length;
-                            if (limitReached) outcome = "capture_limit_reached";
+                            if (listenCancelRequested) outcome = "cancelled_by_user";
+                            else if (limitReached) outcome = "capture_limit_reached";
                             else if (bytesRead > 0 && "timed_out_no_data".equals(outcome)) outcome = "captured_until_timeout";
                         }
                     }
@@ -708,6 +725,7 @@ public class MainActivity extends Activity {
                     try { report.put("close_error", ex.getClass().getSimpleName()); } catch (Exception ignored) {}
                 }
             }
+            listenDescriptor = null;
         }
         try {
             StringBuilder hexCapture = new StringBuilder(bytesRead * 3);
@@ -736,8 +754,15 @@ public class MainActivity extends Activity {
         final String result = outcome;
         final int finalBytes = bytesRead;
         final String json = report.toString();
+        if (!listenCompleted.compareAndSet(false, true)) {
+            // Watchdog has already saved an error report and restored the UI.
+            listenReaderStalled = false;
+            return;
+        }
+        if (listenWatchdog != null) uiHandler.removeCallbacks(listenWatchdog);
         getPreferences(MODE_PRIVATE).edit().putString("usb_listen", json).apply();
         runOnUiThread(() -> {
+            stopListenButton.setVisibility(View.GONE);
             connectionActive = false;
             scanProgress.setIndeterminate(false);
             scanProgress.setProgress(100);
