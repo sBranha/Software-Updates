@@ -50,12 +50,14 @@ public class MainActivity extends Activity {
     private TextView scanStatus;
     private ProgressBar scanProgress;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private boolean scanActive = false;
+    private volatile boolean scanActive = false;
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
-            if (USB_STATE.equals(intent.getAction())) runScan("USB state changed", true);
+            if (USB_STATE.equals(intent.getAction()) && !scanActive) {
+                scanStatus.setText("USB state changed. Tap DEEP USB-C DISCOVERY for a new full scan. The last report has been preserved.");
+            }
         }
     };
     private boolean receiverRegistered;
@@ -141,6 +143,11 @@ public class MainActivity extends Activity {
         deepLp.topMargin = dp(12);
         root.addView(deep, deepLp);
         deep.setOnClickListener(v -> runScan("Test: usb_c_deep", true));
+        Button exportDeep = button("EXPORT SAVED DEEP USB-C REPORT", 0xff29435a);
+        LinearLayout.LayoutParams exportDeepLp = new LinearLayout.LayoutParams(-1, -2);
+        exportDeepLp.topMargin = dp(8);
+        root.addView(exportDeep, exportDeepLp);
+        exportDeep.setOnClickListener(v -> exportSavedDeepReport());
         Button access = button("REQUEST USB ACCESS PERMISSION", 0xff776225);
         LinearLayout.LayoutParams accessLp = new LinearLayout.LayoutParams(-1, -2);
         accessLp.topMargin = dp(10);
@@ -311,7 +318,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.4.0");
+            report.put("app_version", "0.4.1");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -450,7 +457,7 @@ public class MainActivity extends Activity {
                 summary.setText("Scan captured: " + capturedLabel);
                 details.setText(visible);
                 if (save) saveLocalReport();
-                finishScan(startedMs, "Scan complete • " + timeUtc() + " • verified checks finished");
+                finishScan(startedMs, ("usb_c_deep".equals(capturedLabel) ? "DEEP SCAN COMPLETE — use EXPORT SAVED DEEP USB-C REPORT" : "Scan complete") + " • " + timeUtc());
             });
         } catch (Exception ex) {
             runOnUiThread(() -> {
@@ -479,6 +486,23 @@ public class MainActivity extends Activity {
             ", accessories=" + item.optInt("usb_accessory_count", 0);
     }
 
+    private void exportSavedDeepReport() {
+        JSONObject deep = stored("usb_c_deep");
+        if (deep == null) {
+            scanStatus.setText("No Deep USB-C report saved yet. Tap DEEP USB-C DISCOVERY, wait for 100%, then export.");
+            return;
+        }
+        try {
+            lastReport = deep.toString(2);
+            latestFilename = "vehicle-usbc-deep-" + fileTimeUtc() + ".json";
+            summary.setText("Saved Deep USB-C Scan selected");
+            scanStatus.setText("Exporting full Deep Scan captured " + deep.optString("scanned_at_utc", "earlier") + ". USB change notifications cannot replace it.");
+            exportJson();
+        } catch (Exception ex) {
+            scanStatus.setText("Could not export saved Deep Scan: " + ex.getClass().getSimpleName());
+        }
+    }
+
     private void showComparison() {
         try {
             JSONObject unplug = stored("disconnected");
@@ -486,7 +510,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.4.0");
+            combined.put("app_version", "0.4.1");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
