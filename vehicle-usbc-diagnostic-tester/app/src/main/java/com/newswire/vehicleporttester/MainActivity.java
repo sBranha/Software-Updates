@@ -118,7 +118,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.1", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.2", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -370,7 +370,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.1");
+            report.put("app_version", "0.7.2");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -548,7 +548,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.1");
+            timeout.put("app_version", "0.7.2");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -588,11 +588,86 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * Safe observations of the Android USB state. These are snapshots of what
+     * Android exposes, not reads of the vehicle ECU or Ford SYNC firmware.
+     */
+    private JSONObject getUsbSessionSnapshot() {
+        JSONObject result = new JSONObject();
+        try {
+            result.put("captured_at_utc", timeUtc());
+            Intent sticky = usbStateIntent();
+            JSONObject usb = new JSONObject();
+            if (sticky != null) {
+                for (String key : new String[]{"connected", "configured", "host_connected", "accessory"}) {
+                    if (sticky.hasExtra(key)) usb.put(key, sticky.getBooleanExtra(key, false));
+                }
+            }
+            result.put("android_usb_state", usb);
+            result.put("state_broadcast_available", sticky != null);
+            UsbManager m = (UsbManager) getSystemService(Context.USB_SERVICE);
+            if (m != null) {
+                UsbAccessory[] aa = m.getAccessoryList();
+                result.put("accessory_count", aa == null ? 0 : aa.length);
+                result.put("usb_host_device_count", m.getDeviceList().size());
+                if (aa != null && aa.length > 0) {
+                    result.put("accessory_model", aa[0].getModel());
+                    result.put("accessory_permission", m.hasPermission(aa[0]));
+                }
+            } else result.put("usb_manager_available", false);
+        } catch (Exception e) {
+            try { result.put("snapshot_error", e.getClass().getSimpleName()); }
+            catch (Exception ignored) {}
+        }
+        return result;
+    }
+
+    private boolean usbSessionChanged(JSONObject before, JSONObject after) {
+        if (before == null || after == null) return false;
+        if (before.optInt("accessory_count", -1) != after.optInt("accessory_count", -1)) return true;
+        JSONObject a = before.optJSONObject("android_usb_state");
+        JSONObject b = after.optJSONObject("android_usb_state");
+        if (a == null || b == null) return a != b;
+        for (String key : new String[]{"connected", "configured", "host_connected", "accessory"}) {
+            if (a.has(key) != b.has(key) || a.optBoolean(key) != b.optBoolean(key)) return true;
+        }
+        return false;
+    }
+
+    private String explanationForListenOutcome(String outcome) {
+        switch (outcome) {
+            case "usb_read_io_error":
+                return "Android returned EIO during USB reading. This is a communication error, not a timeout or proof of a bad cable. Android Auto session contention, USB reconfiguration, or accessory behavior are possible.";
+            case "usb_io_error":
+                return "The Android USB driver returned EIO before or during a USB operation. No diagnostic data was established.";
+            case "accessory_disconnected_or_error":
+            case "accessory_disconnected_or_unavailable":
+                return "The accessory became unavailable or Android reported a USB disconnect/error. Check the connection while parked.";
+            case "timed_out_no_data":
+                return "The ten-second timeout elapsed without receiving data. The app stopped on schedule.";
+            case "captured_until_timeout":
+                return "Some incoming bytes were captured before the ten-second limit.";
+            case "capture_limit_reached":
+                return "The 4096-byte capture limit was reached. Captured data is unclassified.";
+            case "cancelled_by_user":
+                return "The Stop button ended this capture.";
+            case "no_accessory_detected":
+                return "Android did not expose an automotive USB accessory at the start of the test.";
+            case "permission_required":
+                return "Android has not granted USB accessory access. Request permission before retrying.";
+            case "received_unclassified_data":
+                return "Data was received, but no Ford diagnostic information was confirmed.";
+            default:
+                return "This result does not confirm access to vehicle computers or Ford SYNC internals.";
+        }
+    }
+
     private void performListenTest() {
         long started = SystemClock.elapsedRealtime();
         JSONObject report = new JSONObject();
         ParcelFileDescriptor connection = null;
         String outcome = "unknown";
+        String stage = "preflight";
         int bytesRead = 0;
         boolean limitReached = false;
         byte[] capture = new byte[4096];
@@ -603,7 +678,8 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.1");
+            report.put("app_version", "0.7.2");
+            report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
             report.put("scan_is_read_only", true);
@@ -633,6 +709,7 @@ public class MainActivity extends Activity {
                         outcome = "permission_required";
                     } else {
                         runOnUiThread(() -> scanStatus.setText("Opening the authorized USB accessory..."));
+                        stage = "open_accessory";
                         connection = manager.openAccessory(accessory);
                         listenDescriptor = connection;
                         if (connection == null) {
@@ -642,6 +719,8 @@ public class MainActivity extends Activity {
                             listenOpened = true;
                             // Require kernel nonblocking reads. Poll alone is not a guarantee
                             // that a subsequent USB accessory read cannot block indefinitely.
+                            stage = "configure_nonblocking";
+                            report.put("usb_state_after_open", getUsbSessionSnapshot());
                             int oldFlags = Os.fcntlInt(connection.getFileDescriptor(), OsConstants.F_GETFL, 0);
                             Os.fcntlInt(connection.getFileDescriptor(), OsConstants.F_SETFL,
                                     oldFlags | OsConstants.O_NONBLOCK);
@@ -663,6 +742,7 @@ public class MainActivity extends Activity {
                                 long remaining = deadline - SystemClock.elapsedRealtime();
                                 int waitMs = (int) Math.min(250L, remaining);
                                 if (waitMs <= 0) break;
+                                stage = "poll";
                                 int polls = Os.poll(new StructPollfd[]{pollDescriptor}, waitMs);
                                 if (polls == 0) continue;
                                 int flags = pollDescriptor.revents;
@@ -670,6 +750,7 @@ public class MainActivity extends Activity {
                                 if ((flags & OsConstants.POLLIN) != 0) {
                                     int received;
                                     try {
+                                        stage = "read";
                                         received = Os.read(connection.getFileDescriptor(), buffer, 0,
                                                 Math.min(buffer.length, capture.length - bytesRead));
                                     } catch (ErrnoException ex) {
@@ -712,7 +793,20 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ex) {
             outcome = "listen_error";
+            if (ex instanceof ErrnoException) {
+                int code = ((ErrnoException) ex).errno;
+                if (code == OsConstants.EIO) {
+                    outcome = "read".equals(stage) ? "usb_read_io_error" : "usb_io_error";
+                } else if (code == OsConstants.ENODEV || code == OsConstants.EPIPE
+                        || code == OsConstants.ENXIO) {
+                    outcome = "accessory_disconnected_or_unavailable";
+                } else {
+                    outcome = "usb_os_error";
+                }
+                try { report.put("error_errno", code); } catch (Exception ignored) {}
+            }
             try {
+                report.put("error_stage", stage);
                 report.put("error_type", ex.getClass().getSimpleName());
                 report.put("error_message", String.valueOf(ex.getMessage()));
             } catch (Exception ignored) {}
@@ -726,6 +820,12 @@ public class MainActivity extends Activity {
                 }
             }
             listenDescriptor = null;
+            try {
+                JSONObject after = getUsbSessionSnapshot();
+                report.put("usb_state_after", after);
+                report.put("usb_state_changed_during_test",
+                        usbSessionChanged(report.optJSONObject("usb_state_before"), after));
+            } catch (Exception ignored) {}
         }
         try {
             StringBuilder hexCapture = new StringBuilder(bytesRead * 3);
@@ -747,6 +847,7 @@ public class MainActivity extends Activity {
             report.put("read_events", events);
             report.put("protocol_analysis", UsbProtocolAnalyzer.analyze(capture, bytesRead));
             report.put("outcome", outcome);
+            report.put("outcome_explanation", explanationForListenOutcome(outcome));
             report.put("duration_ms", SystemClock.elapsedRealtime() - started);
         } catch (Exception ex) {
             try { report.put("analysis_error", ex.getClass().getSimpleName()); } catch (Exception ignored) {}
@@ -778,6 +879,7 @@ public class MainActivity extends Activity {
                 + "\nMatching structured frames: " + (framing == null ? 0 : framing.optInt("candidate_frames", 0))
                 + "\nOutgoing bytes and vehicle commands: 0"
                 + "\nOutcome: " + result
+                + "\nExplanation: " + explanationForListenOutcome(result)
                 + "\nHeader matches are not confirmed Ford diagnostic data."
                 + "\nThe exported hex may contain personal information.");
             saveLocalReport();
@@ -823,7 +925,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.1");
+            report.put("app_version", "0.7.2");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1015,7 +1117,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.1");
+            combined.put("app_version", "0.7.2");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
