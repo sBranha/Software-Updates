@@ -18,10 +18,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK platform with runner's SDK manager
+      - name: Install Android SDK platform
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          if [ -n "$SDKMANAGER" ]; then "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"; else echo 'SDK manager not found; use preinstalled platform'; fi
+          ls -la "$ANDROID_HOME/platforms" || true
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
