@@ -17,7 +17,7 @@ public class ReportProvider extends ContentProvider {
             throw new FileNotFoundException("Unknown report authority");
         }
         String name = uri.getLastPathSegment();
-        if (name == null || !name.matches("PortProbe_[0-9]{8}_[0-9]{9}\\.json")) {
+        if (name == null || !name.matches("PortProbe_[0-9]{8}_[0-9]{6}_[0-9]{3}\\.json")) {
             throw new FileNotFoundException("Invalid report name");
         }
         File file = new File(new File(getContext().getFilesDir(), "reports"), name);
