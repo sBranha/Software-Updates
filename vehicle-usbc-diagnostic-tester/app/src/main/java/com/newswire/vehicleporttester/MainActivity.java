@@ -1,8 +1,10 @@
 package com.newswire.vehicleporttester;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.os.Handler;
 import android.os.Looper;
@@ -51,11 +53,12 @@ public class MainActivity extends Activity {
     private ProgressBar scanProgress;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private volatile boolean scanActive = false;
+    private volatile boolean connectionActive = false;
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
-            if (USB_STATE.equals(intent.getAction()) && !scanActive) {
+            if (USB_STATE.equals(intent.getAction()) && !scanActive && !connectionActive) {
                 scanStatus.setText("USB state changed. Tap DEEP USB-C DISCOVERY for a new full scan. The last report has been preserved.");
             }
         }
@@ -99,9 +102,9 @@ public class MainActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
 
-        TextView eyebrow = text("READ-ONLY DISCOVERY • NO VEHICLE CONTROL", 12, 0xff84d9cc, true);
+        TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.4.0", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.5.0", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -153,6 +156,18 @@ public class MainActivity extends Activity {
         accessLp.topMargin = dp(10);
         root.addView(access, accessLp);
         access.setOnClickListener(v -> requestUsbAccess());
+        Button test = button("5  TEST USB OPEN / CLOSE", 0xff876338);
+        LinearLayout.LayoutParams testLp = new LinearLayout.LayoutParams(-1,-2);
+        testLp.topMargin = dp(12);
+        root.addView(test,testLp);
+        test.setOnClickListener(v -> confirmConnectionTest());
+        TextView testWarning = text("PARKED ONLY. Android Auto may disconnect. No USB payloads or vehicle commands sent.",12,0xffffcc91,false);
+        root.addView(testWarning);
+        Button exportTest = button("EXPORT SAVED USB CONNECTION TEST",0xff29435a);
+        LinearLayout.LayoutParams testExportLp = new LinearLayout.LayoutParams(-1,-2);
+        testExportLp.topMargin=dp(8);
+        root.addView(exportTest,testExportLp);
+        exportTest.setOnClickListener(v -> exportSavedConnectionTest());
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
         cmp.topMargin = dp(14);
@@ -296,8 +311,134 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    /** Optional user-confirmed open/close only. No stream reads, writes, or protocol commands. */
+    private void confirmConnectionTest() {
+        if (scanActive || connectionActive) {
+            scanStatus.setText("Another USB test is in progress."); return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("USB accessory open/close test")
+            .setMessage("Only run while safely parked. Android Auto may disconnect. The app will attempt to open the accessory and immediately close it. No bytes or commands will be sent. Continue?")
+            .setNegativeButton("Cancel", (d,w)->{})
+            .setPositiveButton("Run test", (d,w)->runConnectionTest())
+            .show();
+    }
+    private void runConnectionTest() {
+        if (scanActive || connectionActive) { scanStatus.setText("Another USB test is in progress."); return; }
+        connectionActive = true;
+        summary.setText("USB connection test running");
+        scanStatus.setText("Opening and closing accessory; parked test only.");
+        new Thread(this::performConnectionTest, "VehiclePortConnectionTest").start();
+    }
+    private void performConnectionTest() {
+        JSONObject report = new JSONObject();
+        String outcome = "unknown";
+        long started = SystemClock.elapsedRealtime();
+        try {
+            report.put("report_format", "Vehicle USB Port Tester communication v1");
+            report.put("test_label", "usb_connection_open_close");
+            report.put("app_version", "0.5.0");
+            report.put("scanned_at_utc", timeUtc());
+            report.put("permission_required", true);
+            report.put("scan_is_read_only", true);
+            report.put("vehicle_data_confirmed", false);
+            report.put("obd_codes_scanned", false);
+            report.put("bytes_read", 0);
+            report.put("bytes_written", 0);
+            report.put("vehicle_commands_sent", 0);
+            report.put("connection_opened", false);
+            report.put("connection_closed", false);
+            report.put("android_auto_session_observed", false);
+            report.put("note", "Opening an accessory may interrupt Android Auto. An open file descriptor does not establish Ford SYNC diagnostic access.");
+            UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+            if (manager == null) {
+                outcome = "usb_manager_unavailable";
+            } else {
+                UsbAccessory[] accessories = manager.getAccessoryList();
+                report.put("accessory_count", accessories == null ? 0 : accessories.length);
+                if (accessories == null || accessories.length == 0) {
+                    outcome = "no_accessory_detected";
+                } else {
+                    UsbAccessory accessory = accessories[0];
+                    report.put("accessory_model", accessory.getModel());
+                    report.put("accessory_manufacturer", accessory.getManufacturer());
+                    boolean granted = manager.hasPermission(accessory);
+                    report.put("permission_granted", granted);
+                    if (!granted) {
+                        outcome = "permission_required";
+                    } else {
+                        ParcelFileDescriptor fd = null;
+                        try {
+                            fd = manager.openAccessory(accessory);
+                            if (fd == null) {
+                                outcome = "open_returned_null";
+                            } else {
+                                report.put("connection_opened", true);
+                                outcome = "opened_and_closed";
+                            }
+                        } catch (Exception ex) {
+                            outcome = "open_error";
+                            report.put("error_type", ex.getClass().getSimpleName());
+                            report.put("error_message", String.valueOf(ex.getMessage()));
+                        } finally {
+                            if (fd != null) {
+                                try {
+                                    fd.close();
+                                    report.put("connection_closed", true);
+                                } catch (Exception ex) {
+                                    outcome = "close_error";
+                                    report.put("close_error_type", ex.getClass().getSimpleName());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            outcome = "test_error";
+            try { report.put("error_type",ex.getClass().getSimpleName()); } catch (Exception ignored) {}
+        }
+        try {
+            report.put("outcome",outcome);
+            report.put("duration_ms", SystemClock.elapsedRealtime()-started);
+        } catch (Exception ignored) {}
+        String finalOutcome = outcome;
+        String json = report.toString();
+        getPreferences(MODE_PRIVATE).edit().putString("usb_connection",json).apply();
+        runOnUiThread(() -> {
+            connectionActive = false;
+            try { lastReport = new JSONObject(json).toString(2); }
+            catch (Exception ignored) { lastReport = json; }
+            latestFilename = "vehicle-usbc-connection-"+fileTimeUtc()+".json";
+            summary.setText("USB connection test: "+finalOutcome);
+            details.setText("Opened: "+report.optBoolean("connection_opened",false)
+                +"\\nClosed: "+report.optBoolean("connection_closed",false)
+                +"\\nBytes read: 0, bytes sent: 0"
+                +"\\nVehicle commands: 0"
+                +"\\nOutcome: "+finalOutcome
+                +"\\nThis does not identify Ford SYNC or access engine diagnostics.");
+            saveLocalReport();
+            scanStatus.setText("Connection test saved. Use EXPORT SAVED USB CONNECTION TEST.");
+        });
+    }
+    private void exportSavedConnectionTest() {
+        JSONObject saved = stored("usb_connection");
+        if (saved == null) {
+            scanStatus.setText("No saved connection test. Run TEST USB OPEN / CLOSE while parked.");
+            return;
+        }
+        try {
+            lastReport = saved.toString(2);
+            latestFilename = "vehicle-usbc-connection-"+fileTimeUtc()+".json";
+            summary.setText("Saved USB connection test");
+            exportJson();
+        } catch (Exception ex) {
+            scanStatus.setText("Could not export connection test: "+ex.getClass().getSimpleName());
+        }
+    }
     private void runScan(String trigger, boolean save) {
-        if (scanActive) {
+        if (scanActive || connectionActive) {
             scanStatus.setText("A scan is already running. Results will appear shortly.");
             return;
         }
@@ -318,7 +459,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.4.1");
+            report.put("app_version", "0.5.0");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -510,13 +651,15 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.4.1");
+            combined.put("app_version", "0.5.0");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
             combined.put("regular_usb_port", usba == null ? JSONObject.NULL : usba);
             JSONObject deep = stored("usb_c_deep");
             combined.put("deep_usb_c_port", deep == null ? JSONObject.NULL : deep);
+            JSONObject connection = stored("usb_connection");
+            combined.put("usb_connection_open_close", connection == null ? JSONObject.NULL : connection);
             combined.put("vehicle_diagnostic_access_confirmed", false);
             combined.put("explanation", "USB configured indicates a link, not an OBD-II connection. Apps cannot assume Android Auto exposes engine or fault-code data.");
             lastReport = combined.toString(2);
