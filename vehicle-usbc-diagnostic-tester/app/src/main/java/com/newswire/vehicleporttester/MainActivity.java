@@ -1,6 +1,7 @@
 package com.newswire.vehicleporttester;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.Handler;
@@ -8,6 +9,7 @@ import android.os.Looper;
 import android.os.Build;
 import android.os.BatteryManager;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
@@ -95,13 +97,13 @@ public class MainActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
 
-        TextView eyebrow = text("READ-ONLY • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
+        TextView eyebrow = text("READ-ONLY DISCOVERY • NO VEHICLE CONTROL", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.3.0", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.4.0", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
-        TextView intro = text("Compare three parked tests: unplugged, USB-C, and regular USB. We record only USB information Android exposes, not hidden engine diagnostics.", 15, 0xffb8c9d8, false);
+        TextView intro = text("Compare unplugged, USB-C and USB-A. Deep Scan also checks accessible USB descriptors, permissions and phone-side car-app services. It cannot assume access to Ford SYNC internals.", 15, 0xffb8c9d8, false);
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
         ip.topMargin = dp(12);
         ip.bottomMargin = dp(20);
@@ -134,6 +136,16 @@ public class MainActivity extends Activity {
         ap.topMargin = dp(10);
         root.addView(usbA, ap);
         usbA.setOnClickListener(v -> runScan("Test: usb_a", true));
+        Button deep = button("4  DEEP USB-C DISCOVERY", 0xffb64236);
+        LinearLayout.LayoutParams deepLp = new LinearLayout.LayoutParams(-1, -2);
+        deepLp.topMargin = dp(12);
+        root.addView(deep, deepLp);
+        deep.setOnClickListener(v -> runScan("Test: usb_c_deep", true));
+        Button access = button("REQUEST USB ACCESS PERMISSION", 0xff776225);
+        LinearLayout.LayoutParams accessLp = new LinearLayout.LayoutParams(-1, -2);
+        accessLp.topMargin = dp(10);
+        root.addView(access, accessLp);
+        access.setOnClickListener(v -> requestUsbAccess());
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
         cmp.topMargin = dp(14);
@@ -160,7 +172,7 @@ public class MainActivity extends Activity {
         root.addView(share, sh);
         share.setOnClickListener(v -> shareReport());
 
-        footer = text("No account, subscription, network permission, or OBD-II hardware needed for this connection test. Reports stay on the phone until you choose to export or share.", 12, 0xff9fb7c8, false);
+        footer = text("Discovery requires no network account. USB permission is optional. Reports stay on the phone until you export or share; no undocumented vehicle commands are sent.", 12, 0xff9fb7c8, false);
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, -2);
         fp.topMargin = dp(18);
         root.addView(footer, fp);
@@ -234,6 +246,49 @@ public class MainActivity extends Activity {
         }, holdMs);
     }
 
+    /**
+     * Android mediates permission. We ask the OS for access only when the user
+     * requests it; no vendor-specific command or bytes are sent to the vehicle.
+     */
+    private void requestUsbAccess() {
+        try {
+            UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+            if (manager == null) {
+                scanStatus.setText("USB manager unavailable");
+                return;
+            }
+            UsbAccessory[] accessories = manager.getAccessoryList();
+            boolean hasAccessory = accessories != null && accessories.length > 0;
+            UsbDevice firstDevice = null;
+            if (!hasAccessory && !manager.getDeviceList().isEmpty())
+                firstDevice = manager.getDeviceList().values().iterator().next();
+            if (!hasAccessory && firstDevice == null) {
+                scanStatus.setText("No USB accessory or host device currently visible for permission request");
+                return;
+            }
+            Intent permission = new Intent(UsbPermissionReceiver.ACTION);
+            permission.setComponent(new ComponentName(this, UsbPermissionReceiver.class));
+            PendingIntent response = PendingIntent.getBroadcast(this, 431,
+                    permission, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+            if (hasAccessory) {
+                if (manager.hasPermission(accessories[0])) {
+                    scanStatus.setText("Android USB accessory permission already granted. Run Deep Scan.");
+                    return;
+                }
+                manager.requestPermission(accessories[0], response);
+            } else {
+                if (manager.hasPermission(firstDevice)) {
+                    scanStatus.setText("Android USB device permission already granted. Run Deep Scan.");
+                    return;
+                }
+                manager.requestPermission(firstDevice, response);
+            }
+            scanStatus.setText("Android permission request submitted. Approve or deny the system prompt, then run Deep Scan.");
+        } catch (Exception ex) {
+            scanStatus.setText("USB permission request failed: " + ex.getClass().getSimpleName());
+        }
+    }
+
     private void runScan(String trigger, boolean save) {
         if (scanActive) {
             scanStatus.setText("A scan is already running. Results will appear shortly.");
@@ -256,7 +311,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.3.0");
+            report.put("app_version", "0.4.0");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -340,6 +395,21 @@ public class MainActivity extends Activity {
             report.put("usb_accessory_count", accessibleAccessories.length());
             report.put("usb_accessories", accessibleAccessories);
             scanStage(90, "USB accessories inspected");
+            JSONObject deepReport = null;
+            if ("Test: usb_c_deep".equals(trigger)) {
+                scanStage(92, "Inspecting USB descriptors and interfaces");
+                deepReport = DeepDiagnostics.capture(this, manager);
+                android.content.SharedPreferences permissionLog =
+                    getSharedPreferences("usb_permission_results", MODE_PRIVATE);
+                JSONObject requestedAccess = new JSONObject();
+                requestedAccess.put("previous_request_received", permissionLog.contains("last_granted"));
+                requestedAccess.put("last_request_granted", permissionLog.contains("last_granted")
+                    ? permissionLog.getBoolean("last_granted", false) : JSONObject.NULL);
+                requestedAccess.put("last_checked_at_ms", permissionLog.getLong("last_checked_at_ms", 0L));
+                deepReport.put("latest_permission_request", requestedAccess);
+                report.put("deep_diagnostics", deepReport);
+                scanStage(97, "Discovering phone-side car and media apps");
+            }
             report.put("communication_path", usbState.optBoolean("connected", false)
                 ? "Android reports USB attached; vehicle diagnostic APIs not established"
                 : "Android does not currently report an attached USB data connection");
@@ -363,7 +433,14 @@ public class MainActivity extends Activity {
                 + (found.length() > 0
                     ? "Android lists USB device interfaces. Details are saved in the report; they are not automatically vehicle diagnostics."
                     : "No USB-host devices listed. This is common when the vehicle acts as USB host. It does not mean the cable is broken.")
-                + "\n\nCapture all three labeled tests, then VIEW AND EXPORT COMPARISON.";
+                + "\\n\\nCapture all three labeled tests, then VIEW AND EXPORT COMPARISON."
+                + (deepReport == null ? "" : "\\n\\nDEEP USB DISCOVERY:"
+                    + "\\nHost devices: " + deepReport.optJSONArray("host_devices").length()
+                    + "\\nAccessory descriptors: " + deepReport.optJSONArray("accessories").length()
+                    + "\\nPhone apps with car/media services (visible subset): "
+                    + deepReport.optJSONArray("phone_apps_with_car_or_media_services").length()
+                    + "\\nFord SYNC internal apps: NOT ACCESSIBLE via standard Android USB"
+                    + "\\nNo vehicle control commands sent. Full details in JSON report.");
             if (trigger.startsWith("Test: ")) {
                 getPreferences(MODE_PRIVATE).edit()
                     .putString(trigger.substring(6), report.toString()).apply();
@@ -373,7 +450,7 @@ public class MainActivity extends Activity {
                 summary.setText("Scan captured: " + capturedLabel);
                 details.setText(visible);
                 if (save) saveLocalReport();
-                finishScan(startedMs, "Scan complete • " + timeUtc() + " • all 5 checks finished");
+                finishScan(startedMs, "Scan complete • " + timeUtc() + " • verified checks finished");
             });
         } catch (Exception ex) {
             runOnUiThread(() -> {
@@ -409,11 +486,13 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.3.0");
+            combined.put("app_version", "0.4.0");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
             combined.put("regular_usb_port", usba == null ? JSONObject.NULL : usba);
+            JSONObject deep = stored("usb_c_deep");
+            combined.put("deep_usb_c_port", deep == null ? JSONObject.NULL : deep);
             combined.put("vehicle_diagnostic_access_confirmed", false);
             combined.put("explanation", "USB configured indicates a link, not an OBD-II connection. Apps cannot assume Android Auto exposes engine or fault-code data.");
             lastReport = combined.toString(2);
@@ -423,6 +502,7 @@ public class MainActivity extends Activity {
             details.setText(describe("1 UNPLUGGED", unplug) + "\n\n" +
                 describe("2 USB-C", usbc) + "\n\n" +
                 describe("3 REGULAR USB", usba) +
+                (deep == null ? "" : "\\n\\n4 DEEP USB-C: last captured " + deep.optString("scanned_at_utc", "unknown")) +
                 "\n\nEngine trouble codes: NOT SCANNED\n" +
                 "Android Auto data link does not imply engine diagnostic access. " +
                 "Tap EXPORT JSON REPORT to save all available results in one file.");
