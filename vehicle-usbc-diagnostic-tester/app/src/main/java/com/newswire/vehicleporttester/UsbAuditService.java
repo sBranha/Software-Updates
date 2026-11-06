@@ -257,17 +257,20 @@ public final class UsbAuditService extends Service {
         int bytesRead = 0;
         JSONArray chunks = new JSONArray();
         String outcome = "no_accessory";
+        String stage = "preflight";
         try {
             UsbManager usb = (UsbManager) getSystemService(Context.USB_SERVICE);
             UsbAccessory[] aa = usb == null ? null : usb.getAccessoryList();
             if (aa != null && aa.length > 0) {
                 if (!usb.hasPermission(aa[0])) outcome = "permission_required";
                 else {
+                    stage = "open_accessory";
                     fd = usb.openAccessory(aa[0]);
                     out.put("connection_opened", fd != null);
                     if (fd == null) outcome = "open_returned_null";
                     else {
                         // We explicitly verify O_NONBLOCK before any read.
+                        stage = "configure_nonblocking";
                         int flags = Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_GETFL, 0);
                         Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_SETFL, flags | OsConstants.O_NONBLOCK);
                         int verified = Os.fcntlInt(fd.getFileDescriptor(), OsConstants.F_GETFL, 0);
@@ -282,6 +285,7 @@ public final class UsbAuditService extends Service {
                             long until = SystemClock.elapsedRealtime() + ATTEMPT_MS;
                             while (!cancelled && SystemClock.elapsedRealtime() < until && bytesRead < CAPTURE_LIMIT) {
                                 int wait = (int) Math.min(250, Math.max(1, until - SystemClock.elapsedRealtime()));
+                                stage = "poll";
                                 int n = Os.poll(new StructPollfd[] {p}, wait);
                                 if (n == 0) continue;
                                 int flagsSeen = p.revents;
@@ -289,6 +293,7 @@ public final class UsbAuditService extends Service {
                                 if ((flagsSeen & OsConstants.POLLIN) != 0) {
                                     int r;
                                     try {
+                                        stage = "read";
                                         r = Os.read(fd.getFileDescriptor(), buffer, 0,
                                                 Math.min(buffer.length, CAPTURE_LIMIT - bytesRead));
                                     } catch (ErrnoException ex) {
@@ -323,7 +328,7 @@ public final class UsbAuditService extends Service {
                 }
             }
         } catch (Exception ex) {
-            describeError(out, ex, "open_poll_or_read");
+            describeError(out, ex, stage);
             outcome = out.optString("outcome", "usb_error");
         } finally {
             if (fd != null) {
@@ -332,6 +337,7 @@ public final class UsbAuditService extends Service {
             }
         }
         out.put("outcome", outcome);
+        out.put("last_operation", stage);
         out.put("bytes_read", bytesRead);
         out.put("read_events", chunks);
         out.put("duration_ms", SystemClock.elapsedRealtime() - start);
