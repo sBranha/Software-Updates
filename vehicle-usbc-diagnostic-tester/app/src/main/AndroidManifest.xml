@@ -6,7 +6,7 @@
         <intent><action android:name="android.media.browse.MediaBrowserService"/></intent>
         <intent><action android:name="androidx.media3.session.MediaLibraryService"/></intent>
     </queries>
-    <application android:icon="@drawable/vehicle_explorer_icon" android:roundIcon="@drawable/vehicle_explorer_icon" android:label="Vehicle Port Tester" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Vehicle Port Tester" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <receiver android:name=".UsbPermissionReceiver" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
