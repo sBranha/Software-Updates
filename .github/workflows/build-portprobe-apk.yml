@@ -1,0 +1,40 @@
+name: Build PortProbe APK
+on:
+  push:
+    branches:
+      - vehicle-portprobe-v0-1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-apk:
+    name: Build signed test APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compile debug-signed APK
+        run: gradle -p vehicle-portprobe :app:assembleDebug --no-daemon --stacktrace
+      - name: Verify APK exists and checksum
+        run: |
+          ls -lh vehicle-portprobe/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum vehicle-portprobe/app/build/outputs/apk/debug/app-debug.apk
+      - name: Package APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PortProbe-v0.1-Android-APK
+          path: vehicle-portprobe/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
