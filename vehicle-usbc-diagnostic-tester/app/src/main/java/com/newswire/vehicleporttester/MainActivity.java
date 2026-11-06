@@ -134,10 +134,13 @@ public class MainActivity extends Activity {
         } catch (Exception ex) {
             footer.setText("USB change notifications unavailable: tap Scan Connection after plugging in.");
         }
+        resumeDeepAuditIfNeeded();
     }
 
     @Override public void onStop() {
-        if (auditRunning) stopDeepAudit("app_backgrounded");
+        // Do not cancel a two-minute audit merely because Android temporarily
+        // backgrounds this activity, locks the screen, or shows a system dialog.
+        // The audit continues in a foreground service in a separate process.
         if (auditReceiverRegistered) {
             try { unregisterReceiver(auditUpdates); } catch (Exception ignored) {}
             auditReceiverRegistered = false;
@@ -161,7 +164,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.3", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.4", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -249,7 +252,7 @@ public class MainActivity extends Activity {
         auditLp.topMargin = dp(18);
         root.addView(deepAudit, auditLp);
         deepAudit.setOnClickListener(v -> confirmDeepAudit());
-        TextView auditWarning = text("PARKED ONLY. Runs a series of read-only tests in an isolated process: connection stability, 3 open/close cycles, and 5 data attempts. Can interrupt Android Auto. Raw exported bytes may contain private data.", 12, 0xffffcc91, false);
+        TextView auditWarning = text("PARKED ONLY. Screen stays awake and the USB audit continues if Android temporarily backgrounds the app. STOP remains available; a safety timeout still applies. Can interrupt Android Auto. Raw bytes may be private.", 12, 0xffffcc91, false);
         root.addView(auditWarning);
         stopAuditButton = button("STOP DEEP AUDIT", 0xffb64236);
         root.addView(stopAuditButton);
@@ -429,7 +432,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.3");
+            report.put("app_version", "0.7.4");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -561,16 +564,62 @@ public class MainActivity extends Activity {
         details.setText("Waiting for isolated diagnostic worker. Stay parked.");
         scanStatus.setText("Preparing deep USB audit...");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(true);
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("audit_in_progress", true)
+            .putLong("audit_started_wall_ms", System.currentTimeMillis()).apply();
         auditWatchdog = () -> {
             if (auditRunning) stopDeepAudit("hard_timeout_160_seconds");
         };
         uiHandler.postDelayed(auditWatchdog, 160000);
         try {
             Intent i = new Intent(this, UsbAuditService.class);
-            if (startService(i) == null) throw new IllegalStateException("Android did not start audit service");
+            if (Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(i);
+            } else if (startService(i) == null) {
+                throw new IllegalStateException("Android did not start audit service");
+            }
         } catch (Exception ex) {
             stopDeepAudit("unable_to_start_worker");
             scanStatus.setText("Could not start deep audit: " + ex.getClass().getSimpleName());
+        }
+    }
+
+    private void resumeDeepAuditIfNeeded() {
+        boolean persisted = getPreferences(MODE_PRIVATE).getBoolean("audit_in_progress", false);
+        if (!auditRunning && !persisted) return;
+        if (!auditRunning) {
+            long startedWall = getPreferences(MODE_PRIVATE)
+                    .getLong("audit_started_wall_ms", System.currentTimeMillis());
+            long age = Math.max(0L, System.currentTimeMillis() - startedWall);
+            auditRunning = true;
+            auditStartedAt = SystemClock.elapsedRealtime() - age;
+            stopAuditButton.setVisibility(View.VISIBLE);
+            scanProgress.setVisibility(View.VISIBLE);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().getDecorView().setKeepScreenOn(true);
+            if (auditWatchdog != null) uiHandler.removeCallbacks(auditWatchdog);
+            long remaining = 160000L - age;
+            auditWatchdog = () -> {
+                if (auditRunning) stopDeepAudit("hard_timeout_160_seconds");
+            };
+            if (remaining > 0) uiHandler.postDelayed(auditWatchdog, remaining);
+            else {
+                stopDeepAudit("timeout_before_return_to_app");
+                return;
+            }
+        }
+        JSONObject saved = loadDeepAuditJson();
+        if (saved != null && !"in_progress".equals(saved.optString("status", "in_progress"))) {
+            finishDeepAudit(null);
+        } else {
+            scanStatus.setText("Deep USB audit continues. Keep this screen visible; STOP remains available.");
+            if (saved != null) {
+                summary.setText("Deep audit running: " + saved.optString("current_test", "connection monitoring"));
+                details.setText("Last USB operation: " + saved.optString("current_operation", "not yet started")
+                    + "\nRead attempt: " + saved.optInt("current_attempt", 0)
+                    + "\nBytes observed: " + saved.optInt("total_bytes_read", 0));
+            }
         }
     }
 
@@ -613,6 +662,8 @@ public class MainActivity extends Activity {
         if (!auditRunning) return;
         auditRunning = false;
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(false);
+        getPreferences(MODE_PRIVATE).edit().putBoolean("audit_in_progress", false).apply();
         if (auditWatchdog != null) uiHandler.removeCallbacks(auditWatchdog);
         stopAuditButton.setVisibility(View.GONE);
         scanProgress.setIndeterminate(false);
@@ -622,7 +673,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.7.3");
+                report.put("app_version", "0.7.4");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -734,7 +785,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.3");
+            timeout.put("app_version", "0.7.4");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -864,7 +915,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.3");
+            report.put("app_version", "0.7.4");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1111,7 +1162,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.3");
+            report.put("app_version", "0.7.4");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1303,7 +1354,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.3");
+            combined.put("app_version", "0.7.4");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
