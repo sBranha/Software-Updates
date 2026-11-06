@@ -1,20 +1,20 @@
-# Vehicle Port Tester v0.4.0
+# Vehicle Port Tester v0.5.0
 
-Android USB-C capability investigator for a parked 2021 Ford Explorer, developed on the working v0.3 application. This does **not** claim general access to Ford SYNC, Android Auto traffic, or vehicle electronic control units.
+Read-only USB discovery and an optional, user-confirmed accessory open/close test for a parked vehicle. Preserves the separate saved deep discovery report from v0.4.1.
 
-## What v0.4 adds
-- A fourth **Deep USB-C Discovery** capture, while preserving unplugged, USB-C and USB-A comparisons.
-- Android USB device, interface and endpoint descriptors, plus limited raw descriptor reads for host-side devices **only when Android has granted permission**.
-- Automotive accessory metadata, permissions, and Android's confirmation or denial of user-initiated USB access requests.
-- Phone-side apps advertising Android for Cars or Android Auto media service declarations, labeled as visible candidates. This is not the SYNC-installed app inventory or proof an app is running on the car display.
-- Combined export includes the deep report; progress and local report storage remain.
-- The same red Explorer icon and application ID as v0.3: `com.newswire.vehicleporttester.v2`, versionCode 4.
+## What is new
 
-## Safety and technical limits
-No arbitrary USB payloads, undocumented Ford commands, vehicle writes, OBD-II queries, or connection takeovers. Standard Android public APIs cannot enumerate software installed on the Ford head unit. Android Auto's accessory descriptor is not a general diagnostic endpoint. If Android permission is available, the app requests it using the system permission prompt; the deep scan does not open an in-use accessory channel.
+- **5 TEST USB OPEN / CLOSE** asks for explicit confirmation before attempting to open the Android USB accessory and immediately close its file descriptor.
+- Checks for accessory enumeration and permission first; records open, close, outcome and exception type.
+- Does not read or write USB stream data, send vehicle commands, or query vehicle control or OBD-II interfaces.
+- Stores the connection test independently from scan status broadcasts and normal deep scan records; **EXPORT SAVED USB CONNECTION TEST** exports its JSON.
+- Adds modern adaptive Android launcher icon resources using the Explorer image, with versionCode 6 and versionName 0.5.0.
+- Maintains the same package ID `com.newswire.vehicleporttester.v2`.
 
-## Installation/signing requirement
-Android allows an update in place only when **the package ID and signing certificate match**. This project retains the package ID. GitHub Actions produces a build using the runner's debug key, which is not a stable signing identity. Do **not** install that build expecting it to update a v0.3 APK: it must be re-signed using the **same private key that signed the installed v0.3 APK**. If that key is unavailable, an in-place update preserving app-private data is not possible. Never commit a private keystore to the public repository.
+## Safety
 
-## Usage
-Park the Explorer, ignition in accessory/on, connect the USB-C data cable, tap **REQUEST USB ACCESS PERMISSION** if needed, respond to Android's prompt, then **DEEP USB-C DISCOVERY**. You can compare unplugged, USB-C and USB-A scans and export a JSON report locally for follow-up analysis.
+**Run only while parked.** Opening an accessory can interrupt Android Auto. A successful open only confirms that the Android USB accessory file descriptor was opened; it does not establish Ford SYNC firmware access, in-car application inventory, diagnostic access or vehicle-computer communications. No automatic takeovers or background open tests are performed.
+
+## Installation/signing
+
+The GitHub Actions output is a debug-signed development APK for compilation testing, **not** a guaranteed in-place update. An actual update over the installed v0.4.1 APK must have the **same Android app signing private key and package ID**, and a higher versionCode. Do not uninstall v0.4.1 merely to install the CI artifact. Sign the v0.5.0 APK with the protected persistent v0.4.1 key before providing the upgrade to the user; do not upload that key to the repository.
