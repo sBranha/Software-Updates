@@ -673,7 +673,7 @@ public class MainActivity extends Activity {
                                         received = Os.read(connection.getFileDescriptor(), buffer, 0,
                                                 Math.min(buffer.length, capture.length - bytesRead));
                                     } catch (ErrnoException ex) {
-                                        if (ex.errno == OsConstants.EAGAIN || ex.errno == OsConstants.EWOULDBLOCK)
+                                        if (ex.errno == OsConstants.EAGAIN)
                                             continue;
                                         throw ex;
                                     }
