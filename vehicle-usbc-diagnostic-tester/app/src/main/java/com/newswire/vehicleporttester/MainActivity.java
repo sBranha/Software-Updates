@@ -97,6 +97,34 @@ public class MainActivity extends Activity {
             }
         }
     };
+    private volatile boolean screenCaptureRunning;
+    private volatile int screenWorkerPid;
+    private String screenCaptureMode = "";
+    private long screenStartedAt;
+    private Runnable screenWatchdog;
+    private Button stopScreenCapture;
+    private boolean screenReceiverRegistered;
+    private final BroadcastReceiver screenUpdates = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (!UsbScreenCompareService.ACTION_UPDATE.equals(intent.getAction())
+                    || !screenCaptureRunning) return;
+            if (!screenCaptureMode.equals(intent.getStringExtra("mode"))) return;
+            int pid = intent.getIntExtra("worker_pid", 0);
+            if (pid > 0 && pid != android.os.Process.myPid()) screenWorkerPid = pid;
+            scanProgress.setIndeterminate(false);
+            scanProgress.setProgress(intent.getIntExtra("percent", 0));
+            String status = intent.getStringExtra("message");
+            scanStatus.setText(status == null ? "Comparing USB traffic..." : status);
+            if (intent.getBooleanExtra("done", false)) {
+                finishScreenCapture(null);
+            } else {
+                summary.setText("Capturing " + screenLabel(screenCaptureMode));
+                details.setText("Live received: " + intent.getIntExtra("bytes", 0)
+                    + " bytes\nWorker process: " + screenWorkerPid
+                    + "\nNo vehicle commands are sent.");
+            }
+        }
+    };
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
@@ -135,12 +163,27 @@ public class MainActivity extends Activity {
             footer.setText("USB change notifications unavailable: tap Scan Connection after plugging in.");
         }
         resumeDeepAuditIfNeeded();
+        try {
+            IntentFilter screenFilter = new IntentFilter(UsbScreenCompareService.ACTION_UPDATE);
+            if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(screenUpdates, screenFilter, Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(screenUpdates, screenFilter);
+            screenReceiverRegistered = true;
+        } catch (Exception ex) {
+            scanStatus.setText("Screen comparison updates unavailable: "
+                + ex.getClass().getSimpleName());
+        }
+        resumeScreenCaptureIfNeeded();
     }
 
     @Override public void onStop() {
         // Do not cancel a two-minute audit merely because Android temporarily
         // backgrounds this activity, locks the screen, or shows a system dialog.
         // The audit continues in a foreground service in a separate process.
+        if (screenReceiverRegistered) {
+            try { unregisterReceiver(screenUpdates); } catch (Exception ignored) {}
+            screenReceiverRegistered = false;
+        }
         if (auditReceiverRegistered) {
             try { unregisterReceiver(auditUpdates); } catch (Exception ignored) {}
             auditReceiverRegistered = false;
@@ -164,7 +207,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.4", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.5", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -261,6 +304,27 @@ public class MainActivity extends Activity {
         Button auditExport = button("EXPORT SAVED DEEP AUDIT REPORT", 0xff29435a);
         root.addView(auditExport);
         auditExport.setOnClickListener(v -> exportDeepAudit());
+
+
+        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.5)", 16, Color.WHITE, true);
+        LinearLayout.LayoutParams compareHeading = new LinearLayout.LayoutParams(-1, -2);
+        compareHeading.topMargin = dp(20);
+        root.addView(compareHead, compareHeading);
+        TextView compareHelp = text("While PARKED, first show the regular Ford SYNC home screen and capture it. Next switch the vehicle display to Android Auto and capture again. We compare only the Android accessory traffic; the app cannot independently confirm what's on the Ford screen. Capturing can interrupt Android Auto.", 12, 0xffffcc91, false);
+        root.addView(compareHelp);
+        Button syncCapture = button("8  CAPTURE FORD SYNC HOME SCREEN (20 SEC)", 0xff247ec6);
+        root.addView(syncCapture);
+        syncCapture.setOnClickListener(v -> confirmScreenCapture(UsbScreenCompareService.MODE_SYNC));
+        Button autoCapture = button("9  CAPTURE ANDROID AUTO SCREEN (20 SEC)", 0xff247ec6);
+        root.addView(autoCapture);
+        autoCapture.setOnClickListener(v -> confirmScreenCapture(UsbScreenCompareService.MODE_AUTO));
+        stopScreenCapture = button("STOP SCREEN TRAFFIC CAPTURE", 0xffb64236);
+        root.addView(stopScreenCapture);
+        stopScreenCapture.setVisibility(View.GONE);
+        stopScreenCapture.setOnClickListener(v -> stopScreenCapture("stopped_by_user"));
+        Button exportCompare = button("10  COMPARE AND EXPORT BOTH SCREEN TESTS", 0xff23736b);
+        root.addView(exportCompare);
+        exportCompare.setOnClickListener(v -> showScreenTrafficComparison());
 
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
@@ -432,7 +496,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.4");
+            report.put("app_version", "0.7.5");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -539,7 +603,7 @@ public class MainActivity extends Activity {
      */
 
     private void confirmDeepAudit() {
-        if (auditRunning || scanActive || connectionActive) {
+        if (auditRunning || scanActive || connectionActive || screenCaptureRunning) {
             scanStatus.setText("Wait for the running test to complete before starting a deep audit.");
             return;
         }
@@ -552,7 +616,7 @@ public class MainActivity extends Activity {
     }
 
     private void startDeepAudit() {
-        if (auditRunning || scanActive || connectionActive) return;
+        if (auditRunning || scanActive || connectionActive || screenCaptureRunning) return;
         auditRunning = true;
         auditWorkerPid = 0;
         auditStartedAt = SystemClock.elapsedRealtime();
@@ -673,7 +737,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.7.4");
+                report.put("app_version", "0.7.5");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -785,7 +849,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.4");
+            timeout.put("app_version", "0.7.5");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -915,7 +979,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.4");
+            report.put("app_version", "0.7.5");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1141,8 +1205,8 @@ public class MainActivity extends Activity {
     }
 
     private void runScan(String trigger, boolean save) {
-        if (scanActive || connectionActive) {
-            scanStatus.setText("A scan is already running. Results will appear shortly.");
+        if (scanActive || connectionActive || screenCaptureRunning) {
+            scanStatus.setText("Another USB test is running. Please finish or stop that test first.");
             return;
         }
         scanActive = true;
@@ -1162,7 +1226,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.4");
+            report.put("app_version", "0.7.5");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1354,7 +1418,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.4");
+            combined.put("app_version", "0.7.5");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
@@ -1396,6 +1460,242 @@ public class MainActivity extends Activity {
         } catch (Exception ex) {
             footer.setText("Could not save locally: " + ex.getMessage() + ". You can still share or export the report.");
         }
+    }
+
+
+    private static String screenLabel(String mode) {
+        return UsbScreenCompareService.MODE_AUTO.equals(mode)
+                ? "Android Auto screen" : "Ford SYNC home screen";
+    }
+
+    private JSONObject readScreenCapture(String mode) {
+        try {
+            File f = new File(getFilesDir(), UsbScreenCompareService.filename(mode));
+            if (!f.exists()) return null;
+            return new JSONObject(new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                    StandardCharsets.UTF_8));
+        } catch (Exception ignored) { return null; }
+    }
+
+    private void persistScreenCapture(JSONObject report, String mode) {
+        try {
+            File f = new File(getFilesDir(), UsbScreenCompareService.filename(mode));
+            java.nio.file.Files.write(f.toPath(), report.toString(2).getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignored) {}
+    }
+
+    private void confirmScreenCapture(String mode) {
+        if (auditRunning || screenCaptureRunning || scanActive || connectionActive) {
+            scanStatus.setText("Stop the current test before starting a screen comparison.");
+            return;
+        }
+        String title = screenLabel(mode);
+        new AlertDialog.Builder(this)
+            .setTitle("Capture " + title + " • PARKED ONLY")
+            .setMessage("First show " + title + " on the Explorer. This runs a 20-second read-only USB capture with a wake lock and STOP button. It can interrupt Android Auto. Incoming bytes could be private. It cannot independently verify the Ford screen or read vehicle ECU data. Ready?")
+            .setNegativeButton("Cancel", (d,w) -> {})
+            .setPositiveButton("Start capture", (d,w) -> startScreenCapture(mode))
+            .show();
+    }
+
+    private void startScreenCapture(String mode) {
+        if (auditRunning || screenCaptureRunning || scanActive || connectionActive) return;
+        screenCaptureRunning = true;
+        screenCaptureMode = mode;
+        screenWorkerPid = 0;
+        screenStartedAt = SystemClock.elapsedRealtime();
+        try { new File(getFilesDir(), UsbScreenCompareService.filename(mode)).delete(); }
+        catch (Exception ignored) {}
+        scanProgress.setVisibility(View.VISIBLE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(0);
+        stopScreenCapture.setVisibility(View.VISIBLE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(true);
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("screen_capture_running", true)
+            .putString("screen_capture_mode", mode)
+            .putLong("screen_capture_wall_start", System.currentTimeMillis()).apply();
+        summary.setText("Capturing " + screenLabel(mode));
+        details.setText("20-second sampling, read-only. Please keep the vehicle parked.");
+        scanStatus.setText("Starting isolated USB capture...");
+        screenWatchdog = () -> {
+            if (screenCaptureRunning) stopScreenCapture("hard_timeout_70_seconds");
+        };
+        uiHandler.postDelayed(screenWatchdog, 70000);
+        try {
+            Intent i = new Intent(this, UsbScreenCompareService.class);
+            i.putExtra(UsbScreenCompareService.EXTRA_MODE, mode);
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+            else if (startService(i) == null) throw new IllegalStateException("Service was not started");
+        } catch (Exception ex) {
+            stopScreenCapture("unable_to_start_service");
+            scanStatus.setText("USB capture startup error: " + ex.getClass().getSimpleName());
+        }
+    }
+
+    private void resumeScreenCaptureIfNeeded() {
+        boolean active = getPreferences(MODE_PRIVATE).getBoolean("screen_capture_running", false);
+        if (!active && !screenCaptureRunning) return;
+        if (!screenCaptureRunning) {
+            screenCaptureMode = getPreferences(MODE_PRIVATE)
+                    .getString("screen_capture_mode", UsbScreenCompareService.MODE_SYNC);
+            long wallStart = getPreferences(MODE_PRIVATE)
+                    .getLong("screen_capture_wall_start", System.currentTimeMillis());
+            long elapsed = Math.max(0, System.currentTimeMillis() - wallStart);
+            screenStartedAt = SystemClock.elapsedRealtime() - elapsed;
+            screenCaptureRunning = true;
+            stopScreenCapture.setVisibility(View.VISIBLE);
+            scanProgress.setVisibility(View.VISIBLE);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().getDecorView().setKeepScreenOn(true);
+            if (screenWatchdog != null) uiHandler.removeCallbacks(screenWatchdog);
+            screenWatchdog = () -> {
+                if (screenCaptureRunning) stopScreenCapture("hard_timeout_70_seconds");
+            };
+            if (elapsed >= 70000) { stopScreenCapture("hard_timeout_70_seconds"); return; }
+            uiHandler.postDelayed(screenWatchdog, 70000-elapsed);
+        }
+        JSONObject saved = readScreenCapture(screenCaptureMode);
+        if (saved != null && !"in_progress".equals(saved.optString("status","in_progress"))) {
+            finishScreenCapture(null);
+        } else {
+            scanStatus.setText("USB comparison capture continuing; screen stays awake. STOP is available.");
+            if (saved != null) {
+                summary.setText("Capturing " + screenLabel(screenCaptureMode));
+                details.setText("Last operation: " + saved.optString("current_operation", "starting")
+                    + "\nBytes: " + saved.optInt("bytes_received",0));
+            }
+        }
+    }
+
+    private void stopScreenCapture(String reason) {
+        if (!screenCaptureRunning) return;
+        int pid = screenWorkerPid;
+        if (pid > 0 && pid != android.os.Process.myPid()) {
+            try { android.os.Process.killProcess(pid); } catch (Exception ignored) {}
+        } else {
+            try { startService(new Intent(this,UsbScreenCompareService.class)
+                    .setAction(UsbScreenCompareService.ACTION_STOP)); }
+            catch (Exception ignored) {}
+        }
+        try { stopService(new Intent(this,UsbScreenCompareService.class)); }
+        catch (Exception ignored) {}
+        finishScreenCapture(reason);
+    }
+
+    private void finishScreenCapture(String stopReason) {
+        if (!screenCaptureRunning) return;
+        screenCaptureRunning=false;
+        if (screenWatchdog != null) uiHandler.removeCallbacks(screenWatchdog);
+        getPreferences(MODE_PRIVATE).edit().putBoolean("screen_capture_running",false).apply();
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(false);
+        stopScreenCapture.setVisibility(View.GONE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(100);
+        JSONObject saved = readScreenCapture(screenCaptureMode);
+        if (saved == null) saved = new JSONObject();
+        try {
+            saved.put("app_version","0.7.5");
+            saved.put("user_selected_screen",screenCaptureMode);
+            if (stopReason != null) {
+                saved.put("status",stopReason);
+                saved.put("interrupted_by_main_app",true);
+                saved.put("last_operation_before_abort",
+                        saved.optString("current_operation","unknown"));
+            }
+            saved.put("main_app_elapsed_ms",SystemClock.elapsedRealtime()-screenStartedAt);
+        } catch (Exception ignored) {}
+        persistScreenCapture(saved,screenCaptureMode);
+        try { lastReport=saved.toString(2); }
+        catch (Exception ignored) { lastReport=saved.toString(); }
+        latestFilename = "vehicle-screen-" + screenCaptureMode + "-" + fileTimeUtc() + ".json";
+        summary.setText(screenLabel(screenCaptureMode) + ": "
+                + saved.optString("status","incomplete"));
+        details.setText("Received: " + saved.optInt("bytes_received",0)
+            + " bytes\nLast USB operation: " + saved.optString("current_operation","unknown")
+            + "\nOutcome: " + saved.optString("outcome","unknown")
+            + "\nRun BOTH screen tests and press 10 to compare.");
+        scanStatus.setText("Saved " + screenLabel(screenCaptureMode)
+            + " capture. EXPORT JSON REPORT exports this individual test.");
+    }
+
+    private static JSONObject metricsForScreen(JSONObject capture) {
+        JSONObject m=new JSONObject();
+        if (capture == null) return m;
+        try {
+            JSONObject analysis = capture.optJSONObject("protocol_analysis");
+            JSONObject framing = analysis == null ? null : analysis.optJSONObject("framing_analysis");
+            int bytes = capture.optInt("bytes_received",0);
+            long millis = capture.optLong("actual_capture_ms",0L);
+            m.put("label",capture.optString("user_selected_screen"));
+            m.put("test_status",capture.optString("status"));
+            m.put("capture_outcome",capture.optString("outcome"));
+            m.put("captured_utc",capture.optString("started_utc"));
+            m.put("total_received_bytes",bytes);
+            m.put("saved_payload_bytes",capture.optInt("stored_bytes",0));
+            m.put("capture_ms",millis);
+            m.put("received_bytes_per_second",millis > 0
+                ? Math.round(bytes*1000.0/millis*100.0)/100.0 : JSONObject.NULL);
+            m.put("candidate_structured_frames",framing == null ? 0 : framing.optInt("candidate_frames",0));
+            m.put("complete_structured_frames",framing == null ? 0 : framing.optInt("complete_frames",0));
+            m.put("tls_like_headers",framing == null ? 0 : framing.optInt("tls_like_record_headers",0));
+            m.put("entropy_bits_per_byte",analysis == null ? JSONObject.NULL :
+                analysis.opt("shannon_entropy_bits_per_byte"));
+            m.put("accessory_before",capture.optJSONObject("before"));
+            m.put("accessory_after",capture.optJSONObject("after"));
+            m.put("error_at_operation",capture.optString("error_at_operation",""));
+        } catch (Exception ignored) {}
+        return m;
+    }
+
+    private void showScreenTrafficComparison() {
+        if (screenCaptureRunning || auditRunning) {
+            scanStatus.setText("Please wait until the running audit finishes.");
+            return;
+        }
+        JSONObject sync=readScreenCapture(UsbScreenCompareService.MODE_SYNC);
+        JSONObject auto=readScreenCapture(UsbScreenCompareService.MODE_AUTO);
+        if (sync==null || auto==null) {
+            scanStatus.setText("Both screen tests are required: run 8 (SYNC home) and 9 (Android Auto).");
+            return;
+        }
+        JSONObject result = new JSONObject();
+        try {
+            result.put("report_format","Vehicle USB screen traffic comparison summary v1");
+            result.put("app_version","0.7.5");
+            result.put("generated_utc",timeUtc());
+            result.put("vehicle_screen_state_is_user_selected_not_verified",true);
+            result.put("ford_sync_or_vehicle_ecu_access_confirmed",false);
+            result.put("bytes_written",0);
+            result.put("ford_sync_home",metricsForScreen(sync));
+            result.put("android_auto_display",metricsForScreen(auto));
+            JSONObject differences=new JSONObject();
+            int syncBytes=sync.optInt("bytes_received");
+            int autoBytes=auto.optInt("bytes_received");
+            differences.put("total_bytes_difference_auto_minus_sync", autoBytes-syncBytes);
+            JSONObject syncAnalysis=sync.optJSONObject("protocol_analysis");
+            JSONObject autoAnalysis=auto.optJSONObject("protocol_analysis");
+            JSONObject sf=syncAnalysis==null ? null : syncAnalysis.optJSONObject("framing_analysis");
+            JSONObject af=autoAnalysis==null ? null : autoAnalysis.optJSONObject("framing_analysis");
+            differences.put("structured_frame_count_difference_auto_minus_sync",
+                (af==null?0:af.optInt("complete_frames"))-(sf==null?0:sf.optInt("complete_frames")));
+            result.put("differences",differences);
+            result.put("interpretation","Differences in accessory bytes and frame rates can correlate with user-selected screens, but do not identify decrypted content, confirm the display state, or demonstrate access to Ford SYNC internals.");
+            result.put("individual_captures_note","The individual capture reports include raw hex; press each screen capture followed by EXPORT JSON REPORT if you intend to share them.");
+        } catch (Exception ignored) {}
+        try {lastReport=result.toString(2);}
+        catch (Exception ignored) {lastReport=result.toString();}
+        latestFilename="vehicle-usb-screen-comparison-"+fileTimeUtc()+".json";
+        summary.setText("Screen comparison report ready");
+        details.setText("Ford SYNC home: " + sync.optInt("bytes_received") + " bytes"
+            + "\nAndroid Auto screen: " + auto.optInt("bytes_received") + " bytes"
+            + "\nSYNC test outcome: " + sync.optString("outcome","not finished")
+            + "\nAndroid Auto outcome: " + auto.optString("outcome","not finished")
+            + "\nNo vehicle diagnostics or internal SYNC access confirmed.");
+        scanStatus.setText("Comparison assembled. Choose where to save the JSON report.");
+        exportJson();
     }
 
     private void exportJson() {
