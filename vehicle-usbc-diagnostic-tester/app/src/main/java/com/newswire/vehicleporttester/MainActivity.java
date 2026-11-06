@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.system.Os;
 import android.system.OsConstants;
+import android.system.ErrnoException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.system.StructPollfd;
 import android.os.SystemClock;
 import android.os.Handler;
@@ -57,6 +59,15 @@ public class MainActivity extends Activity {
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private volatile boolean scanActive = false;
     private volatile boolean connectionActive = false;
+    private volatile boolean listenCancelRequested = false;
+    private volatile boolean listenReaderStalled = false;
+    private volatile ParcelFileDescriptor listenDescriptor = null;
+    private volatile int listenBytesObserved = 0;
+    private volatile boolean listenOpened = false;
+    private volatile long listenStartAt = 0;
+    private final AtomicBoolean listenCompleted = new AtomicBoolean(true);
+    private Button stopListenButton;
+    private Runnable listenWatchdog;
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
@@ -107,7 +118,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.0", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.1", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -176,6 +187,12 @@ public class MainActivity extends Activity {
         listenLp.topMargin = dp(12);
         root.addView(listen, listenLp);
         listen.setOnClickListener(v -> confirmListenTest());
+        stopListenButton = button("STOP USB STREAM TEST", 0xffb64236);
+        LinearLayout.LayoutParams stopLp = new LinearLayout.LayoutParams(-1, -2);
+        stopLp.topMargin = dp(8);
+        root.addView(stopListenButton, stopLp);
+        stopListenButton.setVisibility(View.GONE);
+        stopListenButton.setOnClickListener(v -> stopListenTest());
         TextView listenWarning = text("PARKED ONLY. Opt-in read-only capture, up to 4,096 bytes or 10 seconds. Reports frame headers, lengths, and timing. No messages are sent. Android Auto may disconnect; exported raw data may be private.", 12, 0xffffcc91, false);
         root.addView(listenWarning);
         Button exportListen = button("EXPORT SAVED USB PROTOCOL REPORT", 0xff29435a);
@@ -353,7 +370,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.0");
+            report.put("app_version", "0.7.1");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -459,6 +476,10 @@ public class MainActivity extends Activity {
      * Poll provides a hard deadline rather than an indefinitely blocking read.
      */
     private void confirmListenTest() {
+        if (listenReaderStalled) {
+            scanStatus.setText("Previous USB read was unresponsive. Force stop and reopen this app before retesting.");
+            return;
+        }
         if (scanActive || connectionActive) {
             scanStatus.setText("Another USB test is already running.");
             return;
@@ -472,16 +493,99 @@ public class MainActivity extends Activity {
     }
 
     private void runListenTest() {
+        if (listenReaderStalled) {
+            scanStatus.setText("Restart the app before retesting after a blocked read.");
+            return;
+        }
         if (scanActive || connectionActive) {
             scanStatus.setText("A test is still running.");
             return;
         }
         connectionActive = true;
+        listenCancelRequested = false;
+        listenCompleted.set(false);
+        listenBytesObserved = 0;
+        listenOpened = false;
+        listenDescriptor = null;
+        listenStartAt = SystemClock.elapsedRealtime();
         summary.setText("Analyzing incoming USB stream");
         scanProgress.setVisibility(View.VISIBLE);
-        scanProgress.setIndeterminate(true);
+        scanProgress.setMax(100);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(0);
+        stopListenButton.setVisibility(View.VISIBLE);
         scanStatus.setText("Checking Android accessory permission...");
+        listenWatchdog = () -> { if (!listenCompleted.get()) abortStalledListen("hard_timeout_12_seconds"); };
+        uiHandler.postDelayed(listenWatchdog, 12000);
         new Thread(this::performListenTest, "VehiclePortListenTest").start();
+    }
+
+    private void stopListenTest() {
+        if (!connectionActive || listenCompleted.get()) return;
+        listenCancelRequested = true;
+        scanStatus.setText("Stopping USB read...");
+        closeListenFdAsync();
+        uiHandler.postDelayed(() -> {
+            if (!listenCompleted.get()) abortStalledListen("cancelled_reader_unresponsive");
+        }, 1500);
+    }
+
+    private void closeListenFdAsync() {
+        ParcelFileDescriptor fd = listenDescriptor;
+        if (fd == null) return;
+        new Thread(() -> {
+            try { fd.close(); } catch (Exception ignored) {}
+        }, "VehicleUsbClose").start();
+    }
+
+    private void abortStalledListen(String reason) {
+        if (!listenCompleted.compareAndSet(false, true)) return;
+        listenCancelRequested = true;
+        listenReaderStalled = true;
+        closeListenFdAsync();
+        if (listenWatchdog != null) uiHandler.removeCallbacks(listenWatchdog);
+        JSONObject timeout = new JSONObject();
+        try {
+            timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
+            timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
+            timeout.put("app_version", "0.7.1");
+            timeout.put("scanned_at_utc", timeUtc());
+            timeout.put("outcome", reason);
+            timeout.put("scan_is_read_only", true);
+            timeout.put("connection_opened", listenOpened);
+            timeout.put("connection_closed", false);
+            timeout.put("close_status", "requested_not_confirmed");
+            timeout.put("bytes_observed_before_abort", listenBytesObserved);
+            timeout.put("bytes_written", 0);
+            timeout.put("vehicle_commands_sent", 0);
+            timeout.put("vehicle_data_confirmed", false);
+            timeout.put("reader_thread_stalled", true);
+            timeout.put("duration_ms", SystemClock.elapsedRealtime() - listenStartAt);
+            timeout.put("note", "USB read did not return within safety deadline; restart app before retesting.");
+        } catch (Exception ignored) {}
+        String json = timeout.toString();
+        getPreferences(MODE_PRIVATE).edit().putString("usb_listen", json).apply();
+        lastReport = json;
+        latestFilename = "vehicle-usbc-protocol-timeout-" + fileTimeUtc() + ".json";
+        saveLocalReport();
+        connectionActive = false;
+        stopListenButton.setVisibility(View.GONE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(100);
+        summary.setText("USB test stopped: " + reason);
+        details.setText("USB read did not return in time. Restart the app before another capture. Export the saved report for details.");
+        scanStatus.setText("Stopped. Export saved USB protocol report.");
+    }
+
+    private void updateListenProgress(long elapsedMs, int bytes) {
+        int percent = Math.min(99, Math.max((int) (elapsedMs / 100), bytes * 100 / 4096));
+        runOnUiThread(() -> {
+            if (!listenCompleted.get()) {
+                scanProgress.setIndeterminate(false);
+                scanProgress.setProgress(percent);
+                scanStatus.setText("Reading: " + bytes + "/4096 bytes, " + (elapsedMs / 1000) + " of 10 sec");
+            }
+        });
     }
 
     private void performListenTest() {
@@ -499,7 +603,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.0");
+            report.put("app_version", "0.7.1");
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
             report.put("scan_is_read_only", true);
@@ -694,7 +798,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.0");
+            report.put("app_version", "0.7.1");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -886,7 +990,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.0");
+            combined.put("app_version", "0.7.1");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
