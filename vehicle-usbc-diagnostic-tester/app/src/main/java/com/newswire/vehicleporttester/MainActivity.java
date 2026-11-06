@@ -644,13 +644,13 @@ public class MainActivity extends Activity {
             JSONObject framing = protocol == null ? null : protocol.optJSONObject("framing_analysis");
             summary.setText("USB protocol analysis: " + result);
             details.setText("Connection opened: " + report.optBoolean("connection_opened", false)
-                + "\\nConnection closed: " + report.optBoolean("connection_closed", false)
-                + "\\nIncoming bytes: " + finalBytes
-                + "\\nMatching structured frames: " + (framing == null ? 0 : framing.optInt("candidate_frames", 0))
-                + "\\nOutgoing bytes and vehicle commands: 0"
-                + "\\nOutcome: " + result
-                + "\\nHeader matches are not confirmed Ford diagnostic data."
-                + "\\nThe exported hex may contain personal information.");
+                + "\nConnection closed: " + report.optBoolean("connection_closed", false)
+                + "\nIncoming bytes: " + finalBytes
+                + "\nMatching structured frames: " + (framing == null ? 0 : framing.optInt("candidate_frames", 0))
+                + "\nOutgoing bytes and vehicle commands: 0"
+                + "\nOutcome: " + result
+                + "\nHeader matches are not confirmed Ford diagnostic data."
+                + "\nThe exported hex may contain personal information.");
             saveLocalReport();
             scanStatus.setText("Protocol analysis saved. Use EXPORT SAVED USB PROTOCOL REPORT.");
         });
