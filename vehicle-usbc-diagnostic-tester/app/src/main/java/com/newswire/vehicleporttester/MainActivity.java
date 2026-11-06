@@ -5,6 +5,9 @@ import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.system.Os;
+import android.system.OsConstants;
+import android.system.StructPollfd;
 import android.os.SystemClock;
 import android.os.Handler;
 import android.os.Looper;
@@ -104,7 +107,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.5.0", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.6.0", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -168,6 +171,18 @@ public class MainActivity extends Activity {
         testExportLp.topMargin=dp(8);
         root.addView(exportTest,testExportLp);
         exportTest.setOnClickListener(v -> exportSavedConnectionTest());
+        Button listen = button("6  LISTEN FOR USB DATA (5 SEC)", 0xff52678a);
+        LinearLayout.LayoutParams listenLp = new LinearLayout.LayoutParams(-1, -2);
+        listenLp.topMargin = dp(12);
+        root.addView(listen, listenLp);
+        listen.setOnClickListener(v -> confirmListenTest());
+        TextView listenWarning = text("PARKED ONLY. Explicitly opens the accessory for up to five seconds. No messages are sent, but Android Auto may disconnect. Any received data may be private.", 12, 0xffffcc91, false);
+        root.addView(listenWarning);
+        Button exportListen = button("EXPORT SAVED USB LISTEN REPORT", 0xff29435a);
+        LinearLayout.LayoutParams listenExportLp = new LinearLayout.LayoutParams(-1, -2);
+        listenExportLp.topMargin = dp(8);
+        root.addView(exportListen, listenExportLp);
+        exportListen.setOnClickListener(v -> exportSavedListenTest());
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
         cmp.topMargin = dp(14);
@@ -338,7 +353,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.5.0");
+            report.put("app_version", "0.6.0");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -437,6 +452,197 @@ public class MainActivity extends Activity {
             scanStatus.setText("Could not export connection test: "+ex.getClass().getSimpleName());
         }
     }
+
+    /**
+     * Read-only, opt-in listen: no application-level payloads are ever written.
+     * The accessory might be used by Android Auto; testing is PARKED ONLY.
+     * Poll provides a hard deadline rather than an indefinitely blocking read.
+     */
+    private void confirmListenTest() {
+        if (scanActive || connectionActive) {
+            scanStatus.setText("Another USB test is already running.");
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Listen for incoming USB data?")
+            .setMessage("Only while PARKED. This may interrupt Android Auto. The app will attempt to open the authorized accessory, listen for at most five seconds, and close it. It sends NO commands or payload bytes. Incoming bytes could include personal information in the exported report. Continue?")
+            .setNegativeButton("Cancel", (d, w) -> {})
+            .setPositiveButton("Listen 5 sec", (d, w) -> runListenTest())
+            .show();
+    }
+
+    private void runListenTest() {
+        if (scanActive || connectionActive) {
+            scanStatus.setText("A test is still running.");
+            return;
+        }
+        connectionActive = true;
+        summary.setText("Listening for incoming USB data");
+        scanProgress.setVisibility(View.VISIBLE);
+        scanProgress.setIndeterminate(true);
+        scanStatus.setText("Checking Android accessory permission...");
+        new Thread(this::performListenTest, "VehiclePortListenTest").start();
+    }
+
+    private void performListenTest() {
+        long started = SystemClock.elapsedRealtime();
+        JSONObject report = new JSONObject();
+        ParcelFileDescriptor connection = null;
+        String outcome = "unknown";
+        int bytesRead = 0;
+        boolean capturedLimitReached = false;
+        StringBuilder hex = new StringBuilder();
+        try {
+            report.put("report_format", "Vehicle USB Port Tester listen v1");
+            report.put("test_label", "usb_accessory_passive_listen");
+            report.put("scanned_at_utc", timeUtc());
+            report.put("app_version", "0.6.0");
+            report.put("listen_timeout_ms", 5000);
+            report.put("max_capture_bytes", 256);
+            report.put("scan_is_read_only", true);
+            report.put("bytes_written", 0);
+            report.put("vehicle_commands_sent", 0);
+            report.put("vehicle_data_confirmed", false);
+            report.put("obd_codes_scanned", false);
+            report.put("connection_opened", false);
+            report.put("connection_closed", false);
+            report.put("android_auto_session_observed", false);
+            report.put("note", "USB accessory bytes, if any, are not necessarily Ford diagnostic data. Standard Android APIs do not expose the SYNC app inventory. Listening may interrupt Android Auto.");
+            UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+            if (manager == null) {
+                outcome = "usb_manager_unavailable";
+            } else {
+                UsbAccessory[] accessories = manager.getAccessoryList();
+                report.put("accessory_count", accessories == null ? 0 : accessories.length);
+                if (accessories == null || accessories.length == 0) {
+                    outcome = "no_accessory_detected";
+                } else {
+                    UsbAccessory accessory = accessories[0];
+                    report.put("accessory_model", accessory.getModel());
+                    report.put("accessory_manufacturer", accessory.getManufacturer());
+                    boolean permitted = manager.hasPermission(accessory);
+                    report.put("permission_granted", permitted);
+                    if (!permitted) {
+                        outcome = "permission_required";
+                    } else {
+                        runOnUiThread(() -> scanStatus.setText("Opening the authorized USB accessory..."));
+                        connection = manager.openAccessory(accessory);
+                        if (connection == null) {
+                            outcome = "open_returned_null";
+                        } else {
+                            report.put("connection_opened", true);
+                            runOnUiThread(() -> scanStatus.setText("Connected. Listening for incoming data (up to 5 seconds)..."));
+                            long deadline = SystemClock.elapsedRealtime() + 5000;
+                            byte[] buffer = new byte[64];
+                            StructPollfd pollDescriptor = new StructPollfd();
+                            pollDescriptor.fd = connection.getFileDescriptor();
+                            pollDescriptor.events = (short) (OsConstants.POLLIN | OsConstants.POLLERR | OsConstants.POLLHUP);
+                            outcome = "timed_out_no_data";
+                            while (SystemClock.elapsedRealtime() < deadline && bytesRead < 256) {
+                                long remaining = deadline - SystemClock.elapsedRealtime();
+                                int waitMs = (int) Math.min(1000L, remaining);
+                                if (waitMs <= 0) break;
+                                int polls = Os.poll(new StructPollfd[]{pollDescriptor}, waitMs);
+                                if (polls == 0) {
+                                    long left = Math.max(0, deadline - SystemClock.elapsedRealtime());
+                                    runOnUiThread(() -> scanStatus.setText("Listening... " + ((left + 999) / 1000) + " seconds remaining"));
+                                    continue;
+                                }
+                                int events = pollDescriptor.revents;
+                                pollDescriptor.revents = 0;
+                                if ((events & OsConstants.POLLIN) != 0) {
+                                    int read = Os.read(connection.getFileDescriptor(), buffer, 0, Math.min(buffer.length, 256 - bytesRead));
+                                    if (read < 1) {
+                                        outcome = "connection_closed_by_peer";
+                                        break;
+                                    }
+                                    for (int i = 0; i < read; i++) {
+                                        if (hex.length() > 0) hex.append(' ');
+                                        int value = buffer[i] & 0xff;
+                                        final char[] digits = "0123456789ABCDEF".toCharArray();
+                                        hex.append(digits[(value >>> 4) & 0x0f]).append(digits[value & 0x0f]);
+                                    }
+                                    bytesRead += read;
+                                    outcome = "received_unclassified_data";
+                                    int currentBytes = bytesRead;
+                                    runOnUiThread(() -> scanStatus.setText("Received " + currentBytes + " unclassified byte(s). No commands sent."));
+                                } else if ((events & (OsConstants.POLLERR | OsConstants.POLLHUP)) != 0) {
+                                    outcome = "accessory_disconnected_or_error";
+                                    break;
+                                }
+                            }
+                            if (bytesRead >= 256) capturedLimitReached = true;
+                            if (bytesRead > 0 && !"accessory_disconnected_or_error".equals(outcome)
+                                    && !"connection_closed_by_peer".equals(outcome)) {
+                                outcome = capturedLimitReached ? "capture_limit_reached" : "received_unclassified_data";
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            outcome = "listen_error";
+            try {
+                report.put("error_type", ex.getClass().getSimpleName());
+                report.put("error_message", String.valueOf(ex.getMessage()));
+            } catch (Exception ignored) {}
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.close();
+                    report.put("connection_closed", true);
+                } catch (Exception ex) {
+                    try { report.put("close_error", ex.getClass().getSimpleName()); } catch (Exception ignored) {}
+                }
+            }
+        }
+        try {
+            report.put("bytes_read", bytesRead);
+            report.put("hex_preview", hex.toString());
+            report.put("capture_limit_reached", capturedLimitReached);
+            report.put("outcome", outcome);
+            report.put("duration_ms", SystemClock.elapsedRealtime() - started);
+        } catch (Exception ignored) {}
+        final String result = outcome;
+        final int finalBytes = bytesRead;
+        final String json = report.toString();
+        getPreferences(MODE_PRIVATE).edit().putString("usb_listen", json).apply();
+        runOnUiThread(() -> {
+            connectionActive = false;
+            scanProgress.setIndeterminate(false);
+            scanProgress.setProgress(100);
+            try { lastReport = new JSONObject(json).toString(2); }
+            catch (Exception ignored) { lastReport = json; }
+            latestFilename = "vehicle-usbc-listen-" + fileTimeUtc() + ".json";
+            summary.setText("USB listen: " + result);
+            details.setText("Connection opened: " + report.optBoolean("connection_opened", false)
+                + "\\nConnection closed: " + report.optBoolean("connection_closed", false)
+                + "\\nIncoming bytes: " + finalBytes
+                + "\\nOutgoing bytes and vehicle commands: 0"
+                + "\\nOutcome: " + result
+                + "\\nAny bytes received are unclassified, NOT confirmed Ford diagnostics."
+                + "\\nExported hex data may contain private information.");
+            saveLocalReport();
+            scanStatus.setText("Listen test saved. Tap EXPORT SAVED USB LISTEN REPORT.");
+        });
+    }
+
+    private void exportSavedListenTest() {
+        JSONObject saved = stored("usb_listen");
+        if (saved == null) {
+            scanStatus.setText("No Listen report saved. Run LISTEN FOR USB DATA while parked.");
+            return;
+        }
+        try {
+            lastReport = saved.toString(2);
+            latestFilename = "vehicle-usbc-listen-" + fileTimeUtc() + ".json";
+            summary.setText("Saved USB Listen test");
+            exportJson();
+        } catch (Exception ex) {
+            scanStatus.setText("Could not export Listen report: " + ex.getClass().getSimpleName());
+        }
+    }
+
     private void runScan(String trigger, boolean save) {
         if (scanActive || connectionActive) {
             scanStatus.setText("A scan is already running. Results will appear shortly.");
@@ -459,7 +665,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.5.0");
+            report.put("app_version", "0.6.0");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -651,7 +857,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.5.0");
+            combined.put("app_version", "0.6.0");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
