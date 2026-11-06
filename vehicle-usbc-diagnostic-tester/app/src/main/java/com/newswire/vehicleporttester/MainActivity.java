@@ -11,7 +11,9 @@ import android.content.BroadcastReceiver;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbDevice;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.view.View;
@@ -87,19 +89,36 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("READ-ONLY • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle USB-C\nConnection Tester", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.2.0", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
-        TextView intro = text("Plug your phone into the car’s existing USB-C port. This tester records what Android can detect. It cannot unlock engine diagnostics or guarantee access to vehicle data.", 15, 0xffb8c9d8, false);
+        TextView intro = text("Compare three parked tests: unplugged, USB-C, and regular USB. We record only USB information Android exposes, not hidden engine diagnostics.", 15, 0xffb8c9d8, false);
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
         ip.topMargin = dp(12);
         ip.bottomMargin = dp(20);
         root.addView(intro, ip);
 
-        Button scan = button("SCAN CONNECTION", 0xff247ec6);
-        root.addView(scan);
-        scan.setOnClickListener(v -> runScan("Manual scan", true));
+        TextView instructions = text("Ignition/accessory power ON, vehicle parked. Change the cable first, then tap the matching button.", 14, 0xff84d9cc, false);
+        root.addView(instructions);
+        Button unplugged = button("1  SCAN UNPLUGGED", 0xff29435a);
+        root.addView(unplugged);
+        unplugged.setOnClickListener(v -> runScan("Test: disconnected", true));
+        Button usbC = button("2  SCAN USB-C PORT", 0xff247ec6);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+        cp.topMargin = dp(10);
+        root.addView(usbC, cp);
+        usbC.setOnClickListener(v -> runScan("Test: usb_c", true));
+        Button usbA = button("3  SCAN REGULAR USB PORT", 0xff247ec6);
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2);
+        ap.topMargin = dp(10);
+        root.addView(usbA, ap);
+        usbA.setOnClickListener(v -> runScan("Test: usb_a", true));
+        Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
+        LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
+        cmp.topMargin = dp(14);
+        root.addView(comparison, cmp);
+        comparison.setOnClickListener(v -> showComparison());
 
         summary = text("Waiting for scan", 17, Color.WHITE, true);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
@@ -177,13 +196,16 @@ public class MainActivity extends Activity {
     private void runScan(String trigger, boolean save) {
         try {
             JSONObject report = new JSONObject();
-            report.put("report_format", "Vehicle USB-C Connection Tester v1");
+            report.put("report_format", "Vehicle USB Port Tester v2");
+            report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.1.0");
+            report.put("app_version", "0.2.0");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
+            report.put("android_usb_host_supported", getPackageManager().hasSystemFeature(PackageManager.FEATURE_USB_HOST));
+            report.put("android_usb_accessory_supported", getPackageManager().hasSystemFeature(PackageManager.FEATURE_USB_ACCESSORY));
             report.put("scan_is_read_only", true);
             report.put("obd_codes_scanned", false);
             report.put("vehicle_data_confirmed", false);
@@ -200,7 +222,7 @@ public class MainActivity extends Activity {
             Intent state = usbStateIntent();
             JSONObject usbState = new JSONObject();
             if (state != null) {
-                for (String key : new String[]{"connected","configured","host_connected","mtp","ptp","adb"}) {
+                for (String key : new String[]{"connected","configured","host_connected","mtp","ptp","adb","rndis","midi","accessory","audio_source","ncm"}) {
                     if (state.hasExtra(key)) usbState.put(key, state.getBooleanExtra(key, false));
                 }
             }
@@ -240,6 +262,26 @@ public class MainActivity extends Activity {
             }
             report.put("usb_host_device_count", found.length());
             report.put("usb_host_devices", found);
+            JSONArray accessibleAccessories = new JSONArray();
+            try {
+                UsbAccessory[] accessories = manager == null ? null : manager.getAccessoryList();
+                if (accessories != null) {
+                    for (UsbAccessory a : accessories) {
+                        JSONObject obj = new JSONObject();
+                        obj.put("manufacturer", a.getManufacturer());
+                        obj.put("model", a.getModel());
+                        obj.put("version", a.getVersion());
+                        obj.put("description", a.getDescription());
+                        obj.put("android_permission_granted", manager.hasPermission(a));
+                        accessibleAccessories.put(obj);
+                    }
+                }
+            } catch (Exception ignored) { /* Some phones restrict USB accessory enumeration. */ }
+            report.put("usb_accessory_count", accessibleAccessories.length());
+            report.put("usb_accessories", accessibleAccessories);
+            report.put("communication_path", usbState.optBoolean("connected", false)
+                ? "Android reports USB attached; vehicle diagnostic APIs not established"
+                : "Android does not currently report an attached USB data connection");
             report.put("limitations", new JSONArray()
                 .put("On Android Auto or phone-peripheral connections, Android USB host enumeration can be empty even with a working data cable.")
                 .put("USB power alone does not prove there is a USB data link.")
@@ -248,23 +290,77 @@ public class MainActivity extends Activity {
                 .put("This is a capability test, not a vehicle health check."));
 
             lastReport = report.toString(2);
-            summary.setText("Connection scan completed");
+            summary.setText("Scan captured: " + report.optString("test_label", "unlabeled"));
             String visible = "Scan time: " + report.getString("scanned_at_utc") + "\n"
                 + "Phone: " + Build.MANUFACTURER + " " + Build.MODEL + "\n"
                 + "Power: " + charging + "\n"
                 + "USB state visible to Android: " + (state == null ? "Not reported" : usbState.toString()) + "\n"
                 + "USB-host devices listed: " + found.length() + "\n"
+                + "USB accessories listed: " + accessibleAccessories.length() + "\n"
                 + "Vehicle information confirmed: NO\n"
                 + "Engine fault codes read: NO\n\n"
                 + (found.length() > 0
                     ? "Android lists USB device interfaces. Details are saved in the report; they are not automatically vehicle diagnostics."
                     : "No USB-host devices listed. This is common when the vehicle acts as USB host. It does not mean the cable is broken.")
-                + "\n\nNext: Compare scans with the cable plugged in and unplugged. Export the JSON report so we can identify any usable interfaces.";
+                + "\n\nCapture all three labeled tests, then VIEW AND EXPORT COMPARISON.";
             details.setText(visible);
+            if (trigger.startsWith("Test: ")) {
+                getPreferences(MODE_PRIVATE).edit()
+                    .putString(trigger.substring(6), report.toString()).apply();
+            }
             if (save) saveLocalReport();
         } catch (Exception ex) {
             summary.setText("Scan could not complete");
             details.setText("The scanner hit an Android access error: " + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "\nNo vehicle commands were sent.");
+        }
+    }
+
+    private JSONObject stored(String key) {
+        String json = getPreferences(MODE_PRIVATE).getString(key, "");
+        if (json.isEmpty()) return null;
+        try { return new JSONObject(json); } catch (Exception ignored) { return null; }
+    }
+
+    private String describe(String label, JSONObject item) {
+        if (item == null) return label + ": NOT TESTED YET";
+        JSONObject state = item.optJSONObject("android_usb_state");
+        if (state == null) state = new JSONObject();
+        String connected = state.has("connected") ? String.valueOf(state.optBoolean("connected")) : "not reported";
+        String configured = state.has("configured") ? String.valueOf(state.optBoolean("configured")) : "not reported";
+        return label + " | connected=" + connected +
+            ", configured=" + configured + ", power=" + item.optString("power_state", "unknown") +
+            ", host devices=" + item.optInt("usb_host_device_count", 0) +
+            ", accessories=" + item.optInt("usb_accessory_count", 0);
+    }
+
+    private void showComparison() {
+        try {
+            JSONObject unplug = stored("disconnected");
+            JSONObject usbc = stored("usb_c");
+            JSONObject usba = stored("usb_a");
+            JSONObject combined = new JSONObject();
+            combined.put("report_format", "Vehicle USB Port Tester comparison v2");
+            combined.put("app_version", "0.2.0");
+            combined.put("created_at_utc", timeUtc());
+            combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
+            combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
+            combined.put("regular_usb_port", usba == null ? JSONObject.NULL : usba);
+            combined.put("vehicle_diagnostic_access_confirmed", false);
+            combined.put("explanation", "USB configured indicates a link, not an OBD-II connection. Apps cannot assume Android Auto exposes engine or fault-code data.");
+            lastReport = combined.toString(2);
+            latestFilename = "vehicle-usb-comparison-" + fileTimeUtc() + ".json";
+            int count = (unplug == null ? 0 : 1) + (usbc == null ? 0 : 1) + (usba == null ? 0 : 1);
+            summary.setText("Comparison: " + count + " of 3 scans saved");
+            details.setText(describe("1 UNPLUGGED", unplug) + "\n\n" +
+                describe("2 USB-C", usbc) + "\n\n" +
+                describe("3 REGULAR USB", usba) +
+                "\n\nEngine trouble codes: NOT SCANNED\n" +
+                "Android Auto data link does not imply engine diagnostic access. " +
+                "Tap EXPORT JSON REPORT to save all available results in one file.");
+            saveLocalReport();
+        } catch (Exception ex) {
+            summary.setText("Unable to compare scans");
+            details.setText(ex.getMessage());
         }
     }
 
