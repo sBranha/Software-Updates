@@ -192,7 +192,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         buildLayout();
-        runScan("App started", true);
+        scanStatus.setText("Ready. Park the vehicle, connect USB and tap ONE BUTTON to record everything.");
     }
 
     @Override public void onStart() {
