@@ -507,10 +507,9 @@ public final class OneClickAuditService extends Service {
         return test;
     }
 
-    private String writeToDownloads(String contents)throws Exception{
+    private String writeToDownloads(String contents,String name)throws Exception{
         if(Build.VERSION.SDK_INT<29)throw new IllegalStateException(
             "Automatic public Downloads export needs Android 10 or later");
-        String name=filename();
         ContentValues values=new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME,name);
         values.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
@@ -621,12 +620,18 @@ public final class OneClickAuditService extends Service {
                 report.put("auto_download_success",false);
                 checkpoint();
                 operation("save_complete_report_to_downloads",96);
-                // JSON is saved privately even if MediaStore fails.
-                String path=writeToDownloads(report.toString(2));
+                // The downloaded JSON includes the same complete export metadata
+                // as the internal checkpoint, so it is self-contained.
+                String name=filename();
+                String path="Downloads/VehiclePortTester/"+name;
                 report.put("saved_downloads_path",path);
                 report.put("auto_download_success",true);
+                checkpoint();
+                writeToDownloads(report.toString(2),name);
             }catch(Exception ex){
                 try{
+                    report.put("auto_download_success",false);
+                    report.remove("saved_downloads_path");
                     report.put("auto_download_error",ex.getClass().getSimpleName()
                         +": "+String.valueOf(ex.getMessage()));
                 }catch(Exception ignored){}
