@@ -12,7 +12,7 @@
         <intent><action android:name="android.media.browse.MediaBrowserService"/></intent>
         <intent><action android:name="androidx.media3.session.MediaLibraryService"/></intent>
     </queries>
-    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Vehicle Port Tester v0.7.7" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Vehicle Capability Explorer" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <receiver android:name=".UsbPermissionReceiver" android:exported="false" />
         <!-- Isolated process prevents a blocked native USB read from hanging the main app. -->
         <service android:name=".UsbAuditService" android:process=":usb_audit"
@@ -27,6 +27,7 @@
         <service android:name=".OneClickAuditService"
             android:process=":one_click" android:exported="false"
             android:foregroundServiceType="shortService" android:stopWithTask="false" />
+        <activity android:name=".CapabilityResultsActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
