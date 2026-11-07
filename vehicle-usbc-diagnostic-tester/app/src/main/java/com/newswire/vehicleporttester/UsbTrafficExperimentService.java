@@ -58,9 +58,11 @@ public final class UsbTrafficExperimentService extends Service {
     public static final String SYNC = "ford_sync_steady";
     public static final String AUTO = "android_auto_steady";
     public static final String ACTIONS = "user_actions";
+    public static final String AUTOMATIC = "automatic_usb_steady_state";
     public static final String REPORT_SYNC = "usb_v076_ford_sync_steady.json";
     public static final String REPORT_AUTO = "usb_v076_android_auto_steady.json";
     public static final String REPORT_ACTIONS = "usb_v076_action_markers.json";
+    public static final String REPORT_AUTOMATIC = "usb_v077_automatic_steady_state.json";
 
     private static final int WARMUP_SECONDS = 5;
     private static final int STEADY_SECONDS = 40; // 5s warm-up + 3 x 10s + 5s final
@@ -96,17 +98,19 @@ public final class UsbTrafficExperimentService extends Service {
     public static String fileFor(String mode) {
         if (SYNC.equals(mode)) return REPORT_SYNC;
         if (AUTO.equals(mode)) return REPORT_AUTO;
+        if (AUTOMATIC.equals(mode)) return REPORT_AUTOMATIC;
         return REPORT_ACTIONS;
     }
 
     public static String labelFor(String mode) {
         if (SYNC.equals(mode)) return "Ford SYNC steady traffic";
         if (AUTO.equals(mode)) return "Android Auto steady traffic";
+        if (AUTOMATIC.equals(mode)) return "One-click automatic steady USB analysis";
         return "Marked vehicle actions";
     }
 
     private static boolean validMode(String mode) {
-        return SYNC.equals(mode) || AUTO.equals(mode) || ACTIONS.equals(mode);
+        return SYNC.equals(mode) || AUTO.equals(mode) || ACTIONS.equals(mode) || AUTOMATIC.equals(mode);
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
@@ -377,7 +381,8 @@ public final class UsbTrafficExperimentService extends Service {
         try {
             report = new JSONObject();
             report.put("report_format", "Vehicle USB controlled traffic experiment v1");
-            report.put("app_version","0.7.6");
+            report.put("app_version","0.7.7");
+            report.put("automatic_full_audit_phase",AUTOMATIC.equals(mode));
             report.put("test_label","steady_state_and_user_markers");
             report.put("selected_condition",mode);
             report.put("selected_condition_is_user_reported",true);
@@ -389,7 +394,7 @@ public final class UsbTrafficExperimentService extends Service {
             report.put("test_duration_seconds",seconds);
             report.put("warmup_exclusion_seconds",WARMUP_SECONDS);
             report.put("method","Ignore first 5 seconds of buffered traffic; measure 3 independent 10-second steady windows. Action mode also records user markers and before/after rates.");
-            report.put("note","Android USB accessory access is not Ford SYNC or ECU diagnostic authorization. Labels are supplied by the user and cannot be verified. Opening accessory may interrupt Android Auto.");
+            report.put("note","Android USB accessory access is not Ford SYNC or ECU diagnostic authorization. AUTOMATIC mode does not label the vehicle screen because the phone cannot read it. Opening accessory may interrupt Android Auto.");
             report.put("snapshot_before",usbSnapshot());
             report.put("user_action_markers",new JSONArray());
             state("preflight");
