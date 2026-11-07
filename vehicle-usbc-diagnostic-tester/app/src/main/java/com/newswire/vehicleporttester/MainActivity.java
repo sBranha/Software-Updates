@@ -289,17 +289,17 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.7", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Capability Explorer\nv0.8.0", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
-        TextView intro = text("Compare unplugged, USB-C and USB-A. Deep Scan also checks accessible USB descriptors, permissions and phone-side car-app services. It cannot assume access to Ford SYNC internals.", 15, 0xffb8c9d8, false);
+        TextView intro = text("Explore what your phone can actually access in the Explorer: screen apps, USB communication, vehicle information, and control possibilities — with evidence for every result.", 15, 0xffb8c9d8, false);
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
         ip.topMargin = dp(12);
         ip.bottomMargin = dp(20);
         root.addView(intro, ip);
 
-        TextView instructions = text("Ignition/accessory power ON, vehicle parked. Change the cable first, then tap the matching button.", 14, 0xff84d9cc, false);
+        TextView instructions = text("Park the vehicle, turn on ignition/accessory power, connect your phone to the Explorer, then tap SCAN EVERYTHING.", 14, 0xff84d9cc, false);
         root.addView(instructions);
         scanStatus = text("Ready to scan", 14, 0xff84d9cc, true);
         LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(-1, -2);
@@ -313,158 +313,171 @@ public class MainActivity extends Activity {
         prog.topMargin = dp(8);
         prog.bottomMargin = dp(12);
         root.addView(scanProgress, prog);
-        Button oneClick=button("ONE BUTTON — RUN ALL TESTS & RECORD",0xff119a85);
+        Button oneClick=button("SCAN EVERYTHING — ONE CLICK",0xff119a85);
         LinearLayout.LayoutParams oneLp=new LinearLayout.LayoutParams(-1,dp(72));
         oneLp.topMargin=dp(10);
         oneLp.bottomMargin=dp(8);
         root.addView(oneClick,oneLp);
         oneClick.setTextSize(17);
         oneClick.setOnClickListener(v->startFullAuto());
-        TextView oneInfo=text("PARKED ONLY. ONE TAP: USB stability, phone-side car app discovery, available Bluetooth OBD adapter detection, 3 USB open/close tests, 60-second read-only protocol/steady-rate analysis, then automatic full JSON save to Downloads/VehiclePortTester. About 80 seconds. May interrupt Android Auto. Cannot switch vehicle screens or access ECUs without an adapter.",13,0xffffcc91,false);
+        TextView oneInfo=text("One tap scans all accessible Android USB and car-app capabilities, tests connection stability and live traffic, and checks whether a paired Bluetooth OBD adapter can be identified. Results are organized into confirmed, possible, and unavailable functions. About 80 seconds. PARKED ONLY: Android Auto may disconnect; no vehicle commands will be sent.",13,0xffffcc91,false);
         root.addView(oneInfo);
-        stopFullAutoButton=button("STOP ONE-CLICK AUDIT",0xffb64236);
+        stopFullAutoButton=button("STOP SCAN",0xffb64236);
         root.addView(stopFullAutoButton);
         stopFullAutoButton.setVisibility(View.GONE);
         stopFullAutoButton.setOnClickListener(v->stopFullAuto());
-        Button showFull=button("SHOW LAST ONE-CLICK AUDIT REPORT",0xff29435a);
+        Button showFull=button("VIEW VEHICLE CAPABILITY RESULTS",0xff29435a);
         root.addView(showFull);
         showFull.setOnClickListener(v->loadLastFullAuto());
+        Button advancedToggle=button("ADVANCED USB DIAGNOSTICS  ▾",0xff263C54);
+        LinearLayout.LayoutParams advancedParams=new LinearLayout.LayoutParams(-1,-2);
+        advancedParams.topMargin=dp(12);
+        root.addView(advancedToggle,advancedParams);
+        LinearLayout advancedArea=new LinearLayout(this);
+        advancedArea.setOrientation(LinearLayout.VERTICAL);
+        advancedArea.setVisibility(View.GONE);
+        root.addView(advancedArea);
+        advancedToggle.setOnClickListener(v->{
+            boolean expanded=advancedArea.getVisibility()!=View.VISIBLE;
+            advancedArea.setVisibility(expanded?View.VISIBLE:View.GONE);
+            advancedToggle.setText(expanded?"HIDE ADVANCED DIAGNOSTICS  ▴":"ADVANCED USB DIAGNOSTICS  ▾");
+        });
         Button unplugged = button("1  SCAN UNPLUGGED", 0xff29435a);
-        root.addView(unplugged);
+        advancedArea.addView(unplugged);
         unplugged.setOnClickListener(v -> runScan("Test: disconnected", true));
         Button usbC = button("2  SCAN USB-C PORT", 0xff247ec6);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.topMargin = dp(10);
-        root.addView(usbC, cp);
+        advancedArea.addView(usbC, cp);
         usbC.setOnClickListener(v -> runScan("Test: usb_c", true));
         Button usbA = button("3  SCAN REGULAR USB PORT", 0xff247ec6);
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2);
         ap.topMargin = dp(10);
-        root.addView(usbA, ap);
+        advancedArea.addView(usbA, ap);
         usbA.setOnClickListener(v -> runScan("Test: usb_a", true));
         Button deep = button("4  DEEP USB-C DISCOVERY", 0xffb64236);
         LinearLayout.LayoutParams deepLp = new LinearLayout.LayoutParams(-1, -2);
         deepLp.topMargin = dp(12);
-        root.addView(deep, deepLp);
+        advancedArea.addView(deep, deepLp);
         deep.setOnClickListener(v -> runScan("Test: usb_c_deep", true));
         Button exportDeep = button("EXPORT SAVED DEEP USB-C REPORT", 0xff29435a);
         LinearLayout.LayoutParams exportDeepLp = new LinearLayout.LayoutParams(-1, -2);
         exportDeepLp.topMargin = dp(8);
-        root.addView(exportDeep, exportDeepLp);
+        advancedArea.addView(exportDeep, exportDeepLp);
         exportDeep.setOnClickListener(v -> exportSavedDeepReport());
         Button access = button("REQUEST USB ACCESS PERMISSION", 0xff776225);
         LinearLayout.LayoutParams accessLp = new LinearLayout.LayoutParams(-1, -2);
         accessLp.topMargin = dp(10);
-        root.addView(access, accessLp);
+        advancedArea.addView(access, accessLp);
         access.setOnClickListener(v -> requestUsbAccess());
         Button test = button("5  TEST USB OPEN / CLOSE", 0xff876338);
         LinearLayout.LayoutParams testLp = new LinearLayout.LayoutParams(-1,-2);
         testLp.topMargin = dp(12);
-        root.addView(test,testLp);
+        advancedArea.addView(test,testLp);
         test.setOnClickListener(v -> confirmConnectionTest());
         TextView testWarning = text("PARKED ONLY. Android Auto may disconnect. No USB payloads or vehicle commands sent.",12,0xffffcc91,false);
-        root.addView(testWarning);
+        advancedArea.addView(testWarning);
         Button exportTest = button("EXPORT SAVED USB CONNECTION TEST",0xff29435a);
         LinearLayout.LayoutParams testExportLp = new LinearLayout.LayoutParams(-1,-2);
         testExportLp.topMargin=dp(8);
-        root.addView(exportTest,testExportLp);
+        advancedArea.addView(exportTest,testExportLp);
         exportTest.setOnClickListener(v -> exportSavedConnectionTest());
         Button listen = button("6  ANALYZE USB STREAM (10 SEC / 4 KB)", 0xff52678a);
         LinearLayout.LayoutParams listenLp = new LinearLayout.LayoutParams(-1, -2);
         listenLp.topMargin = dp(12);
-        root.addView(listen, listenLp);
+        advancedArea.addView(listen, listenLp);
         listen.setOnClickListener(v -> confirmListenTest());
         stopListenButton = button("STOP USB STREAM TEST", 0xffb64236);
         LinearLayout.LayoutParams stopLp = new LinearLayout.LayoutParams(-1, -2);
         stopLp.topMargin = dp(8);
-        root.addView(stopListenButton, stopLp);
+        advancedArea.addView(stopListenButton, stopLp);
         stopListenButton.setVisibility(View.GONE);
         stopListenButton.setOnClickListener(v -> stopListenTest());
         TextView listenWarning = text("PARKED ONLY. Opt-in read-only capture, up to 4,096 bytes or 10 seconds. Reports frame headers, lengths, and timing. No messages are sent. Android Auto may disconnect; exported raw data may be private.", 12, 0xffffcc91, false);
-        root.addView(listenWarning);
+        advancedArea.addView(listenWarning);
         Button exportListen = button("EXPORT SAVED USB PROTOCOL REPORT", 0xff29435a);
         LinearLayout.LayoutParams listenExportLp = new LinearLayout.LayoutParams(-1, -2);
         listenExportLp.topMargin = dp(8);
-        root.addView(exportListen, listenExportLp);
+        advancedArea.addView(exportListen, listenExportLp);
         exportListen.setOnClickListener(v -> exportSavedListenTest());
 
         Button deepAudit = button("7  DEEP COMMUNICATION AUDIT (~2 MIN)", 0xffb64236);
         LinearLayout.LayoutParams auditLp = new LinearLayout.LayoutParams(-1, -2);
         auditLp.topMargin = dp(18);
-        root.addView(deepAudit, auditLp);
+        advancedArea.addView(deepAudit, auditLp);
         deepAudit.setOnClickListener(v -> confirmDeepAudit());
         TextView auditWarning = text("PARKED ONLY. Screen stays awake and the USB audit continues if Android temporarily backgrounds the app. STOP remains available; a safety timeout still applies. Can interrupt Android Auto. Raw bytes may be private.", 12, 0xffffcc91, false);
-        root.addView(auditWarning);
+        advancedArea.addView(auditWarning);
         stopAuditButton = button("STOP DEEP AUDIT", 0xffb64236);
-        root.addView(stopAuditButton);
+        advancedArea.addView(stopAuditButton);
         stopAuditButton.setVisibility(View.GONE);
         stopAuditButton.setOnClickListener(v -> stopDeepAudit("cancelled_by_user"));
         Button auditExport = button("EXPORT SAVED DEEP AUDIT REPORT", 0xff29435a);
-        root.addView(auditExport);
+        advancedArea.addView(auditExport);
         auditExport.setOnClickListener(v -> exportDeepAudit());
 
 
-        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.7)", 16, Color.WHITE, true);
+        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.8.0)", 16, Color.WHITE, true);
         LinearLayout.LayoutParams compareHeading = new LinearLayout.LayoutParams(-1, -2);
         compareHeading.topMargin = dp(20);
-        root.addView(compareHead, compareHeading);
+        advancedArea.addView(compareHead, compareHeading);
         TextView compareHelp = text("While PARKED, first show the regular Ford SYNC home screen and capture it. Next switch the vehicle display to Android Auto and capture again. We compare only the Android accessory traffic; the app cannot independently confirm what's on the Ford screen. Capturing can interrupt Android Auto.", 12, 0xffffcc91, false);
-        root.addView(compareHelp);
+        advancedArea.addView(compareHelp);
         Button syncCapture = button("8  CAPTURE FORD SYNC HOME SCREEN (20 SEC)", 0xff247ec6);
-        root.addView(syncCapture);
+        advancedArea.addView(syncCapture);
         syncCapture.setOnClickListener(v -> confirmScreenCapture(UsbScreenCompareService.MODE_SYNC));
         Button autoCapture = button("9  CAPTURE ANDROID AUTO SCREEN (20 SEC)", 0xff247ec6);
-        root.addView(autoCapture);
+        advancedArea.addView(autoCapture);
         autoCapture.setOnClickListener(v -> confirmScreenCapture(UsbScreenCompareService.MODE_AUTO));
         stopScreenCapture = button("STOP SCREEN TRAFFIC CAPTURE", 0xffb64236);
-        root.addView(stopScreenCapture);
+        advancedArea.addView(stopScreenCapture);
         stopScreenCapture.setVisibility(View.GONE);
         stopScreenCapture.setOnClickListener(v -> stopScreenCapture("stopped_by_user"));
         Button exportCompare = button("10  COMPARE AND EXPORT BOTH SCREEN TESTS", 0xff23736b);
-        root.addView(exportCompare);
+        advancedArea.addView(exportCompare);
         exportCompare.setOnClickListener(v -> showScreenTrafficComparison());
 
 
-        TextView experimentHeading=text("v0.7.7  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
+        TextView experimentHeading=text("v0.8.0  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
         LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-1,-2);
         elp.topMargin=dp(20);
-        root.addView(experimentHeading,elp);
+        advancedArea.addView(experimentHeading,elp);
         TextView experimentIntro=text("PARKED ONLY. First 5 seconds are excluded from steady-state measurements. Three separate 10-second windows are compared. Use the action test to mark when you open Maps, change music, or switch screens. These labels are user-reported; the app cannot see what SYNC displays. Capturing can interrupt Android Auto.",12,0xffffcc91,false);
-        root.addView(experimentIntro);
+        advancedArea.addView(experimentIntro);
         Button steadySync=button("11  MEASURE SYNC STEADY TRAFFIC (40 SEC)",0xff23736b);
-        root.addView(steadySync);
+        advancedArea.addView(steadySync);
         steadySync.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.SYNC));
         Button steadyAuto=button("12  MEASURE ANDROID AUTO STEADY TRAFFIC (40 SEC)",0xff23736b);
-        root.addView(steadyAuto);
+        advancedArea.addView(steadyAuto);
         steadyAuto.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.AUTO));
         Button actions=button("13  RECORD ACTION MARKERS (65 SEC)",0xffb64236);
-        root.addView(actions);
+        advancedArea.addView(actions);
         actions.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.ACTIONS));
         experimentMarkMaps=button("MARK: OPEN MAPS",0xff52678a);
-        root.addView(experimentMarkMaps);
+        advancedArea.addView(experimentMarkMaps);
         experimentMarkMaps.setOnClickListener(v->sendActionMarker("Open Maps"));
         experimentMarkMusic=button("MARK: CHANGE MUSIC APP",0xff52678a);
-        root.addView(experimentMarkMusic);
+        advancedArea.addView(experimentMarkMusic);
         experimentMarkMusic.setOnClickListener(v->sendActionMarker("Change music app"));
         experimentMarkScreen=button("MARK: SWITCH VEHICLE SCREEN",0xff52678a);
-        root.addView(experimentMarkScreen);
+        advancedArea.addView(experimentMarkScreen);
         experimentMarkScreen.setOnClickListener(v->sendActionMarker("Switch vehicle display"));
         experimentMarkOther=button("MARK: OTHER ACTION",0xff52678a);
-        root.addView(experimentMarkOther);
+        advancedArea.addView(experimentMarkOther);
         experimentMarkOther.setOnClickListener(v->sendActionMarker("Other user action"));
         experimentStopButton=button("STOP CONTROLLED EXPERIMENT",0xffb64236);
-        root.addView(experimentStopButton);
+        advancedArea.addView(experimentStopButton);
         experimentStopButton.setOnClickListener(v->stopExperiment("stopped_by_user"));
         experimentStopButton.setVisibility(View.GONE);
         showMarkerControls(false);
         Button experimentCompare=button("14  COMPARE STEADY RESULTS / EXPORT JSON",0xff23736b);
-        root.addView(experimentCompare);
+        advancedArea.addView(experimentCompare);
         experimentCompare.setOnClickListener(v->compareExperiments());
 
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
         cmp.topMargin = dp(14);
-        root.addView(comparison, cmp);
+        advancedArea.addView(comparison, cmp);
         comparison.setOnClickListener(v -> showComparison());
 
         summary = text("Waiting for scan", 17, Color.WHITE, true);
@@ -631,7 +644,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.7");
+            report.put("app_version", "0.8.0");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -872,7 +885,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.7.7");
+                report.put("app_version", "0.8.0");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -984,7 +997,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.7");
+            timeout.put("app_version", "0.8.0");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -1114,7 +1127,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.7");
+            report.put("app_version", "0.8.0");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1361,7 +1374,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.7");
+            report.put("app_version", "0.8.0");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1553,7 +1566,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.7");
+            combined.put("app_version", "0.8.0");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
@@ -1732,7 +1745,7 @@ public class MainActivity extends Activity {
         JSONObject saved = readScreenCapture(screenCaptureMode);
         if (saved == null) saved = new JSONObject();
         try {
-            saved.put("app_version","0.7.7");
+            saved.put("app_version","0.8.0");
             saved.put("user_selected_screen",screenCaptureMode);
             if (stopReason != null) {
                 saved.put("status",stopReason);
@@ -1799,7 +1812,7 @@ public class MainActivity extends Activity {
         JSONObject result = new JSONObject();
         try {
             result.put("report_format","Vehicle USB screen traffic comparison summary v1");
-            result.put("app_version","0.7.7");
+            result.put("app_version","0.8.0");
             result.put("generated_utc",timeUtc());
             result.put("vehicle_screen_state_is_user_selected_not_verified",true);
             result.put("ford_sync_or_vehicle_ecu_access_confirmed",false);
@@ -2000,7 +2013,7 @@ public class MainActivity extends Activity {
         JSONObject saved=readExperiment(experimentMode);
         if(saved==null)saved=new JSONObject();
         try {
-            saved.put("app_version","0.7.7");
+            saved.put("app_version","0.8.0");
             saved.put("main_app_elapsed_ms",
                 SystemClock.elapsedRealtime()-experimentStartedAt);
             if(forcedReason!=null){
@@ -2040,7 +2053,7 @@ public class MainActivity extends Activity {
         JSONObject comparisonData=new JSONObject();
         try{
             comparisonData.put("report_format","Vehicle controlled USB steady-state comparison v1");
-            comparisonData.put("app_version","0.7.7");
+            comparisonData.put("app_version","0.8.0");
             comparisonData.put("created_at_utc",timeUtc());
             comparisonData.put("ford_sync_user_selected",true);
             comparisonData.put("android_auto_user_selected",true);
@@ -2074,7 +2087,7 @@ public class MainActivity extends Activity {
         try{lastReport=comparisonData.toString(2);}
         catch(Exception ignored){lastReport=comparisonData.toString();}
         latestFilename="vehicle-v076-steady-screen-comparison-"+fileTimeUtc()+".json";
-        summary.setText("v0.7.7 Steady-state comparison assembled");
+        summary.setText("v0.8.0 Steady-state comparison assembled");
         details.setText("Both 40-second experiments have saved statistics. "
             +"The first 5 seconds are excluded; each screen has three 10-second measurement windows. "
             +"The combined JSON includes action markers if test 13 has been run.");
@@ -2201,15 +2214,18 @@ public class MainActivity extends Activity {
             }catch(Exception ignored){}
         }
         renderFullAuto(file);
+        if(forced==null && file.optJSONObject("capability_map")!=null) {
+            startActivity(new Intent(this,CapabilityResultsActivity.class));
+        }
     }
 
     private void renderFullAuto(JSONObject file){
         try{lastReport=file.toString(2);}
         catch(Exception ignored){lastReport=file.toString();}
-        latestFilename="Vehicle-Port-Tester-v0.7.7-FULL-AUDIT-"+fileTimeUtc()+".json";
+        latestFilename="Vehicle-Capability-Explorer-v0.8.0-FULL-SCAN-"+fileTimeUtc()+".json";
         JSONObject read=file.optJSONObject("usb_stream_and_steady_analysis");
         JSONObject rate=read==null?null:read.optJSONObject("all_45s_steady");
-        summary.setText("FULL VEHICLE USB AUDIT: "+file.optString("status","unknown"));
+        summary.setText("VEHICLE CAPABILITY SCAN: "+file.optString("status","unknown"));
         details.setText("Received USB bytes: "+file.optInt("total_usb_bytes",0)
             +"\nSteady data rate: "+(rate==null?"not available":rate.optString("bytes_per_second","not available"))+" B/s"
             +"\nUSB capture: "+(read==null?"not performed":read.optString("outcome","unknown"))
@@ -2229,7 +2245,10 @@ public class MainActivity extends Activity {
             return;
         }
         renderFullAuto(file);
-        scanStatus.setText("Last full audit loaded. The EXPORT JSON REPORT button can share a copy.");
+        if(file.optJSONObject("capability_map")!=null)
+            startActivity(new Intent(this,CapabilityResultsActivity.class));
+        else
+            scanStatus.setText("Report predates capability map. Press SCAN EVERYTHING to generate new results.");
     }
 
     private void exportJson() {
