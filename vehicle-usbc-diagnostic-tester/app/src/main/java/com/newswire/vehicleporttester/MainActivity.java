@@ -1985,42 +1985,42 @@ public class MainActivity extends Activity {
             scanStatus.setText("Run BOTH tests 11 and 12 before comparing.");
             return;
         }
-        JSONObject summary=new JSONObject();
+        JSONObject comparisonData=new JSONObject();
         try{
-            summary.put("report_format","Vehicle controlled USB steady-state comparison v1");
-            summary.put("app_version","0.7.6");
-            summary.put("created_at_utc",timeUtc());
-            summary.put("ford_sync_user_selected",true);
-            summary.put("android_auto_user_selected",true);
-            summary.put("ford_screen_state_independently_verified",false);
-            summary.put("ford_sync_internal_access_confirmed",false);
-            summary.put("vehicle_diagnostic_data_confirmed",false);
+            comparisonData.put("report_format","Vehicle controlled USB steady-state comparison v1");
+            comparisonData.put("app_version","0.7.6");
+            comparisonData.put("created_at_utc",timeUtc());
+            comparisonData.put("ford_sync_user_selected",true);
+            comparisonData.put("android_auto_user_selected",true);
+            comparisonData.put("ford_screen_state_independently_verified",false);
+            comparisonData.put("ford_sync_internal_access_confirmed",false);
+            comparisonData.put("vehicle_diagnostic_data_confirmed",false);
             JSONObject sa=sync.optJSONObject("analysis");
             JSONObject aa=auto.optJSONObject("analysis");
             JSONObject sm=sa==null?new JSONObject():sa.optJSONObject("steady_total_30_seconds");
             JSONObject am=aa==null?new JSONObject():aa.optJSONObject("steady_total_30_seconds");
             int sb=sm==null?0:sm.optInt("bytes_received",0);
             int ab=am==null?0:am.optInt("bytes_received",0);
-            summary.put("sync_status",sync.optString("status"));
-            summary.put("auto_status",auto.optString("status"));
-            summary.put("ford_sync_steady_30sec",sm);
-            summary.put("android_auto_steady_30sec",am);
-            summary.put("difference_auto_minus_sync_bytes",ab-sb);
-            summary.put("sync_repeated_windows",sa==null?new JSONArray():
+            comparisonData.put("sync_status",sync.optString("status"));
+            comparisonData.put("auto_status",auto.optString("status"));
+            comparisonData.put("ford_sync_steady_30sec",sm);
+            comparisonData.put("android_auto_steady_30sec",am);
+            comparisonData.put("difference_auto_minus_sync_bytes",ab-sb);
+            comparisonData.put("sync_repeated_windows",sa==null?new JSONArray():
                 sa.optJSONArray("steady_windows"));
-            summary.put("auto_repeated_windows",aa==null?new JSONArray():
+            comparisonData.put("auto_repeated_windows",aa==null?new JSONArray():
                 aa.optJSONArray("steady_windows"));
             JSONObject actions=readExperiment(UsbTrafficExperimentService.ACTIONS);
             if(actions!=null){
-                summary.put("optional_action_markers",actions.optJSONArray("user_action_markers"));
+                comparisonData.put("optional_action_markers",actions.optJSONArray("user_action_markers"));
                 JSONObject an=actions.optJSONObject("analysis");
-                summary.put("optional_action_before_after_rates",
+                comparisonData.put("optional_action_before_after_rates",
                     an==null?new JSONArray():an.optJSONArray("action_comparisons"));
             }
-            summary.put("interpretation","These measurements reflect Android USB accessory traffic after excluding initial buffering. Differences are associations only, not evidence of decrypted Ford SYNC or vehicle diagnostic data.");
+            comparisonData.put("interpretation","These measurements reflect Android USB accessory traffic after excluding initial buffering. Differences are associations only, not evidence of decrypted Ford SYNC or vehicle diagnostic data.");
         }catch(Exception ignored){}
-        try{lastReport=summary.toString(2);}
-        catch(Exception ignored){lastReport=summary.toString();}
+        try{lastReport=comparisonData.toString(2);}
+        catch(Exception ignored){lastReport=comparisonData.toString();}
         latestFilename="vehicle-v076-steady-screen-comparison-"+fileTimeUtc()+".json";
         summary.setText("v0.7.6 Steady-state comparison assembled");
         details.setText("Both 40-second experiments have saved statistics. "
