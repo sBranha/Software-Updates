@@ -125,6 +125,37 @@ public class MainActivity extends Activity {
             }
         }
     };
+    private volatile boolean experimentRunning = false;
+    private String experimentMode = "";
+    private volatile int experimentWorkerPid = 0;
+    private long experimentStartedAt = 0;
+    private Runnable experimentWatchdog;
+    private boolean experimentReceiverRegistered;
+    private Button experimentStopButton;
+    private Button experimentMarkMaps;
+    private Button experimentMarkMusic;
+    private Button experimentMarkScreen;
+    private Button experimentMarkOther;
+    private final BroadcastReceiver experimentUpdates = new BroadcastReceiver() {
+        @Override public void onReceive(Context ctx, Intent intent) {
+            if (!experimentRunning ||
+                !UsbTrafficExperimentService.ACTION_EVENT.equals(intent.getAction())) return;
+            if (!experimentMode.equals(intent.getStringExtra("mode"))) return;
+            int pid=intent.getIntExtra("pid",0);
+            if(pid>0 && pid!=android.os.Process.myPid())experimentWorkerPid=pid;
+            scanProgress.setIndeterminate(false);
+            scanProgress.setProgress(intent.getIntExtra("progress",0));
+            String msg=intent.getStringExtra("message");
+            if(msg!=null)scanStatus.setText(msg);
+            if(intent.getBooleanExtra("done",false)) {
+                finishExperiment(null);
+            } else {
+                summary.setText(UsbTrafficExperimentService.labelFor(experimentMode));
+                details.setText("Operation: "+intent.getStringExtra("stage")
+                    +"\nUSB data capture is read-only; no vehicle commands.");
+            }
+        }
+    };
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
@@ -174,12 +205,27 @@ public class MainActivity extends Activity {
                 + ex.getClass().getSimpleName());
         }
         resumeScreenCaptureIfNeeded();
+        try {
+            IntentFilter f=new IntentFilter(UsbTrafficExperimentService.ACTION_EVENT);
+            if(Build.VERSION.SDK_INT>=33)
+                registerReceiver(experimentUpdates,f,Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(experimentUpdates,f);
+            experimentReceiverRegistered=true;
+        } catch(Exception ex) {
+            scanStatus.setText("Experiment receiver unavailable: "+
+                ex.getClass().getSimpleName());
+        }
+        resumeExperimentIfNeeded();
     }
 
     @Override public void onStop() {
         // Do not cancel a two-minute audit merely because Android temporarily
         // backgrounds this activity, locks the screen, or shows a system dialog.
         // The audit continues in a foreground service in a separate process.
+        if(experimentReceiverRegistered) {
+            try{unregisterReceiver(experimentUpdates);}catch(Exception ignored){}
+            experimentReceiverRegistered=false;
+        }
         if (screenReceiverRegistered) {
             try { unregisterReceiver(screenUpdates); } catch (Exception ignored) {}
             screenReceiverRegistered = false;
@@ -207,7 +253,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.5", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.6", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -306,7 +352,7 @@ public class MainActivity extends Activity {
         auditExport.setOnClickListener(v -> exportDeepAudit());
 
 
-        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.5)", 16, Color.WHITE, true);
+        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.6)", 16, Color.WHITE, true);
         LinearLayout.LayoutParams compareHeading = new LinearLayout.LayoutParams(-1, -2);
         compareHeading.topMargin = dp(20);
         root.addView(compareHead, compareHeading);
@@ -325,6 +371,43 @@ public class MainActivity extends Activity {
         Button exportCompare = button("10  COMPARE AND EXPORT BOTH SCREEN TESTS", 0xff23736b);
         root.addView(exportCompare);
         exportCompare.setOnClickListener(v -> showScreenTrafficComparison());
+
+
+        TextView experimentHeading=text("v0.7.6  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
+        LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-1,-2);
+        elp.topMargin=dp(20);
+        root.addView(experimentHeading,elp);
+        TextView experimentIntro=text("PARKED ONLY. First 5 seconds are excluded from steady-state measurements. Three separate 10-second windows are compared. Use the action test to mark when you open Maps, change music, or switch screens. These labels are user-reported; the app cannot see what SYNC displays. Capturing can interrupt Android Auto.",12,0xffffcc91,false);
+        root.addView(experimentIntro);
+        Button steadySync=button("11  MEASURE SYNC STEADY TRAFFIC (40 SEC)",0xff23736b);
+        root.addView(steadySync);
+        steadySync.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.SYNC));
+        Button steadyAuto=button("12  MEASURE ANDROID AUTO STEADY TRAFFIC (40 SEC)",0xff23736b);
+        root.addView(steadyAuto);
+        steadyAuto.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.AUTO));
+        Button actions=button("13  RECORD ACTION MARKERS (65 SEC)",0xffb64236);
+        root.addView(actions);
+        actions.setOnClickListener(v->confirmExperiment(UsbTrafficExperimentService.ACTIONS));
+        experimentMarkMaps=button("MARK: OPEN MAPS",0xff52678a);
+        root.addView(experimentMarkMaps);
+        experimentMarkMaps.setOnClickListener(v->sendActionMarker("Open Maps"));
+        experimentMarkMusic=button("MARK: CHANGE MUSIC APP",0xff52678a);
+        root.addView(experimentMarkMusic);
+        experimentMarkMusic.setOnClickListener(v->sendActionMarker("Change music app"));
+        experimentMarkScreen=button("MARK: SWITCH VEHICLE SCREEN",0xff52678a);
+        root.addView(experimentMarkScreen);
+        experimentMarkScreen.setOnClickListener(v->sendActionMarker("Switch vehicle display"));
+        experimentMarkOther=button("MARK: OTHER ACTION",0xff52678a);
+        root.addView(experimentMarkOther);
+        experimentMarkOther.setOnClickListener(v->sendActionMarker("Other user action"));
+        experimentStopButton=button("STOP CONTROLLED EXPERIMENT",0xffb64236);
+        root.addView(experimentStopButton);
+        experimentStopButton.setOnClickListener(v->stopExperiment("stopped_by_user"));
+        experimentStopButton.setVisibility(View.GONE);
+        showMarkerControls(false);
+        Button experimentCompare=button("14  COMPARE STEADY RESULTS / EXPORT JSON",0xff23736b);
+        root.addView(experimentCompare);
+        experimentCompare.setOnClickListener(v->compareExperiments());
 
         Button comparison = button("VIEW AND EXPORT COMPARISON", 0xff23736b);
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, -2);
@@ -496,7 +579,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.5");
+            report.put("app_version", "0.7.6");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -603,7 +686,7 @@ public class MainActivity extends Activity {
      */
 
     private void confirmDeepAudit() {
-        if (auditRunning || scanActive || connectionActive || screenCaptureRunning) {
+        if (auditRunning || scanActive || connectionActive || screenCaptureRunning || experimentRunning) {
             scanStatus.setText("Wait for the running test to complete before starting a deep audit.");
             return;
         }
@@ -616,7 +699,7 @@ public class MainActivity extends Activity {
     }
 
     private void startDeepAudit() {
-        if (auditRunning || scanActive || connectionActive || screenCaptureRunning) return;
+        if (auditRunning || scanActive || connectionActive || screenCaptureRunning || experimentRunning) return;
         auditRunning = true;
         auditWorkerPid = 0;
         auditStartedAt = SystemClock.elapsedRealtime();
@@ -737,7 +820,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.7.5");
+                report.put("app_version", "0.7.6");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -849,7 +932,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.5");
+            timeout.put("app_version", "0.7.6");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -979,7 +1062,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.5");
+            report.put("app_version", "0.7.6");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1205,7 +1288,7 @@ public class MainActivity extends Activity {
     }
 
     private void runScan(String trigger, boolean save) {
-        if (scanActive || connectionActive || screenCaptureRunning) {
+        if (scanActive || connectionActive || screenCaptureRunning || experimentRunning) {
             scanStatus.setText("Another USB test is running. Please finish or stop that test first.");
             return;
         }
@@ -1226,7 +1309,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.5");
+            report.put("app_version", "0.7.6");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1418,7 +1501,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.5");
+            combined.put("app_version", "0.7.6");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
@@ -1485,7 +1568,7 @@ public class MainActivity extends Activity {
     }
 
     private void confirmScreenCapture(String mode) {
-        if (auditRunning || screenCaptureRunning || scanActive || connectionActive) {
+        if (auditRunning || screenCaptureRunning || scanActive || connectionActive || experimentRunning) {
             scanStatus.setText("Stop the current test before starting a screen comparison.");
             return;
         }
@@ -1499,7 +1582,7 @@ public class MainActivity extends Activity {
     }
 
     private void startScreenCapture(String mode) {
-        if (auditRunning || screenCaptureRunning || scanActive || connectionActive) return;
+        if (auditRunning || screenCaptureRunning || scanActive || connectionActive || experimentRunning) return;
         screenCaptureRunning = true;
         screenCaptureMode = mode;
         screenWorkerPid = 0;
@@ -1597,7 +1680,7 @@ public class MainActivity extends Activity {
         JSONObject saved = readScreenCapture(screenCaptureMode);
         if (saved == null) saved = new JSONObject();
         try {
-            saved.put("app_version","0.7.5");
+            saved.put("app_version","0.7.6");
             saved.put("user_selected_screen",screenCaptureMode);
             if (stopReason != null) {
                 saved.put("status",stopReason);
@@ -1664,7 +1747,7 @@ public class MainActivity extends Activity {
         JSONObject result = new JSONObject();
         try {
             result.put("report_format","Vehicle USB screen traffic comparison summary v1");
-            result.put("app_version","0.7.5");
+            result.put("app_version","0.7.6");
             result.put("generated_utc",timeUtc());
             result.put("vehicle_screen_state_is_user_selected_not_verified",true);
             result.put("ford_sync_or_vehicle_ecu_access_confirmed",false);
@@ -1695,6 +1778,255 @@ public class MainActivity extends Activity {
             + "\nAndroid Auto outcome: " + auto.optString("outcome","not finished")
             + "\nNo vehicle diagnostics or internal SYNC access confirmed.");
         scanStatus.setText("Comparison assembled. Choose where to save the JSON report.");
+        exportJson();
+    }
+
+
+    private void showMarkerControls(boolean show) {
+        int vis=show?View.VISIBLE:View.GONE;
+        if(experimentMarkMaps!=null)experimentMarkMaps.setVisibility(vis);
+        if(experimentMarkMusic!=null)experimentMarkMusic.setVisibility(vis);
+        if(experimentMarkScreen!=null)experimentMarkScreen.setVisibility(vis);
+        if(experimentMarkOther!=null)experimentMarkOther.setVisibility(vis);
+    }
+
+    private void confirmExperiment(String mode) {
+        if(experimentRunning||auditRunning||screenCaptureRunning||
+                scanActive||connectionActive) {
+            scanStatus.setText("Finish the current USB test first.");
+            return;
+        }
+        String display=UsbTrafficExperimentService.labelFor(mode);
+        new AlertDialog.Builder(this)
+            .setTitle(display+" — PARKED ONLY")
+            .setMessage("This opt-in read-only test " +
+                (UsbTrafficExperimentService.ACTIONS.equals(mode)
+                    ?"runs for 65 seconds. After the 5-second warm-up, press a marker button just before performing an action in the car."
+                    :"runs for 40 seconds: 5-second buffered traffic exclusion followed by three 10-second windows.") +
+                "\n\nOpening the USB accessory may interrupt Android Auto. The tester does NOT read Ford ECUs or SYNC internals. Incoming bytes can be private. Keep parked and press STOP to cancel. Ready?")
+            .setNegativeButton("Cancel",(d,w)->{})
+            .setPositiveButton("Start test",(d,w)->startExperiment(mode))
+            .show();
+    }
+
+    private JSONObject readExperiment(String mode) {
+        try {
+            File f=new File(getFilesDir(),UsbTrafficExperimentService.fileFor(mode));
+            if(!f.exists())return null;
+            return new JSONObject(new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                    StandardCharsets.UTF_8));
+        }catch(Exception ignored){return null;}
+    }
+
+    private void saveExperiment(String mode,JSONObject value) {
+        try {
+            java.nio.file.Files.write(
+                new File(getFilesDir(),UsbTrafficExperimentService.fileFor(mode)).toPath(),
+                value.toString(2).getBytes(StandardCharsets.UTF_8));
+        }catch(Exception ignored){}
+    }
+
+    private void startExperiment(String mode) {
+        if(experimentRunning||auditRunning||screenCaptureRunning||scanActive||connectionActive)
+            return;
+        experimentRunning=true;
+        experimentMode=mode;
+        experimentWorkerPid=0;
+        experimentStartedAt=SystemClock.elapsedRealtime();
+        try{new File(getFilesDir(),UsbTrafficExperimentService.fileFor(mode)).delete();}
+        catch(Exception ignored){}
+        scanProgress.setVisibility(View.VISIBLE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(0);
+        experimentStopButton.setVisibility(View.VISIBLE);
+        showMarkerControls(UsbTrafficExperimentService.ACTIONS.equals(mode));
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(true);
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("v076_running",true)
+            .putString("v076_mode",mode)
+            .putLong("v076_start_wall",System.currentTimeMillis()).apply();
+        summary.setText("Starting "+UsbTrafficExperimentService.labelFor(mode));
+        details.setText("Do not drive. The first five seconds of USB data are excluded from steady-state comparisons.");
+        scanStatus.setText("Starting isolated read-only USB experiment...");
+        experimentWatchdog=()->{
+            if(experimentRunning)stopExperiment("main_app_timeout_110_seconds");
+        };
+        uiHandler.postDelayed(experimentWatchdog,110000);
+        try {
+            Intent i=new Intent(this,UsbTrafficExperimentService.class);
+            i.putExtra(UsbTrafficExperimentService.EXTRA_MODE,mode);
+            if(Build.VERSION.SDK_INT>=26) startForegroundService(i);
+            else if(startService(i)==null) throw new IllegalStateException("Worker not started");
+        }catch(Exception ex) {
+            stopExperiment("worker_start_failed");
+            scanStatus.setText("Could not start controlled experiment: "
+                    +ex.getClass().getSimpleName());
+        }
+    }
+
+    private void sendActionMarker(String marker) {
+        if(!experimentRunning || !UsbTrafficExperimentService.ACTIONS.equals(experimentMode)){
+            scanStatus.setText("Start test 13 before marking an action.");
+            return;
+        }
+        try {
+            Intent i=new Intent(this,UsbTrafficExperimentService.class);
+            i.setAction(UsbTrafficExperimentService.ACTION_MARK);
+            i.putExtra(UsbTrafficExperimentService.EXTRA_MARK,marker);
+            startService(i);
+            scanStatus.setText("Marked "+marker+". You can perform the action now.");
+        }catch(Exception ex){
+            scanStatus.setText("Marker failed: "+ex.getClass().getSimpleName());
+        }
+    }
+
+    private void resumeExperimentIfNeeded() {
+        boolean stored=getPreferences(MODE_PRIVATE).getBoolean("v076_running",false);
+        if(!experimentRunning&&!stored)return;
+        if(!experimentRunning) {
+            experimentMode=getPreferences(MODE_PRIVATE).getString("v076_mode",
+                    UsbTrafficExperimentService.SYNC);
+            long wall=getPreferences(MODE_PRIVATE).getLong("v076_start_wall",
+                    System.currentTimeMillis());
+            long age=Math.max(0,System.currentTimeMillis()-wall);
+            experimentStartedAt=SystemClock.elapsedRealtime()-age;
+            experimentRunning=true;
+            experimentStopButton.setVisibility(View.VISIBLE);
+            showMarkerControls(UsbTrafficExperimentService.ACTIONS.equals(experimentMode));
+            scanProgress.setVisibility(View.VISIBLE);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().getDecorView().setKeepScreenOn(true);
+            if(experimentWatchdog!=null)uiHandler.removeCallbacks(experimentWatchdog);
+            experimentWatchdog=()->{
+                if(experimentRunning)stopExperiment("main_app_timeout_110_seconds");
+            };
+            if(age>=110000) {
+                stopExperiment("timeout_before_return");
+                return;
+            }
+            uiHandler.postDelayed(experimentWatchdog,110000-age);
+        }
+        JSONObject saved=readExperiment(experimentMode);
+        if(saved!=null&&!"in_progress".equals(saved.optString("status","in_progress"))) {
+            finishExperiment(null);
+        }else{
+            scanStatus.setText("Controlled experiment continues in a foreground service.");
+            summary.setText(UsbTrafficExperimentService.labelFor(experimentMode));
+            if(saved!=null)details.setText(
+                "Last USB operation: "+saved.optString("current_operation","starting")
+                +"\nCaptured bytes so far: "+saved.optInt("bytes_received_so_far",0));
+        }
+    }
+
+    private void stopExperiment(String reason) {
+        if(!experimentRunning)return;
+        int pid=experimentWorkerPid;
+        if(pid>0&&pid!=android.os.Process.myPid()) {
+            try{android.os.Process.killProcess(pid);}catch(Exception ignored){}
+        }else{
+            try{startService(new Intent(this,UsbTrafficExperimentService.class)
+                .setAction(UsbTrafficExperimentService.ACTION_STOP));}
+            catch(Exception ignored){}
+        }
+        try{stopService(new Intent(this,UsbTrafficExperimentService.class));}
+        catch(Exception ignored){}
+        finishExperiment(reason);
+    }
+
+    private void finishExperiment(String forcedReason) {
+        if(!experimentRunning)return;
+        experimentRunning=false;
+        if(experimentWatchdog!=null)uiHandler.removeCallbacks(experimentWatchdog);
+        getPreferences(MODE_PRIVATE).edit().putBoolean("v076_running",false).apply();
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(false);
+        experimentStopButton.setVisibility(View.GONE);
+        showMarkerControls(false);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(100);
+        JSONObject saved=readExperiment(experimentMode);
+        if(saved==null)saved=new JSONObject();
+        try {
+            saved.put("app_version","0.7.6");
+            saved.put("main_app_elapsed_ms",
+                SystemClock.elapsedRealtime()-experimentStartedAt);
+            if(forcedReason!=null){
+                saved.put("status",forcedReason);
+                saved.put("terminated_by_main_process",true);
+                saved.put("last_operation_before_abort",
+                    saved.optString("current_operation","unknown"));
+            }
+        }catch(Exception ignored){}
+        saveExperiment(experimentMode,saved);
+        try{lastReport=saved.toString(2);}
+        catch(Exception ignored){lastReport=saved.toString();}
+        latestFilename="vehicle-v076-"+experimentMode+"-"+fileTimeUtc()+".json";
+        summary.setText(UsbTrafficExperimentService.labelFor(experimentMode)
+                +": "+saved.optString("status","unknown"));
+        JSONObject analysis=saved.optJSONObject("analysis");
+        JSONObject steady=analysis==null?null:analysis.optJSONObject("steady_total_30_seconds");
+        details.setText("Test outcome: "+saved.optString("outcome","unknown")
+            +"\nTotal bytes: "+saved.optInt("total_bytes_including_warmup",0)
+            +"\nSteady 30-sec bytes: "+(steady==null?0:steady.optInt("bytes_received",0))
+            +"\nLast USB operation: "+saved.optString("current_operation","unknown")
+            +"\nUse EXPORT JSON REPORT to save this detailed test.");
+        scanStatus.setText("Experiment saved. Export JSON for analysis.");
+    }
+
+    private void compareExperiments() {
+        if(experimentRunning||auditRunning||screenCaptureRunning) {
+            scanStatus.setText("Finish the current test first.");
+            return;
+        }
+        JSONObject sync=readExperiment(UsbTrafficExperimentService.SYNC);
+        JSONObject auto=readExperiment(UsbTrafficExperimentService.AUTO);
+        if(sync==null||auto==null) {
+            scanStatus.setText("Run BOTH tests 11 and 12 before comparing.");
+            return;
+        }
+        JSONObject summary=new JSONObject();
+        try{
+            summary.put("report_format","Vehicle controlled USB steady-state comparison v1");
+            summary.put("app_version","0.7.6");
+            summary.put("created_at_utc",timeUtc());
+            summary.put("ford_sync_user_selected",true);
+            summary.put("android_auto_user_selected",true);
+            summary.put("ford_screen_state_independently_verified",false);
+            summary.put("ford_sync_internal_access_confirmed",false);
+            summary.put("vehicle_diagnostic_data_confirmed",false);
+            JSONObject sa=sync.optJSONObject("analysis");
+            JSONObject aa=auto.optJSONObject("analysis");
+            JSONObject sm=sa==null?new JSONObject():sa.optJSONObject("steady_total_30_seconds");
+            JSONObject am=aa==null?new JSONObject():aa.optJSONObject("steady_total_30_seconds");
+            int sb=sm==null?0:sm.optInt("bytes_received",0);
+            int ab=am==null?0:am.optInt("bytes_received",0);
+            summary.put("sync_status",sync.optString("status"));
+            summary.put("auto_status",auto.optString("status"));
+            summary.put("ford_sync_steady_30sec",sm);
+            summary.put("android_auto_steady_30sec",am);
+            summary.put("difference_auto_minus_sync_bytes",ab-sb);
+            summary.put("sync_repeated_windows",sa==null?new JSONArray():
+                sa.optJSONArray("steady_windows"));
+            summary.put("auto_repeated_windows",aa==null?new JSONArray():
+                aa.optJSONArray("steady_windows"));
+            JSONObject actions=readExperiment(UsbTrafficExperimentService.ACTIONS);
+            if(actions!=null){
+                summary.put("optional_action_markers",actions.optJSONArray("user_action_markers"));
+                JSONObject an=actions.optJSONObject("analysis");
+                summary.put("optional_action_before_after_rates",
+                    an==null?new JSONArray():an.optJSONArray("action_comparisons"));
+            }
+            summary.put("interpretation","These measurements reflect Android USB accessory traffic after excluding initial buffering. Differences are associations only, not evidence of decrypted Ford SYNC or vehicle diagnostic data.");
+        }catch(Exception ignored){}
+        try{lastReport=summary.toString(2);}
+        catch(Exception ignored){lastReport=summary.toString();}
+        latestFilename="vehicle-v076-steady-screen-comparison-"+fileTimeUtc()+".json";
+        summary.setText("v0.7.6 Steady-state comparison assembled");
+        details.setText("Both 40-second experiments have saved statistics. "
+            +"The first 5 seconds are excluded; each screen has three 10-second measurement windows. "
+            +"The combined JSON includes action markers if test 13 has been run.");
+        scanStatus.setText("Choose a file location to export your comparison.");
         exportJson();
     }
 
