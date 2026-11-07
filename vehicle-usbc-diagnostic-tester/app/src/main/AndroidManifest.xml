@@ -19,6 +19,9 @@
         <service android:name=".UsbScreenCompareService" android:process=":usb_compare"
             android:exported="false" android:foregroundServiceType="shortService"
             android:stopWithTask="false" />
+        <service android:name=".UsbTrafficExperimentService"
+            android:process=":usb_experiment" android:exported="false"
+            android:foregroundServiceType="shortService" android:stopWithTask="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
