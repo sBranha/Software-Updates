@@ -143,7 +143,7 @@ public final class OneClickAuditService extends Service {
     }
 
     private static String filename(){
-        return "Vehicle-Port-Tester-v0.7.7-FULL-AUDIT-"
+        return "Vehicle-Capability-Explorer-v0.8.0-SCAN-EVERYTHING-"
                 +new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())
                 +".json";
     }
@@ -533,8 +533,9 @@ public final class OneClickAuditService extends Service {
         String status="completed";
         try{
             report=new JSONObject();
-            report.put("report_format","Vehicle Port Tester one-click comprehensive USB audit v1");
-            report.put("app_version","0.7.7");
+            report.put("report_format","Vehicle Capability Explorer one-click scan v1");
+            report.put("app_version","0.8.0");
+            report.put("scan_mode","automatic_read_only_capability_discovery");
             report.put("started_utc",utc());
             report.put("status","in_progress");
             report.put("read_only",true);
@@ -601,6 +602,9 @@ public final class OneClickAuditService extends Service {
             limits.put("obd_engine_transmission_abs",
                 "not_performed: no verified connected diagnostic adapter session");
             report.put("not_automatable_or_unavailable_checks",limits);
+            operation("analyze_explorer_screen_and_vehicle_capabilities",93);
+            report.put("capability_map",CapabilityMatrix.build(this,report));
+            checkpoint();
             report.put("interpretation","This automatically measures Android accessory connectivity and incoming USB traffic. It does not prove access to Ford SYNC internals, decrypted Android Auto content or vehicle ECUs.");
             status=cancelled?"cancelled":"completed";
         }catch(Exception ex){
