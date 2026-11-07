@@ -156,6 +156,28 @@ public class MainActivity extends Activity {
             }
         }
     };
+    private volatile boolean fullAutoRunning = false;
+    private volatile int fullAutoPid = 0;
+    private long fullAutoStarted = 0;
+    private boolean fullAutoReceiverRegistered = false;
+    private Runnable fullAutoWatchdog;
+    private Button stopFullAutoButton;
+    private static final String FULL_REPORT = OneClickAuditService.FILE;
+    private final BroadcastReceiver fullAutoEvents = new BroadcastReceiver() {
+        @Override public void onReceive(Context ctx, Intent i) {
+            if(!OneClickAuditService.EVENT.equals(i.getAction())||!fullAutoRunning)return;
+            int pid=i.getIntExtra("worker_pid",0);
+            if(pid>0&&pid!=android.os.Process.myPid())fullAutoPid=pid;
+            scanProgress.setIndeterminate(false);
+            scanProgress.setProgress(i.getIntExtra("percent",0));
+            String message=i.getStringExtra("text");
+            scanStatus.setText(message==null?"Automatic audit running":message);
+            summary.setText("ONE-CLICK FULL USB AUDIT");
+            details.setText("Stage: "+i.getStringExtra("stage")
+                +"\nNo vehicle commands sent. Report automatically saves to Downloads.");
+            if(i.getBooleanExtra("done",false))showCompletedFullAuto(null);
+        }
+    };
     private String lastReport = "";
     private String latestFilename = "";
     private final BroadcastReceiver usbChanged = new BroadcastReceiver() {
@@ -216,12 +238,26 @@ public class MainActivity extends Activity {
                 ex.getClass().getSimpleName());
         }
         resumeExperimentIfNeeded();
+        try {
+            IntentFilter f=new IntentFilter(OneClickAuditService.EVENT);
+            if(Build.VERSION.SDK_INT>=33)
+                registerReceiver(fullAutoEvents,f,Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(fullAutoEvents,f);
+            fullAutoReceiverRegistered=true;
+        }catch(Exception e){
+            scanStatus.setText("Full audit updates unavailable: "+e.getClass().getSimpleName());
+        }
+        resumeFullAutoIfNeeded();
     }
 
     @Override public void onStop() {
         // Do not cancel a two-minute audit merely because Android temporarily
         // backgrounds this activity, locks the screen, or shows a system dialog.
         // The audit continues in a foreground service in a separate process.
+        if(fullAutoReceiverRegistered) {
+            try{unregisterReceiver(fullAutoEvents);}catch(Exception ignored){}
+            fullAutoReceiverRegistered=false;
+        }
         if(experimentReceiverRegistered) {
             try{unregisterReceiver(experimentUpdates);}catch(Exception ignored){}
             experimentReceiverRegistered=false;
@@ -253,7 +289,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Port Tester\nv0.7.6", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Port Tester\nv0.7.7", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -277,6 +313,22 @@ public class MainActivity extends Activity {
         prog.topMargin = dp(8);
         prog.bottomMargin = dp(12);
         root.addView(scanProgress, prog);
+        Button oneClick=button("ONE BUTTON — RUN ALL TESTS & RECORD",0xff119a85);
+        LinearLayout.LayoutParams oneLp=new LinearLayout.LayoutParams(-1,dp(72));
+        oneLp.topMargin=dp(10);
+        oneLp.bottomMargin=dp(8);
+        root.addView(oneClick,oneLp);
+        oneClick.setTextSize(17);
+        oneClick.setOnClickListener(v->startFullAuto());
+        TextView oneInfo=text("PARKED ONLY. ONE TAP: USB stability, phone-side car app discovery, available Bluetooth OBD adapter detection, 3 USB open/close tests, 60-second read-only protocol/steady-rate analysis, then automatic full JSON save to Downloads/VehiclePortTester. About 80 seconds. May interrupt Android Auto. Cannot switch vehicle screens or access ECUs without an adapter.",13,0xffffcc91,false);
+        root.addView(oneInfo);
+        stopFullAutoButton=button("STOP ONE-CLICK AUDIT",0xffb64236);
+        root.addView(stopFullAutoButton);
+        stopFullAutoButton.setVisibility(View.GONE);
+        stopFullAutoButton.setOnClickListener(v->stopFullAuto());
+        Button showFull=button("SHOW LAST ONE-CLICK AUDIT REPORT",0xff29435a);
+        root.addView(showFull);
+        showFull.setOnClickListener(v->loadLastFullAuto());
         Button unplugged = button("1  SCAN UNPLUGGED", 0xff29435a);
         root.addView(unplugged);
         unplugged.setOnClickListener(v -> runScan("Test: disconnected", true));
@@ -352,7 +404,7 @@ public class MainActivity extends Activity {
         auditExport.setOnClickListener(v -> exportDeepAudit());
 
 
-        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.6)", 16, Color.WHITE, true);
+        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.7.7)", 16, Color.WHITE, true);
         LinearLayout.LayoutParams compareHeading = new LinearLayout.LayoutParams(-1, -2);
         compareHeading.topMargin = dp(20);
         root.addView(compareHead, compareHeading);
@@ -373,7 +425,7 @@ public class MainActivity extends Activity {
         exportCompare.setOnClickListener(v -> showScreenTrafficComparison());
 
 
-        TextView experimentHeading=text("v0.7.6  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
+        TextView experimentHeading=text("v0.7.7  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
         LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-1,-2);
         elp.topMargin=dp(20);
         root.addView(experimentHeading,elp);
@@ -579,7 +631,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.7.6");
+            report.put("app_version", "0.7.7");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -820,7 +872,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.7.6");
+                report.put("app_version", "0.7.7");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -932,7 +984,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.7.6");
+            timeout.put("app_version", "0.7.7");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -1062,7 +1114,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.7.6");
+            report.put("app_version", "0.7.7");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1288,7 +1340,7 @@ public class MainActivity extends Activity {
     }
 
     private void runScan(String trigger, boolean save) {
-        if (scanActive || connectionActive || screenCaptureRunning || experimentRunning) {
+        if (scanActive || connectionActive || screenCaptureRunning || experimentRunning || fullAutoRunning) {
             scanStatus.setText("Another USB test is running. Please finish or stop that test first.");
             return;
         }
@@ -1309,7 +1361,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.7.6");
+            report.put("app_version", "0.7.7");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1501,7 +1553,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.7.6");
+            combined.put("app_version", "0.7.7");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
@@ -1680,7 +1732,7 @@ public class MainActivity extends Activity {
         JSONObject saved = readScreenCapture(screenCaptureMode);
         if (saved == null) saved = new JSONObject();
         try {
-            saved.put("app_version","0.7.6");
+            saved.put("app_version","0.7.7");
             saved.put("user_selected_screen",screenCaptureMode);
             if (stopReason != null) {
                 saved.put("status",stopReason);
@@ -1747,7 +1799,7 @@ public class MainActivity extends Activity {
         JSONObject result = new JSONObject();
         try {
             result.put("report_format","Vehicle USB screen traffic comparison summary v1");
-            result.put("app_version","0.7.6");
+            result.put("app_version","0.7.7");
             result.put("generated_utc",timeUtc());
             result.put("vehicle_screen_state_is_user_selected_not_verified",true);
             result.put("ford_sync_or_vehicle_ecu_access_confirmed",false);
@@ -1948,7 +2000,7 @@ public class MainActivity extends Activity {
         JSONObject saved=readExperiment(experimentMode);
         if(saved==null)saved=new JSONObject();
         try {
-            saved.put("app_version","0.7.6");
+            saved.put("app_version","0.7.7");
             saved.put("main_app_elapsed_ms",
                 SystemClock.elapsedRealtime()-experimentStartedAt);
             if(forcedReason!=null){
@@ -1988,7 +2040,7 @@ public class MainActivity extends Activity {
         JSONObject comparisonData=new JSONObject();
         try{
             comparisonData.put("report_format","Vehicle controlled USB steady-state comparison v1");
-            comparisonData.put("app_version","0.7.6");
+            comparisonData.put("app_version","0.7.7");
             comparisonData.put("created_at_utc",timeUtc());
             comparisonData.put("ford_sync_user_selected",true);
             comparisonData.put("android_auto_user_selected",true);
@@ -2022,12 +2074,162 @@ public class MainActivity extends Activity {
         try{lastReport=comparisonData.toString(2);}
         catch(Exception ignored){lastReport=comparisonData.toString();}
         latestFilename="vehicle-v076-steady-screen-comparison-"+fileTimeUtc()+".json";
-        summary.setText("v0.7.6 Steady-state comparison assembled");
+        summary.setText("v0.7.7 Steady-state comparison assembled");
         details.setText("Both 40-second experiments have saved statistics. "
             +"The first 5 seconds are excluded; each screen has three 10-second measurement windows. "
             +"The combined JSON includes action markers if test 13 has been run.");
         scanStatus.setText("Choose a file location to export your comparison.");
         exportJson();
+    }
+
+
+    private JSONObject readFullAutoReport(){
+        try{
+            File file=new File(getFilesDir(),FULL_REPORT);
+            if(!file.exists())return null;
+            byte[] bytes=java.nio.file.Files.readAllBytes(file.toPath());
+            return new JSONObject(new String(bytes,StandardCharsets.UTF_8));
+        }catch(Exception ignored){return null;}
+    }
+
+    private void startFullAuto(){
+        if(fullAutoRunning||auditRunning||experimentRunning||screenCaptureRunning||
+                scanActive||connectionActive){
+            scanStatus.setText("Stop or finish another USB test before starting.");
+            return;
+        }
+        fullAutoRunning=true;
+        fullAutoPid=0;
+        fullAutoStarted=SystemClock.elapsedRealtime();
+        try{new File(getFilesDir(),FULL_REPORT).delete();}catch(Exception ignored){}
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("v077_oneclick_running",true)
+            .putLong("v077_oneclick_start_wall",System.currentTimeMillis()).apply();
+        stopFullAutoButton.setVisibility(View.VISIBLE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(true);
+        scanProgress.setVisibility(View.VISIBLE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(0);
+        summary.setText("ONE-CLICK AUDIT — STARTING");
+        details.setText("Runs automatically; no additional buttons needed. The report will be saved in Downloads/VehiclePortTester.");
+        scanStatus.setText("Starting read-only full vehicle USB audit...");
+        fullAutoWatchdog=()->{
+            if(fullAutoRunning)stopFullAutoWithReason("ui_hard_timeout_160_seconds");
+        };
+        uiHandler.postDelayed(fullAutoWatchdog,160000);
+        try{
+            Intent i=new Intent(this,OneClickAuditService.class);
+            if(Build.VERSION.SDK_INT>=26)startForegroundService(i);
+            else if(startService(i)==null)throw new IllegalStateException("Service did not start");
+        }catch(Exception e){
+            stopFullAutoWithReason("service_start_failed");
+            scanStatus.setText("Full audit could not start: "+e.getClass().getSimpleName());
+        }
+    }
+
+    private void resumeFullAutoIfNeeded(){
+        boolean saved=getPreferences(MODE_PRIVATE).getBoolean("v077_oneclick_running",false);
+        if(!saved&&!fullAutoRunning)return;
+        if(!fullAutoRunning){
+            long wall=getPreferences(MODE_PRIVATE).getLong(
+                "v077_oneclick_start_wall",System.currentTimeMillis());
+            long elapsed=Math.max(0,System.currentTimeMillis()-wall);
+            fullAutoStarted=SystemClock.elapsedRealtime()-elapsed;
+            fullAutoRunning=true;
+            stopFullAutoButton.setVisibility(View.VISIBLE);
+            scanProgress.setVisibility(View.VISIBLE);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().getDecorView().setKeepScreenOn(true);
+            if(fullAutoWatchdog!=null)uiHandler.removeCallbacks(fullAutoWatchdog);
+            if(elapsed<160000){
+                fullAutoWatchdog=()->{
+                    if(fullAutoRunning)stopFullAutoWithReason("ui_hard_timeout_160_seconds");
+                };
+                uiHandler.postDelayed(fullAutoWatchdog,160000-elapsed);
+            }else{
+                stopFullAutoWithReason("timeout_on_return_to_app");
+                return;
+            }
+        }
+        JSONObject file=readFullAutoReport();
+        if(file!=null&&!"in_progress".equals(file.optString("status","in_progress"))
+            &&(file.has("completed_utc")||file.optBoolean("auto_download_success",false))){
+            showCompletedFullAuto(null);
+        }else{
+            scanStatus.setText("The full automatic USB audit continues in the background.");
+        }
+    }
+
+    private void stopFullAuto(){
+        stopFullAutoWithReason("stopped_by_user");
+    }
+
+    private void stopFullAutoWithReason(String reason){
+        if(!fullAutoRunning)return;
+        int pid=fullAutoPid;
+        if(pid>0&&pid!=android.os.Process.myPid()){
+            try{android.os.Process.killProcess(pid);}catch(Exception ignored){}
+        }else{
+            try{startService(new Intent(this,OneClickAuditService.class)
+                .setAction(OneClickAuditService.STOP));}
+            catch(Exception ignored){}
+        }
+        try{stopService(new Intent(this,OneClickAuditService.class));}
+        catch(Exception ignored){}
+        showCompletedFullAuto(reason);
+    }
+
+    private void showCompletedFullAuto(String forced){
+        if(!fullAutoRunning)return;
+        fullAutoRunning=false;
+        if(fullAutoWatchdog!=null)uiHandler.removeCallbacks(fullAutoWatchdog);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().getDecorView().setKeepScreenOn(false);
+        getPreferences(MODE_PRIVATE).edit().putBoolean("v077_oneclick_running",false).apply();
+        stopFullAutoButton.setVisibility(View.GONE);
+        scanProgress.setIndeterminate(false);
+        scanProgress.setProgress(100);
+        JSONObject file=readFullAutoReport();
+        if(file==null)file=new JSONObject();
+        if(forced!=null){
+            try{
+                file.put("status",forced);
+                file.put("partial_checkpoint_preserved",true);
+                java.nio.file.Files.write(new File(getFilesDir(),FULL_REPORT).toPath(),
+                    file.toString(2).getBytes(StandardCharsets.UTF_8));
+            }catch(Exception ignored){}
+        }
+        renderFullAuto(file);
+    }
+
+    private void renderFullAuto(JSONObject file){
+        try{lastReport=file.toString(2);}
+        catch(Exception ignored){lastReport=file.toString();}
+        latestFilename="Vehicle-Port-Tester-v0.7.7-FULL-AUDIT-"+fileTimeUtc()+".json";
+        JSONObject read=file.optJSONObject("usb_stream_and_steady_analysis");
+        JSONObject rate=read==null?null:read.optJSONObject("all_45s_steady");
+        summary.setText("FULL VEHICLE USB AUDIT: "+file.optString("status","unknown"));
+        details.setText("Received USB bytes: "+file.optInt("total_usb_bytes",0)
+            +"\nSteady data rate: "+(rate==null?"not available":rate.optString("bytes_per_second","not available"))+" B/s"
+            +"\nUSB capture: "+(read==null?"not performed":read.optString("outcome","unknown"))
+            +"\nFord internal/ECU access: NOT established"
+            +"\nAuto-saved: "+file.optBoolean("auto_download_success",false)
+            +"\n"+file.optString("saved_downloads_path",
+                    "The full report remains available in the app; tap EXPORT JSON REPORT if not in Downloads."));
+        scanStatus.setText(file.optBoolean("auto_download_success",false)
+            ?"Complete JSON saved automatically in Downloads/VehiclePortTester."
+            :"Full audit result preserved. Check Downloads or tap EXPORT JSON REPORT.");
+    }
+
+    private void loadLastFullAuto(){
+        JSONObject file=readFullAutoReport();
+        if(file==null){
+            scanStatus.setText("No one-click full audit report saved yet.");
+            return;
+        }
+        renderFullAuto(file);
+        scanStatus.setText("Last full audit loaded. The EXPORT JSON REPORT button can share a copy.");
     }
 
     private void exportJson() {
