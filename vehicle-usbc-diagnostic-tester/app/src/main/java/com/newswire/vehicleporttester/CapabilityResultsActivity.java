@@ -178,7 +178,7 @@ public final class CapabilityResultsActivity extends Activity {
                     inventoryCard.addView(text("EXPLORE EVERY SYSTEM",12,MINT,true));
                     space(inventoryCard,8);
                     inventoryCard.addView(text(
-                        inv.optInt("total_candidates_checked")+
+                        inv.optInt("total_feature_candidates")+
                         " potential data points & functions across Ford systems",
                         20,Color.WHITE,true));
                     inventoryCard.addView(text(
