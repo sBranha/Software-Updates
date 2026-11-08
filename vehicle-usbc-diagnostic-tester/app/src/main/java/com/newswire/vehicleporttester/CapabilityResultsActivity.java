@@ -126,7 +126,7 @@ public final class CapabilityResultsActivity extends Activity {
         root.setPadding(dp(20),dp(28),dp(20),dp(28));
         scroll.addView(root);
         setContentView(scroll);
-        TextView eyebrow=text("VEHICLE CAPABILITY EXPLORER  •  v0.8.0",12,MINT,true);
+        TextView eyebrow=text("VEHICLE CAPABILITY EXPLORER  •  v0.8.1",12,MINT,true);
         root.addView(eyebrow);
         space(root,8);
         TextView title=text("What can we actually do?",27,Color.WHITE,true);
@@ -167,6 +167,36 @@ public final class CapabilityResultsActivity extends Activity {
                     13,MUTED,false));
                 top.addView(text("Vehicle: 2021 Ford Explorer Limited (user-reported)",12,MUTED,false));
                 space(root,20);
+
+                JSONObject inv=report.optJSONObject("vehicle_system_inventory");
+                if(inv!=null) {
+                    space(root,5);
+                    LinearLayout inventoryCard=vertical();
+                    inventoryCard.setBackground(background(0xff15293B,0xff256979));
+                    inventoryCard.setPadding(dp(16),dp(16),dp(16),dp(17));
+                    root.addView(inventoryCard);
+                    inventoryCard.addView(text("EXPLORE EVERY SYSTEM",12,MINT,true));
+                    space(inventoryCard,8);
+                    inventoryCard.addView(text(
+                        inv.optInt("total_candidates_checked")+
+                        " potential data points & functions across Ford systems",
+                        20,Color.WHITE,true));
+                    inventoryCard.addView(text(
+                        "Each has separate read and control access evidence. "
+                        +"Only actual Android observations count as verified.",
+                        12,MUTED,false));
+                    space(inventoryCard,12);
+                    Button browse=new Button(this);
+                    browse.setText("VIEW ALL SYSTEMS & CONTROL POSSIBILITIES");
+                    browse.setAllCaps(false);
+                    browse.setTextSize(13);
+                    browse.setTextColor(BG);
+                    browse.setBackground(background(MINT,0));
+                    browse.setOnClickListener(v->startActivity(
+                        new android.content.Intent(this,SystemInventoryActivity.class)));
+                    inventoryCard.addView(browse,new LinearLayout.LayoutParams(-1,dp(55)));
+                    space(root,20);
+                }
 
                 JSONArray capabilities=matrix.optJSONArray("capabilities");
                 makeSection(root,capabilities,"USB & CONNECTION",
