@@ -161,7 +161,7 @@ public final class CapabilityMatrix {
                 else unverified++;
             }
             result.put("format","Vehicle Capability Explorer evidence matrix v1");
-            result.put("generated_version","0.8.0");
+            result.put("generated_version","0.8.2");
             result.put("vehicle","2021 Ford Explorer Limited (user-reported; not electronically identified)");
             result.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
             result.put("status_meaning",new JSONObject()
