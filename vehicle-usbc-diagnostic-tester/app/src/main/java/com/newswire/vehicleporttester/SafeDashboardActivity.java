@@ -54,11 +54,14 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private static final int TEXT=0xffeef5fc, MUTED=0xff92a9bc;
     private static final int CYAN=0xff38d6eb, ORANGE=0xffffb55d, GREEN=0xff61e2a5;
     private static final int REQ_GPS=803;
+    private static final int REQ_CAMERA_TACH=860;
     private TextView linkStatus, gpsStatus, tripText, scanResult, touchResult, rpmValueText;
     private NeedleGauge gpsGauge, rpmGauge;
     private Button gpsButton;
     private SeekBar rpmSlider;
     private int demoRpm=0;
+    private float cameraOpticalRpm=Float.NaN, cameraOpticalConfidence=0;
+    private String cameraOpticalSource="not_tested";
     private LocationManager locationManager;
     private boolean locationEnabled=false, receivingGps=false, wasResumed=false;
     private Location previousFix;
@@ -128,7 +131,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Instrument Lab",30,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.4   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.5   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -230,6 +233,22 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         demo.addView(row2);
         body.addView(demo);
         updateDemoRpm(0,true);
+        gap(body,13);
+
+        LinearLayout cameraPanel=vertical();
+        cameraPanel.setPadding(dp(15),dp(13),dp(15),dp(15));
+        cameraPanel.setBackground(panel(0xff152c38,0xff255763));
+        cameraPanel.addView(text("REAL DASHBOARD RPM • PHONE CAMERA",13,CYAN,true));
+        gap(cameraPanel,5);
+        cameraPanel.addView(text("Optical estimate from your Explorer's cyan tachometer needle. Park, aim the rear camera at the LEFT gauge, then tap its CENTER, 0 tick and MAX tick. No OBD or USB control.",12,MUTED,false));
+        gap(cameraPanel,8);
+        Button cameraReader=button("OPEN CAMERA RPM READER",0xff176579);
+        cameraPanel.addView(cameraReader,new LinearLayout.LayoutParams(-1,dp(51)));
+        cameraReader.setOnClickListener(v->{
+            Intent i=new Intent(this,CameraTachometerActivity.class);
+            startActivityForResult(i,REQ_CAMERA_TACH);
+        });
+        body.addView(cameraPanel);
         gap(body,15);
 
         Button scan=button("SAFE CONNECTION SCAN",0xff147389);
@@ -250,12 +269,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             .setNeutralButton("CANCEL",(d,w)->{})
             .show());
         gap(body,7);
-        touchResult=text("Ford touchscreen: not yet tested with v0.8.4.",12,MUTED,false);
+        touchResult=text("Ford touchscreen: not yet tested with v0.8.5.",12,MUTED,false);
         body.addView(touchResult);
         gap(body,17);
         body.addView(text("REAL FORD RPM / ODOMETER: NOT CONNECTED",12,ORANGE,true));
         gap(body,3);
-        body.addView(text("Android Auto doesn't provide public engine-RPM or odometer readings. The GPS display is real phone data; the RPM gauge is intentionally simulated. No OBD device is required for these UI tests.",12,MUTED,false));
+        body.addView(text("Android Auto does not expose actual engine-RPM or odometer readings. PHONE GPS is real phone data. RPM presets are DEMO; CAMERA RPM is an optical estimate after calibration, never a Ford ECU reading.",12,MUTED,false));
     }
 
     private void addPreset(LinearLayout row,String label,int rpm){
@@ -267,12 +286,30 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     }
     private void updateDemoRpm(int rpm,boolean setSlider){
         demoRpm=Math.max(0,Math.min(8000,rpm));
+        // Returning to a demo preset explicitly overrides an old camera estimate.
         if(rpmValueText!=null)
             rpmValueText.setText(String.format(Locale.US,"%,d RPM • DEMO",demoRpm));
         if(rpmGauge!=null)
             rpmGauge.setReading(demoRpm/1000f,"DEMO ONLY",true);
         if(setSlider && rpmSlider!=null && rpmSlider.getProgress()!=demoRpm)
             rpmSlider.setProgress(demoRpm);
+    }
+
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==REQ_CAMERA_TACH&&resultCode==RESULT_OK&&data!=null){
+            float rpm=data.getFloatExtra("optical_rpm",Float.NaN);
+            if(Float.isFinite(rpm)&&rpm>=0&&rpm<=8000){
+                cameraOpticalRpm=rpm;
+                cameraOpticalConfidence=data.getFloatExtra("optical_confidence",0);
+                cameraOpticalSource=data.getStringExtra("optical_source");
+                if(cameraOpticalSource==null)cameraOpticalSource="camera_optical";
+                rpmGauge.setReading(rpm/1000f,"CAMERA EST.",true);
+                rpmValueText.setText(String.format(Locale.US,
+                    "%,.0f RPM • CAMERA ESTIMATE",rpm));
+                scanResult.setText("Camera estimated RPM from tachometer photo/preview. This is not ECU data. Tap SAFE CONNECTION SCAN to export metadata.");
+            }
+        }
     }
 
     private void setTouchResult(String status){
@@ -300,7 +337,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format","Vehicle Capability Explorer safe dashboard scan v1");
-            j.put("app_version","0.8.4");
+            j.put("app_version","0.8.5");
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
             j.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
@@ -318,6 +355,10 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             j.put("phone_gps_trip_miles",tripMiles);
             j.put("rpm_gauge_source","user_controlled_demo_presets_or_slider");
             j.put("rpm_demo_value_only_not_from_vehicle",demoRpm);
+            j.put("camera_optical_rpm_estimate",Float.isFinite(cameraOpticalRpm)?cameraOpticalRpm:JSONObject.NULL);
+            j.put("camera_optical_confidence",cameraOpticalConfidence);
+            j.put("camera_optical_source",cameraOpticalSource);
+            j.put("camera_rpm_is_derived_from_phone_camera_not_vehicle_sensor",true);
             j.put("touchscreen_user_test",touchCheck);
             j.put("touchscreen_test_is_user_reported_not_electronically_verified",true);
             UsbManager usb=(UsbManager)getSystemService(USB_SERVICE);
@@ -347,7 +388,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             lastSafeReport=j;
             refreshConnectionStatus();
 
-            String fileName="Vehicle-Capability-Explorer-v0.8.4-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
+            String fileName="Vehicle-Capability-Explorer-v0.8.5-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
             ContentValues cv=new ContentValues();
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME,fileName);
             cv.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
