@@ -174,6 +174,8 @@ public class MainActivity extends Activity {
     private boolean fullAutoReceiverRegistered = false;
     private Runnable fullAutoWatchdog;
     private Button stopFullAutoButton;
+    private Button markGuidedActionButton;
+    private String activeGuidedStage="";
     private static final String FULL_REPORT = OneClickAuditService.FILE;
     private final BroadcastReceiver fullAutoEvents = new BroadcastReceiver() {
         @Override public void onReceive(Context ctx, Intent i) {
@@ -184,9 +186,20 @@ public class MainActivity extends Activity {
             scanProgress.setProgress(i.getIntExtra("percent",0));
             String message=i.getStringExtra("text");
             scanStatus.setText(message==null?"Automatic audit running":message);
-            summary.setText("ONE-CLICK FULL USB AUDIT");
+            String stage=i.getStringExtra("stage_key");
+            activeGuidedStage=stage==null?"":stage;
+            if(markGuidedActionButton!=null){
+                boolean show=!activeGuidedStage.isEmpty()
+                    &&!"baseline".equals(activeGuidedStage);
+                markGuidedActionButton.setVisibility(show?View.VISIBLE:View.GONE);
+                if(show)markGuidedActionButton.setText("MARK ACTION DONE • "+
+                    activeGuidedStage.replace('_',' ').toUpperCase(Locale.US));
+            }
+            summary.setText("GUIDED USB COMPARISON • PARKED ONLY");
             details.setText("Stage: "+i.getStringExtra("stage")
-                +"\nNo vehicle commands sent. Report automatically saves to Downloads.");
+                +"\nFollow the instruction above if parked and safe."
+                +"\nMARK ACTION DONE is optional. No vehicle commands are sent."
+                +"\nOne JSON report will be saved automatically.");
             if(i.getBooleanExtra("done",false))showCompletedFullAuto(null);
         }
     };
@@ -204,7 +217,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         buildLayout();
-        scanStatus.setText("Ready. Park the vehicle, connect USB and tap ONE BUTTON to record everything.");
+        scanStatus.setText("Ready. Park the Explorer, connect USB, and tap SCAN EVERYTHING.");
     }
 
     @Override public void onStart() {
@@ -314,7 +327,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Capability Explorer\nv0.8.1", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Capability Explorer\nv0.8.2", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -345,8 +358,28 @@ public class MainActivity extends Activity {
         root.addView(oneClick,oneLp);
         oneClick.setTextSize(17);
         oneClick.setOnClickListener(v->beginFullScanWithPermissions());
-        TextView oneInfo=text("One tap scans all accessible Android USB and car-app capabilities, tests connection stability and live traffic, and checks whether a paired Bluetooth OBD adapter can be identified. Results are organized into confirmed, possible, and unavailable functions. About 80 seconds. PARKED ONLY: Android Auto may disconnect; no vehicle commands will be sent.",13,0xffffcc91,false);
+        TextView oneInfo=text("PARKED ONLY. One scan checks phone USB, Bluetooth and supported Android Auto service paths, then guides you through 6 short windows: idle, Maps, audio, Ford home screen, climate and restore. Follow each onscreen prompt. You may mark an action done. No Ford commands are sent by this app; the report will compare USB traffic, not claim to decode SYNC or ECU data. About 80 seconds. May interrupt Android Auto.",13,0xffffcc91,false);
         root.addView(oneInfo);
+        markGuidedActionButton=button("MARK ACTION DONE",0xff246D90);
+        LinearLayout.LayoutParams markParams=new LinearLayout.LayoutParams(-1,dp(58));
+        markParams.topMargin=dp(12);
+        root.addView(markGuidedActionButton,markParams);
+        markGuidedActionButton.setVisibility(View.GONE);
+        markGuidedActionButton.setOnClickListener(v->{
+            if(!fullAutoRunning||activeGuidedStage.isEmpty()||
+                    "baseline".equals(activeGuidedStage))return;
+            Intent mark=new Intent(this,OneClickAuditService.class);
+            mark.setAction(OneClickAuditService.MARK_ACTION);
+            mark.putExtra("stage_key",activeGuidedStage);
+            try{
+                startService(mark);
+                markGuidedActionButton.setEnabled(false);
+                uiHandler.postDelayed(()->markGuidedActionButton.setEnabled(true),1000);
+            }catch(Exception ex){
+                scanStatus.setText("Could not mark action: "+
+                    ex.getClass().getSimpleName());
+            }
+        });
         stopFullAutoButton=button("STOP SCAN",0xffb64236);
         root.addView(stopFullAutoButton);
         stopFullAutoButton.setVisibility(View.GONE);
@@ -2231,7 +2264,9 @@ public class MainActivity extends Activity {
         scanProgress.setVisibility(View.VISIBLE);
         scanProgress.setIndeterminate(false);
         scanProgress.setProgress(0);
-        summary.setText("ONE-CLICK AUDIT — STARTING");
+        summary.setText("GUIDED DISCOVERY — STARTING");
+        activeGuidedStage="";
+        if(markGuidedActionButton!=null)markGuidedActionButton.setVisibility(View.GONE);
         details.setText("Runs automatically; no additional buttons needed. The report will be saved in Downloads/VehiclePortTester.");
         scanStatus.setText("Starting read-only full vehicle USB audit...");
         fullAutoWatchdog=()->{
@@ -2308,6 +2343,8 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setKeepScreenOn(false);
         getPreferences(MODE_PRIVATE).edit().putBoolean("v077_oneclick_running",false).apply();
         stopFullAutoButton.setVisibility(View.GONE);
+        activeGuidedStage="";
+        if(markGuidedActionButton!=null)markGuidedActionButton.setVisibility(View.GONE);
         scanProgress.setIndeterminate(false);
         scanProgress.setProgress(100);
         JSONObject file=readFullAutoReport();
@@ -2329,7 +2366,7 @@ public class MainActivity extends Activity {
     private void renderFullAuto(JSONObject file){
         try{lastReport=file.toString(2);}
         catch(Exception ignored){lastReport=file.toString();}
-        latestFilename="Vehicle-Capability-Explorer-v0.8.1-FULL-SCAN-"+fileTimeUtc()+".json";
+        latestFilename="Vehicle-Capability-Explorer-v0.8.2-GUIDED-USB-"+fileTimeUtc()+".json";
         JSONObject read=file.optJSONObject("usb_stream_and_steady_analysis");
         JSONObject rate=read==null?null:read.optJSONObject("all_45s_steady");
         summary.setText("VEHICLE CAPABILITY SCAN: "+file.optString("status","unknown"));
@@ -2337,6 +2374,9 @@ public class MainActivity extends Activity {
             +"\nSteady data rate: "+(rate==null?"not available":rate.optString("bytes_per_second","not available"))+" B/s"
             +"\nUSB capture: "+(read==null?"not performed":read.optString("outcome","unknown"))
             +"\nFord internal/ECU access: NOT established"
+            +"\nGuided phases: "+(file.optJSONObject("guided_usb_comparison")==null
+                ?"not available":file.optJSONObject("guided_usb_comparison")
+                .optJSONArray("phases")==null?"skipped":"6 timed windows")
             +"\nAuto-saved: "+file.optBoolean("auto_download_success",false)
             +"\n"+file.optString("saved_downloads_path",
                     "The full report remains available in the app; tap EXPORT JSON REPORT if not in Downloads."));
