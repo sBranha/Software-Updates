@@ -27,6 +27,7 @@
         <service android:name=".OneClickAuditService"
             android:process=":one_click" android:exported="false"
             android:foregroundServiceType="shortService" android:stopWithTask="false" />
+        <activity android:name=".SystemInventoryActivity" android:exported="false" />
         <activity android:name=".CapabilityResultsActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
