@@ -55,6 +55,7 @@ import java.util.TimeZone;
 public final class OneClickAuditService extends Service {
     public static final String EVENT="com.newswire.vehicleporttester.ONE_CLICK_AUDIT_EVENT";
     public static final String STOP="com.newswire.vehicleporttester.ONE_CLICK_STOP";
+    public static final String MARK_ACTION="com.newswire.vehicleporttester.ONE_CLICK_STAGE_CONFIRMED";
     public static final String FILE="vehicle-v077-one-click-full-audit.json";
     private static final String CHANNEL="vehicle_port_one_click";
     private static final int NOTIFICATION_ID=7717;
@@ -64,6 +65,8 @@ public final class OneClickAuditService extends Service {
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
     private final Object fileLock=new Object();
     private volatile boolean cancelled=false;
+    private volatile String currentGuidedStage="";
+    private final JSONArray confirmedGuidedActions=new JSONArray();
     private Thread worker;
     private JSONObject report;
     private long started;
@@ -74,6 +77,33 @@ public final class OneClickAuditService extends Service {
     @Override public IBinder onBind(Intent i){return null;}
 
     @Override public int onStartCommand(Intent i,int flags,int id){
+        if(i!=null&&MARK_ACTION.equals(i.getAction())){
+            String key=i.getStringExtra("stage_key");
+            if(key!=null&&key.equals(currentGuidedStage)&&!key.isEmpty()){
+                synchronized(fileLock){
+                    try{
+                        boolean seen=false;
+                        for(int j=0;j<confirmedGuidedActions.length();j++){
+                            if(key.equals(confirmedGuidedActions.getJSONObject(j)
+                                .optString("stage_key")))seen=true;
+                        }
+                        if(!seen){
+                            confirmedGuidedActions.put(new JSONObject()
+                                .put("stage_key",key)
+                                .put("marked_utc",utc())
+                                .put("capture_second",captureStart<=0?-1:
+                                    (SystemClock.elapsedRealtime()-captureStart)/1000));
+                            if(report!=null)
+                                report.put("guided_user_action_markers",confirmedGuidedActions);
+                        }
+                    }catch(Exception ignored){}
+                }
+                checkpoint();
+                notifyProgress("guided_action_marked",22,"Marked "+key+
+                    " as done by user. Recording continues.",false);
+            }
+            return START_NOT_STICKY;
+        }
         if(i!=null&&STOP.equals(i.getAction())){
             cancelled=true;
             Process.killProcess(Process.myPid()); // dedicated :one_click process only
@@ -85,10 +115,10 @@ public final class OneClickAuditService extends Service {
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             if(nm!=null && Build.VERSION.SDK_INT>=26)
                 nm.createNotificationChannel(new NotificationChannel(CHANNEL,
-                    "Vehicle Port Tester full audit",NotificationManager.IMPORTANCE_LOW));
+                    "Vehicle Capability Explorer guided scan",NotificationManager.IMPORTANCE_LOW));
             Notification n=new Notification.Builder(this,CHANNEL)
                     .setSmallIcon(android.R.drawable.ic_menu_info_details)
-                    .setContentTitle("Vehicle Port Tester: full USB audit")
+                    .setContentTitle("Vehicle Explorer: guided USB test")
                     .setContentText("Read-only, automatic recording in progress")
                     .setOngoing(true).build();
             if(Build.VERSION.SDK_INT>=34)
@@ -143,7 +173,7 @@ public final class OneClickAuditService extends Service {
     }
 
     private static String filename(){
-        return "Vehicle-Capability-Explorer-v0.8.1-FULL-ACCESS-INVENTORY-"
+        return "Vehicle-Capability-Explorer-v0.8.2-GUIDED-USB-COMPARE-"
                 +new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())
                 +".json";
     }
@@ -152,6 +182,7 @@ public final class OneClickAuditService extends Service {
         Intent intent=new Intent(EVENT);
         intent.setPackage(getPackageName());
         intent.putExtra("stage",stage);
+        intent.putExtra("stage_key",currentGuidedStage);
         intent.putExtra("percent",Math.max(0,Math.min(100,percent)));
         intent.putExtra("text",note);
         intent.putExtra("done",finished);
@@ -392,8 +423,19 @@ public final class OneClickAuditService extends Service {
                         long deadline=captureStart+SECONDS*1000L;
                         long nextCheckpoint=captureStart+2000;
                         outcome="no_data_during_capture";
+                        String lastGuidedStage="";
                         while(!cancelled&&SystemClock.elapsedRealtime()<deadline){
                             long now=SystemClock.elapsedRealtime();
+                            int stageSec=(int)Math.min(SECONDS-1,
+                                Math.max(0,(now-captureStart)/1000L));
+                            String key=GuidedActionPlan.keyAt(stageSec);
+                            if(!key.equals(lastGuidedStage)){
+                                currentGuidedStage=key;
+                                lastGuidedStage=key;
+                                notifyProgress("guided_"+key,22+stageSec,
+                                    "PARKED TEST "+(GuidedActionPlan.atSecond(stageSec)+1)+"/6: "
+                                    +GuidedActionPlan.promptAt(stageSec),false);
+                            }
                             int wait=(int)Math.min(250,Math.max(1,deadline-now));
                             step="poll";
                             if(!step.equals(previous)){operation(step,22);previous=step;}
@@ -443,9 +485,9 @@ public final class OneClickAuditService extends Service {
                                 }
                                 checkpoint();
                                 int progress=25+Math.min(60,elapsed);
-                                notifyProgress("usb_stream_capture",progress,
-                                    "Recording USB communication: "+elapsed+"/60 sec, "
-                                        +total+" bytes",false);
+                                notifyProgress("guided_"+currentGuidedStage,progress,
+                                    "PARKED • "+GuidedActionPlan.promptAt(Math.min(59,elapsed))
+                                    +" • "+elapsed+"/60 sec, "+total+" bytes",false);
                                 nextCheckpoint=now+2000;
                             }
                         }
@@ -467,6 +509,7 @@ public final class OneClickAuditService extends Service {
                     test.put("errno",((ErrnoException)ex).errno);
             }catch(Exception ignored){}
         }finally{
+            currentGuidedStage="";
             if(fd!=null){
                 try{fd.close();test.put("connection_closed",true);}
                 catch(Exception ex){
@@ -500,6 +543,16 @@ public final class OneClickAuditService extends Service {
                 test.put("post_warmup_frame_heuristics",
                     UsbProtocolAnalyzer.analyze(sample,stored));
                 test.put("outcome",outcome);
+                if(test.optBoolean("opened",false)
+                    &&test.optLong("actual_capture_ms",0)>=15000){
+                    test.put("guided_stage_comparison",
+                        GuidedActionPlan.compare(seconds,confirmedGuidedActions));
+                }else{
+                    test.put("guided_stage_comparison",new JSONObject()
+                        .put("status","skipped_no_sustained_usb_capture")
+                        .put("reason",outcome));
+                }
+                test.put("user_action_markers",confirmedGuidedActions);
                 test.put("vehicle_diagnostic_data_confirmed",false);
                 test.put("note","TLS-like frames may be Android Auto or other encrypted traffic; cannot interpret vehicle diagnostics.");
             }catch(Exception ignored){}
@@ -533,9 +586,10 @@ public final class OneClickAuditService extends Service {
         String status="completed";
         try{
             report=new JSONObject();
-            report.put("report_format","Vehicle Capability Explorer one-click scan v1");
-            report.put("app_version","0.8.1");
-            report.put("scan_mode","automatic_read_only_capability_discovery");
+            report.put("report_format","Vehicle Capability Explorer guided USB and Bluetooth scan v2");
+            report.put("app_version","0.8.2");
+            report.put("scan_mode","guided_parked_phone_usb_comparison_no_obd");
+            report.put("guided_action_execution","prompted_only; user actions not verified without manual markers");
             report.put("started_utc",utc());
             report.put("status","in_progress");
             report.put("read_only",true);
@@ -582,6 +636,8 @@ public final class OneClickAuditService extends Service {
             operation("usb_protocol_and_steady_state_60sec",22);
             JSONObject capture=sampleUsb();
             report.put("usb_stream_and_steady_analysis",capture);
+            report.put("guided_user_action_markers",confirmedGuidedActions);
+            report.put("guided_usb_comparison",capture.optJSONObject("guided_stage_comparison"));
             report.put("total_usb_bytes",capture.optInt("bytes_received_total",0));
             checkpoint();
 
@@ -598,7 +654,7 @@ public final class OneClickAuditService extends Service {
             limits.put("ford_sync_vs_android_auto_screen",
                 "not_performed: vehicle screen state cannot be controlled or verified by phone");
             limits.put("manual_action_changes",
-                "not_performed: a one-click unattended run cannot operate the Ford touchscreen");
+                "prompted manual actions only; the phone cannot operate or verify physical touchscreen actions");
             limits.put("obd_engine_transmission_abs",
                 "not_performed: no verified connected diagnostic adapter session");
             report.put("not_automatable_or_unavailable_checks",limits);
@@ -606,7 +662,7 @@ public final class OneClickAuditService extends Service {
             report.put("capability_map",CapabilityMatrix.build(this,report));
             report.put("vehicle_system_inventory",VehicleSystemInventory.create(this,report));
             checkpoint();
-            report.put("interpretation","This automatically measures Android accessory connectivity and incoming USB traffic. It does not prove access to Ford SYNC internals, decrypted Android Auto content or vehicle ECUs.");
+            report.put("interpretation","Guided stage comparisons can detect USB traffic metadata changes while the user manually operates screen or settings; they cannot attribute frames to Ford modules, read decrypted SYNC content, or prove ECU control.");
             String captureStatus=capture.optString("outcome","unknown");
             boolean usbGranted=report.optJSONObject("baseline")!=null
                 &&report.optJSONObject("baseline").optBoolean("android_permission",false);
