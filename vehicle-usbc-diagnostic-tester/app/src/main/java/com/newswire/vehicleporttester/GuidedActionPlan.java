@@ -81,16 +81,21 @@ public final class GuidedActionPlan {
                 }else{
                     row.put("bytes_change_vs_baseline",bytes-baselineBytes);
                     row.put("reads_change_vs_baseline",reads-baselineReads);
+                    // Tolerate one or two startup/transport reads per window.
+                    // A small timing jitter must not be called a Ford response.
+                    boolean materiallyDifferentFrameMix=
+                        Math.abs(small-baselineSmall)>Math.max(2,baselineSmall*0.2)
+                        ||Math.abs(large-baselineLarge)>Math.max(2,baselineLarge*0.2)
+                        ||Math.abs(other-baselineOthers)>Math.max(2,baselineOthers*0.2);
                     row.put("frame_size_distribution_changed",
-                        small!=baselineSmall||large!=baselineLarge||other!=baselineOthers);
+                        materiallyDifferentFrameMix);
                     row.put("rate_change_percent",baselineBytes==0?JSONObject.NULL:
                         (bytes-baselineBytes)*100.0/baselineBytes);
                     row.put("traffic_change_vs_baseline",baselineBytes==0
                         ?(bytes>0?"traffic_began":"no_baseline_traffic")
                         :(Math.abs(bytes-baselineBytes)<=
-                            Math.max(30,baselineBytes*0.10)
-                            &&small==baselineSmall&&large==baselineLarge
-                            &&other==baselineOthers
+                            Math.max(150,baselineBytes*0.15)
+                            &&!materiallyDifferentFrameMix
                             ?"no_clear_change_in_length_or_rate"
                             :"observable_metadata_change_only"));
                 }
