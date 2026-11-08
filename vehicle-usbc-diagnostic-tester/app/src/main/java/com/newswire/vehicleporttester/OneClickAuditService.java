@@ -143,7 +143,7 @@ public final class OneClickAuditService extends Service {
     }
 
     private static String filename(){
-        return "Vehicle-Capability-Explorer-v0.8.0-SCAN-EVERYTHING-"
+        return "Vehicle-Capability-Explorer-v0.8.1-FULL-ACCESS-INVENTORY-"
                 +new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())
                 +".json";
     }
@@ -534,7 +534,7 @@ public final class OneClickAuditService extends Service {
         try{
             report=new JSONObject();
             report.put("report_format","Vehicle Capability Explorer one-click scan v1");
-            report.put("app_version","0.8.0");
+            report.put("app_version","0.8.1");
             report.put("scan_mode","automatic_read_only_capability_discovery");
             report.put("started_utc",utc());
             report.put("status","in_progress");
@@ -604,9 +604,26 @@ public final class OneClickAuditService extends Service {
             report.put("not_automatable_or_unavailable_checks",limits);
             operation("analyze_explorer_screen_and_vehicle_capabilities",93);
             report.put("capability_map",CapabilityMatrix.build(this,report));
+            report.put("vehicle_system_inventory",VehicleSystemInventory.create(this,report));
             checkpoint();
             report.put("interpretation","This automatically measures Android accessory connectivity and incoming USB traffic. It does not prove access to Ford SYNC internals, decrypted Android Auto content or vehicle ECUs.");
-            status=cancelled?"cancelled":"completed";
+            String captureStatus=capture.optString("outcome","unknown");
+            boolean usbGranted=report.optJSONObject("baseline")!=null
+                &&report.optJSONObject("baseline").optBoolean("android_permission",false);
+            if(cancelled)status="cancelled";
+            else if(!usbGranted && "permission_required".equals(captureStatus))
+                status="partial_usb_permission_required";
+            else if("no_accessory".equals(captureStatus))
+                status="partial_no_usb_accessory";
+            else if("completed_with_bytes".equals(captureStatus))
+                status="completed_usb_capture";
+            else if("no_data_during_capture".equals(captureStatus))
+                status="partial_no_usb_bytes_observed";
+            else status="partial_usb_capture_"+captureStatus;
+            report.put("usb_capture_test_outcome",captureStatus);
+            report.put("full_vehicle_control_access_proven",false);
+            report.put("all_vehicle_modules_scanned",false);
+            report.put("scan_status_explanation","An automatic read-only phone scan cannot enumerate hidden Ford modules or verify writable controls. This status distinguishes a completed phone-side test from blocked or skipped steps.");
         }catch(Exception ex){
             status="worker_error";
             try{
