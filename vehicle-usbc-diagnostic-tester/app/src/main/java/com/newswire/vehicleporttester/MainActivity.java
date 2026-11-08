@@ -52,6 +52,7 @@ import java.util.TimeZone;
 public class MainActivity extends Activity {
     private static final String USB_STATE = "android.hardware.usb.action.USB_STATE";
     private static final int EXPORT_JSON = 9001;
+    private static final int REQ_SCAN_BLUETOOTH = 8805;
     private TextView summary;
     private TextView details;
     private TextView footer;
@@ -156,6 +157,17 @@ public class MainActivity extends Activity {
             }
         }
     };
+    private boolean usbAutoPermissionReceiverRegistered=false;
+    private final BroadcastReceiver usbAutoPermissionResult=new BroadcastReceiver(){
+        @Override public void onReceive(Context c,Intent i){
+            if(!UsbPermissionReceiver.RESULT.equals(i.getAction()))return;
+            if(!getPreferences(MODE_PRIVATE).getBoolean("v081_scan_waiting_permissions",false))return;
+            scanStatus.setText(i.getBooleanExtra("granted",false)
+                ?"USB permission granted. Continuing scan setup..."
+                :"USB permission declined. Continuing limited discovery with this step unavailable.");
+            continueFullScanPermissionSetup();
+        }
+    };
     private volatile boolean fullAutoRunning = false;
     private volatile int fullAutoPid = 0;
     private long fullAutoStarted = 0;
@@ -197,6 +209,15 @@ public class MainActivity extends Activity {
 
     @Override public void onStart() {
         super.onStart();
+        try{
+            IntentFilter permissionFilter=new IntentFilter(UsbPermissionReceiver.RESULT);
+            if(Build.VERSION.SDK_INT>=33)
+                registerReceiver(usbAutoPermissionResult,permissionFilter,Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(usbAutoPermissionResult,permissionFilter);
+            usbAutoPermissionReceiverRegistered=true;
+        }catch(Exception ignored){}
+        if(getPreferences(MODE_PRIVATE).getBoolean("v081_scan_waiting_permissions",false))
+            uiHandler.post(this::continueFullScanPermissionSetup);
         try {
             IntentFilter auditFilter = new IntentFilter(UsbAuditService.ACTION_EVENT);
             if (Build.VERSION.SDK_INT >= 33) {
@@ -254,6 +275,10 @@ public class MainActivity extends Activity {
         // Do not cancel a two-minute audit merely because Android temporarily
         // backgrounds this activity, locks the screen, or shows a system dialog.
         // The audit continues in a foreground service in a separate process.
+        if(usbAutoPermissionReceiverRegistered) {
+            try{unregisterReceiver(usbAutoPermissionResult);}catch(Exception ignored){}
+            usbAutoPermissionReceiverRegistered=false;
+        }
         if(fullAutoReceiverRegistered) {
             try{unregisterReceiver(fullAutoEvents);}catch(Exception ignored){}
             fullAutoReceiverRegistered=false;
@@ -289,7 +314,7 @@ public class MainActivity extends Activity {
 
         TextView eyebrow = text("USB CAPABILITY TEST • NO VEHICLE COMMANDS", 12, 0xff84d9cc, true);
         root.addView(eyebrow);
-        TextView heading = text("Vehicle Capability Explorer\nv0.8.0", 28, Color.WHITE, true);
+        TextView heading = text("Vehicle Capability Explorer\nv0.8.1", 28, Color.WHITE, true);
         LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
         h.topMargin = dp(12);
         root.addView(heading, h);
@@ -319,7 +344,7 @@ public class MainActivity extends Activity {
         oneLp.bottomMargin=dp(8);
         root.addView(oneClick,oneLp);
         oneClick.setTextSize(17);
-        oneClick.setOnClickListener(v->startFullAuto());
+        oneClick.setOnClickListener(v->beginFullScanWithPermissions());
         TextView oneInfo=text("One tap scans all accessible Android USB and car-app capabilities, tests connection stability and live traffic, and checks whether a paired Bluetooth OBD adapter can be identified. Results are organized into confirmed, possible, and unavailable functions. About 80 seconds. PARKED ONLY: Android Auto may disconnect; no vehicle commands will be sent.",13,0xffffcc91,false);
         root.addView(oneInfo);
         stopFullAutoButton=button("STOP SCAN",0xffb64236);
@@ -417,7 +442,7 @@ public class MainActivity extends Activity {
         auditExport.setOnClickListener(v -> exportDeepAudit());
 
 
-        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.8.0)", 16, Color.WHITE, true);
+        TextView compareHead = text("USB SCREEN TRAFFIC COMPARISON (v0.8.1)", 16, Color.WHITE, true);
         LinearLayout.LayoutParams compareHeading = new LinearLayout.LayoutParams(-1, -2);
         compareHeading.topMargin = dp(20);
         advancedArea.addView(compareHead, compareHeading);
@@ -438,7 +463,7 @@ public class MainActivity extends Activity {
         exportCompare.setOnClickListener(v -> showScreenTrafficComparison());
 
 
-        TextView experimentHeading=text("v0.8.0  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
+        TextView experimentHeading=text("v0.8.1  CONTROLLED TRAFFIC EXPERIMENT",17,Color.WHITE,true);
         LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-1,-2);
         elp.topMargin=dp(20);
         advancedArea.addView(experimentHeading,elp);
@@ -644,7 +669,7 @@ public class MainActivity extends Activity {
         try {
             report.put("report_format", "Vehicle USB Port Tester communication v1");
             report.put("test_label", "usb_connection_open_close");
-            report.put("app_version", "0.8.0");
+            report.put("app_version", "0.8.1");
             report.put("scanned_at_utc", timeUtc());
             report.put("permission_required", true);
             report.put("scan_is_read_only", true);
@@ -885,7 +910,7 @@ public class MainActivity extends Activity {
             report = new JSONObject();
             try {
                 report.put("report_format", "Vehicle Port Tester deep communication audit v1");
-                report.put("app_version", "0.8.0");
+                report.put("app_version", "0.8.1");
                 report.put("status", "report_unavailable");
             } catch (Exception ignored) {}
         }
@@ -997,7 +1022,7 @@ public class MainActivity extends Activity {
         try {
             timeout.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             timeout.put("test_label", "usb_accessory_passive_protocol_analysis");
-            timeout.put("app_version", "0.8.0");
+            timeout.put("app_version", "0.8.1");
             timeout.put("scanned_at_utc", timeUtc());
             timeout.put("outcome", reason);
             timeout.put("scan_is_read_only", true);
@@ -1127,7 +1152,7 @@ public class MainActivity extends Activity {
             report.put("report_format", "Vehicle USB Port Tester protocol analysis v1");
             report.put("test_label", "usb_accessory_passive_protocol_analysis");
             report.put("scanned_at_utc", timeUtc());
-            report.put("app_version", "0.8.0");
+            report.put("app_version", "0.8.1");
             report.put("usb_state_before", getUsbSessionSnapshot());
             report.put("listen_timeout_ms", 10000);
             report.put("max_capture_bytes", capture.length);
@@ -1374,7 +1399,7 @@ public class MainActivity extends Activity {
             report.put("test_label", trigger.startsWith("Test: ") ? trigger.substring(6) : "unlabeled");
             report.put("scanned_at_utc", timeUtc());
             report.put("trigger", trigger);
-            report.put("app_version", "0.8.0");
+            report.put("app_version", "0.8.1");
             report.put("device_manufacturer", Build.MANUFACTURER);
             report.put("device_model", Build.MODEL);
             report.put("android_api_level", Build.VERSION.SDK_INT);
@@ -1566,7 +1591,7 @@ public class MainActivity extends Activity {
             JSONObject usba = stored("usb_a");
             JSONObject combined = new JSONObject();
             combined.put("report_format", "Vehicle USB Port Tester comparison v2");
-            combined.put("app_version", "0.8.0");
+            combined.put("app_version", "0.8.1");
             combined.put("created_at_utc", timeUtc());
             combined.put("baseline_unplugged", unplug == null ? JSONObject.NULL : unplug);
             combined.put("usb_c_port", usbc == null ? JSONObject.NULL : usbc);
@@ -1745,7 +1770,7 @@ public class MainActivity extends Activity {
         JSONObject saved = readScreenCapture(screenCaptureMode);
         if (saved == null) saved = new JSONObject();
         try {
-            saved.put("app_version","0.8.0");
+            saved.put("app_version","0.8.1");
             saved.put("user_selected_screen",screenCaptureMode);
             if (stopReason != null) {
                 saved.put("status",stopReason);
@@ -1812,7 +1837,7 @@ public class MainActivity extends Activity {
         JSONObject result = new JSONObject();
         try {
             result.put("report_format","Vehicle USB screen traffic comparison summary v1");
-            result.put("app_version","0.8.0");
+            result.put("app_version","0.8.1");
             result.put("generated_utc",timeUtc());
             result.put("vehicle_screen_state_is_user_selected_not_verified",true);
             result.put("ford_sync_or_vehicle_ecu_access_confirmed",false);
@@ -2013,7 +2038,7 @@ public class MainActivity extends Activity {
         JSONObject saved=readExperiment(experimentMode);
         if(saved==null)saved=new JSONObject();
         try {
-            saved.put("app_version","0.8.0");
+            saved.put("app_version","0.8.1");
             saved.put("main_app_elapsed_ms",
                 SystemClock.elapsedRealtime()-experimentStartedAt);
             if(forcedReason!=null){
@@ -2053,7 +2078,7 @@ public class MainActivity extends Activity {
         JSONObject comparisonData=new JSONObject();
         try{
             comparisonData.put("report_format","Vehicle controlled USB steady-state comparison v1");
-            comparisonData.put("app_version","0.8.0");
+            comparisonData.put("app_version","0.8.1");
             comparisonData.put("created_at_utc",timeUtc());
             comparisonData.put("ford_sync_user_selected",true);
             comparisonData.put("android_auto_user_selected",true);
@@ -2087,7 +2112,7 @@ public class MainActivity extends Activity {
         try{lastReport=comparisonData.toString(2);}
         catch(Exception ignored){lastReport=comparisonData.toString();}
         latestFilename="vehicle-v076-steady-screen-comparison-"+fileTimeUtc()+".json";
-        summary.setText("v0.8.0 Steady-state comparison assembled");
+        summary.setText("v0.8.1 Steady-state comparison assembled");
         details.setText("Both 40-second experiments have saved statistics. "
             +"The first 5 seconds are excluded; each screen has three 10-second measurement windows. "
             +"The combined JSON includes action markers if test 13 has been run.");
@@ -2103,6 +2128,88 @@ public class MainActivity extends Activity {
             byte[] bytes=java.nio.file.Files.readAllBytes(file.toPath());
             return new JSONObject(new String(bytes,StandardCharsets.UTF_8));
         }catch(Exception ignored){return null;}
+    }
+
+
+    private void beginFullScanWithPermissions(){
+        if(fullAutoRunning||auditRunning||experimentRunning||screenCaptureRunning||
+                scanActive||connectionActive){
+            scanStatus.setText("Stop the current test before starting another scan.");
+            return;
+        }
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("v081_scan_waiting_permissions",true)
+            .putBoolean("v081_usb_prompted",false)
+            .putBoolean("v081_bt_prompted",false)
+            .putLong("v081_usb_request_epoch",0).apply();
+        scanStatus.setText("Checking USB and Bluetooth permissions before scanning.");
+        continueFullScanPermissionSetup();
+    }
+
+    private void continueFullScanPermissionSetup(){
+        if(!getPreferences(MODE_PRIVATE).getBoolean("v081_scan_waiting_permissions",false))return;
+        try{
+            UsbManager usb=(UsbManager)getSystemService(Context.USB_SERVICE);
+            UsbAccessory[] accessories=usb==null?null:usb.getAccessoryList();
+            boolean attached=accessories!=null&&accessories.length>0;
+            if(attached&&!usb.hasPermission(accessories[0])){
+                boolean requested=getPreferences(MODE_PRIVATE)
+                    .getBoolean("v081_usb_prompted",false);
+                if(!requested){
+                    Intent responseIntent=new Intent(UsbPermissionReceiver.ACTION);
+                    responseIntent.setComponent(new ComponentName(this,UsbPermissionReceiver.class));
+                    PendingIntent response=PendingIntent.getBroadcast(this,8081,responseIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_MUTABLE);
+                    getPreferences(MODE_PRIVATE).edit()
+                        .putBoolean("v081_usb_prompted",true)
+                        .putLong("v081_usb_request_epoch",System.currentTimeMillis()).apply();
+                    scanStatus.setText("Approve Android's USB-access prompt to record the actual data.");
+                    usb.requestPermission(accessories[0],response);
+                    return;
+                }
+                long requestedAt=getPreferences(MODE_PRIVATE)
+                    .getLong("v081_usb_request_epoch",0);
+                long answeredAt=getSharedPreferences("usb_permission_results",MODE_PRIVATE)
+                    .getLong("last_checked_at_ms",0);
+                if(answeredAt<requestedAt &&
+                        System.currentTimeMillis()-requestedAt<90000){
+                    scanStatus.setText("Waiting for Android USB permission response...");
+                    return;
+                }
+                scanStatus.setText("USB data permission not approved; the scan will mark traffic unavailable.");
+            }
+            if(Build.VERSION.SDK_INT>=31 &&
+                checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                    !=PackageManager.PERMISSION_GRANTED &&
+                !getPreferences(MODE_PRIVATE).getBoolean("v081_bt_prompted",false)){
+                getPreferences(MODE_PRIVATE).edit().putBoolean("v081_bt_prompted",true).apply();
+                scanStatus.setText("Approve Bluetooth permission to check for paired OBD-II adapters.");
+                requestPermissions(new String[]{android.Manifest.permission.BLUETOOTH_CONNECT},
+                    REQ_SCAN_BLUETOOTH);
+                return;
+            }
+        }catch(Exception ex){
+            scanStatus.setText("Some permission checks unavailable ("+
+                ex.getClass().getSimpleName()+"). Running supported parts of scan.");
+        }
+        getPreferences(MODE_PRIVATE).edit()
+            .putBoolean("v081_scan_waiting_permissions",false).apply();
+        startFullAuto();
+    }
+
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,
+            int[] results){
+        super.onRequestPermissionsResult(code,permissions,results);
+        if(code==REQ_SCAN_BLUETOOTH&&
+                getPreferences(MODE_PRIVATE).getBoolean("v081_scan_waiting_permissions",false)){
+            if(results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED)
+                scanStatus.setText("Bluetooth discovery permission granted.");
+            else
+                scanStatus.setText("Bluetooth permission declined: adapter check will be marked skipped.");
+            getPreferences(MODE_PRIVATE).edit()
+                .putBoolean("v081_scan_waiting_permissions",false).apply();
+            startFullAuto();
+        }
     }
 
     private void startFullAuto(){
@@ -2222,7 +2329,7 @@ public class MainActivity extends Activity {
     private void renderFullAuto(JSONObject file){
         try{lastReport=file.toString(2);}
         catch(Exception ignored){lastReport=file.toString();}
-        latestFilename="Vehicle-Capability-Explorer-v0.8.0-FULL-SCAN-"+fileTimeUtc()+".json";
+        latestFilename="Vehicle-Capability-Explorer-v0.8.1-FULL-SCAN-"+fileTimeUtc()+".json";
         JSONObject read=file.optJSONObject("usb_stream_and_steady_analysis");
         JSONObject rate=read==null?null:read.optJSONObject("all_45s_steady");
         summary.setText("VEHICLE CAPABILITY SCAN: "+file.optString("status","unknown"));
