@@ -126,7 +126,7 @@ public final class CapabilityResultsActivity extends Activity {
         root.setPadding(dp(20),dp(28),dp(20),dp(28));
         scroll.addView(root);
         setContentView(scroll);
-        TextView eyebrow=text("VEHICLE CAPABILITY EXPLORER  •  v0.8.1",12,MINT,true);
+        TextView eyebrow=text("VEHICLE CAPABILITY EXPLORER  •  v0.8.2",12,MINT,true);
         root.addView(eyebrow);
         space(root,8);
         TextView title=text("What can we actually do?",27,Color.WHITE,true);
@@ -167,6 +167,47 @@ public final class CapabilityResultsActivity extends Activity {
                     13,MUTED,false));
                 top.addView(text("Vehicle: 2021 Ford Explorer Limited (user-reported)",12,MUTED,false));
                 space(root,20);
+
+                JSONObject comparison=report.optJSONObject("guided_usb_comparison");
+                if(comparison!=null){
+                    TextView guidetitle=text("GUIDED SCREEN & CONTROL COMPARISON",15,BLUE,true);
+                    root.addView(guidetitle);
+                    space(root,7);
+                    root.addView(text("Changes in USB message sizes or rates are clues, "
+                        +"not decoded Ford data or evidence of control access.",
+                        12,MUTED,false));
+                    space(root,12);
+                    JSONArray phases=comparison.optJSONArray("phases");
+                    if(phases==null){
+                        root.addView(text("Guided stages unavailable: "+
+                            comparison.optString("reason","No sustained USB capture."),
+                            13,AMBER,true));
+                        space(root,16);
+                    }else{
+                        for(int n=0;n<phases.length();n++){
+                            JSONObject p=phases.optJSONObject(n);
+                            if(p==null)continue;
+                            LinearLayout stageCard=vertical();
+                            stageCard.setBackground(background(PANEL,OUTLINE));
+                            stageCard.setPadding(dp(14),dp(12),dp(14),dp(13));
+                            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+                            lp.bottomMargin=dp(9);
+                            root.addView(stageCard,lp);
+                            stageCard.addView(text((n+1)+". "+p.optString("name"),14,Color.WHITE,true));
+                            stageCard.addView(text(
+                                p.optDouble("bytes_per_second",0)+" bytes/s  •  "+
+                                p.optInt("read_events")+" reads",12,MINT,false));
+                            String delta=p.optString("traffic_change_vs_baseline");
+                            String indicator=p.optBoolean("action_confirmed_by_user",false)
+                                ?"Action marked done by user"
+                                :"Action NOT confirmed by user";
+                            stageCard.addView(text(n==0?"Baseline window":
+                                delta.replace('_',' ')+" • "+indicator,
+                                12,MUTED,false));
+                        }
+                        space(root,11);
+                    }
+                }
 
                 JSONObject inv=report.optJSONObject("vehicle_system_inventory");
                 if(inv!=null) {
