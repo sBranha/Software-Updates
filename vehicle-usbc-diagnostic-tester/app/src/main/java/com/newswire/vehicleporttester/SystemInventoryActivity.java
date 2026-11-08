@@ -153,7 +153,7 @@ public final class SystemInventoryActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
 
-        root.addView(text("VEHICLE CAPABILITY EXPLORER  •  v0.8.1",12,MINT,true));
+        root.addView(text("VEHICLE CAPABILITY EXPLORER  •  v0.8.2",12,MINT,true));
         space(root,9);
         root.addView(text("Every system we can investigate",24,Color.WHITE,true));
         space(root,8);
