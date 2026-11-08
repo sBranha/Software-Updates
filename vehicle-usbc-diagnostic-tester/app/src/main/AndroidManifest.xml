@@ -1,35 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-    <!-- Allows the active, user-initiated ~2 minute audit to keep running if
-         the screen locks or Android briefly backgrounds the activity. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-    <queries>
-        <intent><action android:name="androidx.car.app.CarAppService"/></intent>
-        <intent><action android:name="android.media.browse.MediaBrowserService"/></intent>
-        <intent><action android:name="androidx.media3.session.MediaLibraryService"/></intent>
-    </queries>
-    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="Vehicle Capability Explorer" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <receiver android:name=".UsbPermissionReceiver" android:exported="false" />
-        <!-- Isolated process prevents a blocked native USB read from hanging the main app. -->
-        <service android:name=".UsbAuditService" android:process=":usb_audit"
-            android:exported="false" android:stopWithTask="false"
-            android:foregroundServiceType="shortService" />
-        <service android:name=".UsbScreenCompareService" android:process=":usb_compare"
-            android:exported="false" android:foregroundServiceType="shortService"
-            android:stopWithTask="false" />
-        <service android:name=".UsbTrafficExperimentService"
-            android:process=":usb_experiment" android:exported="false"
-            android:foregroundServiceType="shortService" android:stopWithTask="false" />
-        <service android:name=".OneClickAuditService"
-            android:process=":one_click" android:exported="false"
-            android:foregroundServiceType="shortService" android:stopWithTask="false" />
-        <activity android:name=".SystemInventoryActivity" android:exported="false" />
-        <activity android:name=".CapabilityResultsActivity" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="true">
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Vehicle Capability Explorer" android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- Only safe launcher is available in this version. Legacy USB takeover
+             services and activities are deliberately NOT registered. -->
+        <activity android:name=".SafeDashboardActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
