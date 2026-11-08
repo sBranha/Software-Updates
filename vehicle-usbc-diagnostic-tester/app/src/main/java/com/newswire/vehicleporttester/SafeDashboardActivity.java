@@ -28,6 +28,7 @@ import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.View;
+import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -53,9 +54,11 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private static final int TEXT=0xffeef5fc, MUTED=0xff92a9bc;
     private static final int CYAN=0xff38d6eb, ORANGE=0xffffb55d, GREEN=0xff61e2a5;
     private static final int REQ_GPS=803;
-    private TextView linkStatus, gpsStatus, tripText, scanResult, touchResult;
+    private TextView linkStatus, gpsStatus, tripText, scanResult, touchResult, rpmValueText;
     private NeedleGauge gpsGauge, rpmGauge;
     private Button gpsButton;
+    private SeekBar rpmSlider;
+    private int demoRpm=0;
     private LocationManager locationManager;
     private boolean locationEnabled=false, receivingGps=false, wasResumed=false;
     private Location previousFix;
@@ -125,7 +128,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Instrument Lab",30,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.3   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.4   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -171,23 +174,62 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gpsButton.setOnClickListener(v->toggleGps());
         gap(body,15);
 
-        LinearLayout demo=vertical();demo.setBackground(panel(PANEL,EDGE));
-        demo.setPadding(dp(15),dp(13),dp(15),dp(10));
+        LinearLayout demo=vertical();
+        demo.setBackground(panel(PANEL,EDGE));
+        demo.setPadding(dp(15),dp(13),dp(15),dp(13));
         demo.addView(text("RPM NEEDLE TEST — DEMO ONLY",13,ORANGE,true));
-        gap(demo,4);
-        demo.addView(text("Move the slider to check the needle and gauge UI. No engine RPM is being read.",12,MUTED,false));
-        SeekBar slider=new SeekBar(this);
-        slider.setMax(8000);slider.setProgress(0);
-        slider.setProgressTintList(android.content.res.ColorStateList.valueOf(ORANGE));
-        slider.setThumbTintList(android.content.res.ColorStateList.valueOf(ORANGE));
-        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            @Override public void onProgressChanged(SeekBar s,int p,boolean user){
-                rpmGauge.setReading(p/1000f,"DEMO",true);
+        gap(demo,5);
+        demo.addView(text("Tap a preset or slide the orange dot. Watch the number and the needle change together. This is NOT live Ford engine RPM.",12,MUTED,false));
+        gap(demo,9);
+        rpmValueText=text("0 RPM • DEMO",22,ORANGE,true);
+        demo.addView(rpmValueText);
+        gap(demo,7);
+        rpmSlider=new SeekBar(this);
+        rpmSlider.setMax(8000);
+        rpmSlider.setProgress(0);
+        rpmSlider.setProgressTintList(android.content.res.ColorStateList.valueOf(ORANGE));
+        rpmSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(ORANGE));
+        rpmSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onProgressChanged(SeekBar seek,int value,boolean user){
+                updateDemoRpm(value,false);
             }
-            @Override public void onStartTrackingTouch(SeekBar s){}
-            @Override public void onStopTrackingTouch(SeekBar s){}
+            @Override public void onStartTrackingTouch(SeekBar seek){
+                seek.getParent().requestDisallowInterceptTouchEvent(true);
+            }
+            @Override public void onStopTrackingTouch(SeekBar seek){
+                seek.getParent().requestDisallowInterceptTouchEvent(false);
+            }
         });
-        demo.addView(slider);body.addView(demo);
+        rpmSlider.setOnTouchListener((view,event)->{
+            switch(event.getActionMasked()){
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_MOVE:
+                    view.getParent().requestDisallowInterceptTouchEvent(true);
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    view.getParent().requestDisallowInterceptTouchEvent(false);
+                    break;
+                default:break;
+            }
+            return false;
+        });
+        demo.addView(rpmSlider,new LinearLayout.LayoutParams(-1,dp(50)));
+        gap(demo,5);
+        LinearLayout row1=new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        addPreset(row1,"0 RPM",0);
+        addPreset(row1,"800 RPM",800);
+        addPreset(row1,"1,500 RPM",1500);
+        demo.addView(row1);
+        gap(demo,7);
+        LinearLayout row2=new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        addPreset(row2,"3,000 RPM",3000);
+        addPreset(row2,"6,000 RPM",6000);
+        demo.addView(row2);
+        body.addView(demo);
+        updateDemoRpm(0,true);
         gap(body,15);
 
         Button scan=button("SAFE CONNECTION SCAN",0xff147389);
@@ -208,12 +250,29 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             .setNeutralButton("CANCEL",(d,w)->{})
             .show());
         gap(body,7);
-        touchResult=text("Ford touchscreen: not yet tested with v0.8.3.",12,MUTED,false);
+        touchResult=text("Ford touchscreen: not yet tested with v0.8.4.",12,MUTED,false);
         body.addView(touchResult);
         gap(body,17);
         body.addView(text("REAL FORD RPM / ODOMETER: NOT CONNECTED",12,ORANGE,true));
         gap(body,3);
         body.addView(text("Android Auto doesn't provide public engine-RPM or odometer readings. The GPS display is real phone data; the RPM gauge is intentionally simulated. No OBD device is required for these UI tests.",12,MUTED,false));
+    }
+
+    private void addPreset(LinearLayout row,String label,int rpm){
+        Button b=button(label,0xff2c4358);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(43),1);
+        lp.setMargins(dp(2),0,dp(2),0);
+        row.addView(b,lp);
+        b.setOnClickListener(v->updateDemoRpm(rpm,true));
+    }
+    private void updateDemoRpm(int rpm,boolean setSlider){
+        demoRpm=Math.max(0,Math.min(8000,rpm));
+        if(rpmValueText!=null)
+            rpmValueText.setText(String.format(Locale.US,"%,d RPM • DEMO",demoRpm));
+        if(rpmGauge!=null)
+            rpmGauge.setReading(demoRpm/1000f,"DEMO ONLY",true);
+        if(setSlider && rpmSlider!=null && rpmSlider.getProgress()!=demoRpm)
+            rpmSlider.setProgress(demoRpm);
     }
 
     private void setTouchResult(String status){
@@ -241,7 +300,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format","Vehicle Capability Explorer safe dashboard scan v1");
-            j.put("app_version","0.8.3");
+            j.put("app_version","0.8.4");
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
             j.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
@@ -257,7 +316,8 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             j.put("phone_gps_speed_enabled",locationEnabled);
             j.put("phone_gps_speed_mph",Double.isFinite(latestPhoneSpeedMph)?latestPhoneSpeedMph:JSONObject.NULL);
             j.put("phone_gps_trip_miles",tripMiles);
-            j.put("rpm_gauge_source","user_controlled_demo_slider");
+            j.put("rpm_gauge_source","user_controlled_demo_presets_or_slider");
+            j.put("rpm_demo_value_only_not_from_vehicle",demoRpm);
             j.put("touchscreen_user_test",touchCheck);
             j.put("touchscreen_test_is_user_reported_not_electronically_verified",true);
             UsbManager usb=(UsbManager)getSystemService(USB_SERVICE);
@@ -287,7 +347,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             lastSafeReport=j;
             refreshConnectionStatus();
 
-            String fileName="Vehicle-Capability-Explorer-v0.8.3-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
+            String fileName="Vehicle-Capability-Explorer-v0.8.4-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
             ContentValues cv=new ContentValues();
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME,fileName);
             cv.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
