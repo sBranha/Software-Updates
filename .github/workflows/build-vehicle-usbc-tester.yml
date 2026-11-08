@@ -2,7 +2,7 @@ name: Build Vehicle USB-C Tester APK
 on:
   push:
     branches:
-      - vehicle-capability-explorer-v0.8.2-no-obd-guided
+      - vehicle-capability-explorer-v0.8.3-safe-dashboard
     paths:
       - 'vehicle-usbc-diagnostic-tester/**'
       - '.github/workflows/build-vehicle-usbc-tester.yml'
@@ -47,7 +47,7 @@ jobs:
       - name: Upload unsigned-for-release dev APK and signing utility
         uses: actions/upload-artifact@v4
         with:
-          name: Vehicle-Capability-Explorer-v0.8.2-Build
+          name: Vehicle-Capability-Explorer-v0.8.3-Build
           path: |
             vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
             signing-tools/apksigner.jar
