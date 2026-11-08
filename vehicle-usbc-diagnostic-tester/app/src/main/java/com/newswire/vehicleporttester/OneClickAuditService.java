@@ -7,6 +7,7 @@ import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -302,8 +303,24 @@ public final class OneClickAuditService extends Service {
                 return o;
             }
             o.put("enabled",bt.isEnabled());
+            // Android only exposes aggregate headset/A2DP state here, not an
+            // ECU interface. It cannot be attributed specifically to Ford.
+            try{
+                o.put("any_bluetooth_a2dp_connected",
+                    bt.getProfileConnectionState(BluetoothProfile.A2DP)
+                        ==BluetoothProfile.STATE_CONNECTED);
+                o.put("any_bluetooth_headset_connected",
+                    bt.getProfileConnectionState(BluetoothProfile.HEADSET)
+                        ==BluetoothProfile.STATE_CONNECTED);
+                o.put("profile_state_note",
+                    "Global headset/audio profile state only, NOT proof of Ford or vehicle-control access.");
+            }catch(Exception e){
+                o.put("profile_state_note",
+                    "Profile connection state unavailable: "+e.getClass().getSimpleName());
+            }
             JSONArray devices=new JSONArray();
             int probable=0;
+            int fordNamed=0;
             Set<BluetoothDevice> bonded=bt.getBondedDevices();
             if(bonded!=null)for(BluetoothDevice d:bonded){
                 String name=d.getName()==null?"Unknown paired device":d.getName();
@@ -313,10 +330,13 @@ public final class OneClickAuditService extends Service {
                 item.put("name",name);
                 item.put("potential_obd_adapter_name",obd);
                 if(obd)probable++;
+                if(name.toLowerCase(Locale.US).contains("ford"))fordNamed++;
                 devices.put(item);
             }
             o.put("paired_devices",devices);
             o.put("candidate_obd_adapters",probable);
+            o.put("paired_ford_named_devices",fordNamed);
+            o.put("bluetooth_vehicle_controls_tested",false);
             o.put("status",probable>0?"possible_paired_obd_adapter_found":"no_named_obd_adapter_found");
             o.put("note","No Bluetooth session opened or diagnostic PIDs queried. Name match alone does not prove a working OBD adapter.");
         }catch(Exception ex){
