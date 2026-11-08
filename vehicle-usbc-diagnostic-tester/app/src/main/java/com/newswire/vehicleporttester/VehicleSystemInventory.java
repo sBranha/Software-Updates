@@ -41,7 +41,12 @@ public final class VehicleSystemInventory {
         obj.put("probable_access_path",accessPath);
         obj.put("next_requirement",needed);
         obj.put("safety_critical",safety);
-        obj.put("source_kind","test_plan_only");
+        obj.put("source_kind",read.equals("read_verified")
+            ||read.equals("interface_observed")
+            ||read.equals("phone_service_declarations_observed")
+            ||read.equals("phone_hardware_observed")
+            ||read.equals("blocked_usb_permission")
+            ? "measured_android_api" : "candidate_not_vehicle_tested");
         items.put(obj);
     }
 
@@ -137,7 +142,8 @@ public final class VehicleSystemInventory {
             result.put("report_format","Ford Explorer proposed system-level access inventory v1");
             result.put("vehicle","2021 Ford Explorer Limited, user-supplied model; not electronically identified");
             result.put("scope","Public Android, USB and Bluetooth data only; no CAN/ECU probes");
-            result.put("total_candidates_checked",count);
+            result.put("total_feature_candidates",count);
+            result.put("vehicle_features_individually_queried",0);
             result.put("verified_control_functions",0);
             result.put("vehicle_ecu_identified_count",0);
             result.put("vehicle_commands_sent",0);
