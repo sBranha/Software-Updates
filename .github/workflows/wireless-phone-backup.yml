@@ -3,6 +3,7 @@ on:
   push:
     branches: [wireless-phone-backup-v0.1]
   workflow_dispatch:
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -11,12 +12,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install pyinstaller
-      - run: pyinstaller --onefile --windowed --name WirelessPhoneBackup backup/windows/backup.py
+      - name: Build standalone Windows application
+        run: |
+          python -m pip install --upgrade pyinstaller
+          pyinstaller --onefile --windowed --name WirelessPhoneBackup backup/windows/backup.py
+      - name: Package Inno Setup installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "backup/windows/installer.iss"
       - uses: actions/upload-artifact@v4
         with:
-          name: WirelessPhoneBackup-Windows-EXE
-          path: dist/WirelessPhoneBackup.exe
+          name: WirelessPhoneBackup-Windows-Installer
+          path: dist/WirelessPhoneBackup-Setup.exe
+          if-no-files-found: error
+
   android:
     runs-on: ubuntu-latest
     steps:
@@ -26,12 +36,15 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - run: |
-          cd backup/android
-          gradle wrapper --gradle-version 8.11.1
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Compile installable debug APK
+        run: gradle -p backup/android assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: WirelessPhoneBackup-Android-APK
           path: backup/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
