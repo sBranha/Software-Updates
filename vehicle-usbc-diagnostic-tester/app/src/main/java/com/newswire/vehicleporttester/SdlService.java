@@ -16,6 +16,13 @@ import com.smartdevicelink.managers.screen.menu.MenuSelectionListener;
 import com.smartdevicelink.proxy.rpc.GetVehicleData;
 import com.smartdevicelink.proxy.rpc.GetVehicleDataResponse;
 import com.smartdevicelink.proxy.RPCResponse;
+import com.smartdevicelink.proxy.RPCNotification;
+import com.smartdevicelink.proxy.rpc.OnHMIStatus;
+import com.smartdevicelink.proxy.rpc.enums.FunctionID;
+import com.smartdevicelink.proxy.rpc.enums.HMILevel;
+import com.smartdevicelink.proxy.rpc.listeners.OnRPCNotificationListener;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import com.smartdevicelink.proxy.rpc.enums.AppHMIType;
 import com.smartdevicelink.proxy.rpc.enums.Language;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
@@ -35,10 +42,36 @@ public final class SdlService extends Service {
     static final String APP_NAME = "Vehicle Explorer";
     private volatile SdlManager manager;
 
-    public static void record(Context c, String state, String detail) {
-        c.getSharedPreferences("sdl_discovery_v091", MODE_PRIVATE).edit()
-                .putString("state", state).putString("detail", detail)
-                .putLong("updated_at_ms", System.currentTimeMillis()).apply();
+    public static synchronized void record(Context c, String state, String detail) {
+        android.content.SharedPreferences prefs =
+                c.getSharedPreferences("sdl_discovery_v091", MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        try {
+            JSONArray history = new JSONArray(prefs.getString("event_history", "[]"));
+            history.put(new JSONObject().put("time_ms", now).put("state", state)
+                    .put("detail", detail == null ? "" : detail));
+            JSONArray bounded = new JSONArray();
+            for (int i = Math.max(0, history.length() - 45); i < history.length(); i++)
+                bounded.put(history.getJSONObject(i));
+            prefs.edit().putString("event_history", bounded.toString())
+                    .putString("state", state).putString("detail", detail == null ? "" : detail)
+                    .putLong("updated_at_ms", now).apply();
+        } catch (Exception ex) {
+            prefs.edit().putString("state", state).putString("detail", detail)
+                    .putLong("updated_at_ms", now).apply();
+        }
+    }
+    private void onHmiNotification(RPCNotification notification) {
+        if (!(notification instanceof OnHMIStatus)) return;
+        OnHMIStatus event = (OnHMIStatus) notification;
+        HMILevel level = event.getHmiLevel();
+        String name = level == null ? "UNKNOWN" : level.toString();
+        android.content.SharedPreferences prefs = getSharedPreferences("sdl_discovery_v091", MODE_PRIVATE);
+        prefs.edit().putString("hmi_level", name)
+                .putBoolean("hmi_ever_full", level == HMILevel.HMI_FULL || prefs.getBoolean("hmi_ever_full", false))
+                .apply();
+        record(this, "HMI_" + name, "Actual Ford head-unit HMI level changed: " + name);
+        if (level == HMILevel.HMI_FULL) showFirstScreen();
     }
     @Override public void onCreate() {
         super.onCreate();
@@ -65,8 +98,8 @@ public final class SdlService extends Service {
             types.add(AppHMIType.INFORMATION);
             SdlManagerListener listener = new SdlManagerListener() {
                 @Override public void onStart() {
-                    record(SdlService.this, "SDL_REGISTERED",
-                            "AppLink registered to head unit. Testing SYNC 3 interface.");
+                    record(SdlService.this, "SDL_SDK_STARTED",
+                            "SDL manager reported startup. Check the HMI level before claiming the app is visible.");
                     showFirstScreen();
                 }
                 @Override public void onDestroy() {
@@ -84,6 +117,13 @@ public final class SdlService extends Service {
             SdlManager.Builder builder = new SdlManager.Builder(this, APP_ID, APP_NAME, listener);
             builder.setAppTypes(types);
             builder.setTransportType(transport);
+            java.util.Map<FunctionID, OnRPCNotificationListener> notifications = new java.util.HashMap<>();
+            notifications.put(FunctionID.ON_HMI_STATUS, new OnRPCNotificationListener() {
+                @Override public void onNotified(RPCNotification notification) {
+                    onHmiNotification(notification);
+                }
+            });
+            builder.setRPCNotificationListeners(notifications);
             manager = builder.build();
             manager.start();
         } catch(Exception e) {
