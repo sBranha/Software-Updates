@@ -6,6 +6,7 @@ on:
       - vehicle-capability-explorer-v0.8.9-official-interface-readiness
       - vehicle-capability-explorer-v0.9.0-ford-data
       - vehicle-capability-explorer-v0.9.1-sync3-applink
+      - vehicle-capability-explorer-v0.9.2-screen-visibility
     paths:
       - 'vehicle-usbc-diagnostic-tester/**'
       - '.github/workflows/build-vehicle-usbc-tester.yml'
@@ -50,7 +51,7 @@ jobs:
       - name: Upload unsigned-for-release dev APK and signing utility
         uses: actions/upload-artifact@v4
         with:
-          name: Vehicle-Capability-Explorer-v0.9.1-SYNC3-AppLink-Test
+          name: Vehicle-Capability-Explorer-v0.9.2-SYNC3-Screen-Visibility
           path: |
             vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
             signing-tools/apksigner.jar
