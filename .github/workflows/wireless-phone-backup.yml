@@ -1,0 +1,37 @@
+name: Wireless Phone Backup installers
+on:
+  push:
+    branches: [wireless-phone-backup-v0.1]
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --windowed --name WirelessPhoneBackup backup/windows/backup.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WirelessPhoneBackup-Windows-EXE
+          path: dist/WirelessPhoneBackup.exe
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: |
+          cd backup/android
+          gradle wrapper --gradle-version 8.11.1
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WirelessPhoneBackup-Android-APK
+          path: backup/android/app/build/outputs/apk/debug/app-debug.apk
