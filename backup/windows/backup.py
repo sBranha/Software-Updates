@@ -113,16 +113,16 @@ def restore_session(sock, folder, code, progress):
             progress(f"{index}/{len(items)} saved: {filename} ({'verified' if verified else 'FAILED CHECK'})")
     finally:
         report = {"device": device, "saved_at": datetime.now().isoformat(),
-                  "files": results, "expected": len(items),
+                  "files": results, "unavailable": manifest.get("unavailable", []), "expected": len(items),
                   "verified": sum(x["verified"] for x in results)}
         (root / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    progress(f"Finished: {report['verified']} of {len(items)} verified. Report at {root}")
+    progress("Finished: " + str(report["verified"]) + "/" + str(len(items)) + " verified; " + str(len(report["unavailable"])) + " limitations. Report at " + str(root))
     return report
 
 
 def run_server(destination, code, progress):
     folder = Path(destination)
-    if not folder.is_dir():
+    if not str(destination).strip() or not folder.is_dir():
         raise RuntimeError("Your selected external drive is not connected")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -163,7 +163,7 @@ def main():
 
     def backup():
         directory = destination.get()
-        if not Path(directory).is_dir():
+        if not directory.strip() or not Path(directory).is_dir():
             messagebox.showerror("Drive unavailable", "Connect and choose your external drive folder.")
             return
         button.config(state="disabled")
