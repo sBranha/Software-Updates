@@ -4,11 +4,11 @@ android {
     namespace 'com.newswire.vehicleporttester'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.newswire.vehicleporttester.experiment'
+        applicationId 'com.newswire.vehicleporttester.experiment.readiness'
         minSdk 26
         targetSdk 34
-        versionCode 24
-        versionName '0.8.8'
+        versionCode 25
+        versionName '0.8.9'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
