@@ -41,7 +41,7 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • ON-SCREEN TEST",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.1 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer v0.9.2 • SmartDeviceLink",13,0xff66e2ad));
         layout.addView(label("PURPOSE: Make Vehicle Explorer show on the car's SYNC 3 Apps screen, not just the phone. The initial Ford screen is a simple text/menu interface, not the full custom concept dashboard.",15,Color.WHITE));
         layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Look for 'Vehicle Explorer'. If shown, open it and use its menu > Read Ford data.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may require a registered/approved AppLink ID before showing this test app or allowing vehicle-data requests. A failure to appear does NOT mean Ford vehicle modules lack the requested data.",13,0xffffc674));
@@ -50,6 +50,17 @@ public final class SdlTestActivity extends Activity {
         Button refresh=button("REFRESH ACTUAL CONNECTION STATUS");layout.addView(refresh);
         state=label("Not started.",16,0xff4ce6c0);layout.addView(state);
         detail=label("No vehicle communication confirmed.",14,Color.WHITE);layout.addView(detail);
+        Button observation=button("RECORD WHAT IS ON THE FORD SCREEN");layout.addView(observation);
+        observation.setOnClickListener(v->{
+            String[] options={"No Mobile Apps Found","Vehicle Explorer not listed","Vehicle Explorer is listed",
+                "Vehicle Explorer opened on Ford screen","Vehicle Explorer opened but display empty"};
+            new AlertDialog.Builder(this).setTitle("What did SYNC 3 display?")
+                .setItems(options,(dialog,which)->{
+                    prefs().edit().putString("ford_screen_observation",options[which])
+                        .putLong("ford_screen_observed_at_ms",System.currentTimeMillis()).apply();
+                    refresh();
+                }).setNegativeButton("Cancel",null).show();
+        });
         Button save=button("SAVE SYNC 3 CONNECTION REPORT");layout.addView(save);
         start.setOnClickListener(v->checkAndStart());
         stop.setOnClickListener(v->{
@@ -61,7 +72,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.1-SYNC3-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.2-SYNC3-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -93,18 +104,29 @@ public final class SdlTestActivity extends Activity {
     private void refresh(){
         String x=prefs().getString("state","NOT_STARTED");
         state.setText("ACTUAL SDL STATUS: "+x);
-        detail.setText(prefs().getString("detail","Not connected to SYNC 3. No Ford vehicle readings verified.")
-                +"\nLast event timestamp (ms): "+prefs().getLong("updated_at_ms",0)
-                +"\nNo sensor values are simulated.");
+        detail.setText("HMI level: "+prefs().getString("hmi_level","NOT_RECEIVED")+
+                "\nFord screen ever in foreground: "+prefs().getBoolean("hmi_ever_full",false)+
+                "\nFord screen observation: "+prefs().getString("ford_screen_observation","not_recorded")+
+                "\nRecent detail: "+prefs().getString("detail","No connection registered.")+
+                "\nRecorded events: "+countEvents());
+    }
+    private int countEvents(){
+        try{return new org.json.JSONArray(prefs().getString("event_history","[]")).length();}
+        catch(Exception ignored){return 0;}
     }
     private JSONObject export(){
         JSONObject j=new JSONObject();
         try{
             j.put("format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.1");
+            j.put("version","0.9.2");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
+            j.put("hmi_level",prefs().getString("hmi_level","NOT_RECEIVED"));
+            j.put("hmi_ever_full",prefs().getBoolean("hmi_ever_full",false));
+            j.put("ford_screen_observation",prefs().getString("ford_screen_observation","not_recorded"));
+            j.put("ford_screen_observed_at_ms",prefs().getLong("ford_screen_observed_at_ms",0));
+            j.put("event_history",new org.json.JSONArray(prefs().getString("event_history","[]")));
             j.put("app_link_event_epoch_ms",prefs().getLong("updated_at_ms",0));
             j.put("sdl_development_app_id",SdlService.APP_ID);
             j.put("oem_approval_verified",false);
