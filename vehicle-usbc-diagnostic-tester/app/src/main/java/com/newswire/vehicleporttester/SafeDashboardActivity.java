@@ -71,6 +71,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private JSONObject lastSafeReport;
     private MotionTripLab motionLab;
     private VehicleVersionPanel vehicleVersionPanel;
+    private ExplorerResearchPanel explorerResearchPanel;
     private BluetoothLinkPanel bluetoothLinkPanel;
 
     private int dp(float value){return (int)(value*getResources().getDisplayMetrics().density+0.5f);}
@@ -81,6 +82,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         getWindow().setNavigationBarColor(BACK);
         getWindow().getDecorView().setSystemUiVisibility(0);
         locationManager=(LocationManager)getSystemService(LOCATION_SERVICE);
+        explorerResearchPanel=new ExplorerResearchPanel(this);
         buildScreen();
         refreshConnectionStatus();
     }
@@ -137,7 +139,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Instrument Lab",30,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.6   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.7   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -156,6 +158,16 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,13);
         vehicleVersionPanel=new VehicleVersionPanel(this);
         body.addView(vehicleVersionPanel.view());
+        gap(body,12);
+        Button profileButton=button("MY EXPLORER • FACTS & 35+ INVESTIGATION TOPICS",0xff1e5c75);
+        body.addView(profileButton,new LinearLayout.LayoutParams(-1,dp(55)));
+        profileButton.setOnClickListener(v->startActivity(
+            new Intent(this,ExplorerResearchActivity.class)));
+        gap(body,9);
+        Button stormsButton=button("NWS WARNING OVERLAY • PHONE MAP TEST",0xff285477);
+        body.addView(stormsButton,new LinearLayout.LayoutParams(-1,dp(55)));
+        stormsButton.setOnClickListener(v->startActivity(
+            new Intent(this,StormWarningMapLabActivity.class)));
         gap(body,12);
         bluetoothLinkPanel=new BluetoothLinkPanel(this);
         body.addView(bluetoothLinkPanel.view());
@@ -268,7 +280,11 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
 
         Button scan=button("SAFE CONNECTION SCAN",0xff147389);
         body.addView(scan,new LinearLayout.LayoutParams(-1,dp(52)));
-        scan.setOnClickListener(v->safeScan());
+        scan.setOnClickListener(v->safeScan(false));
+        gap(body,9);
+        Button shareReport=button("SAVE & SHARE REPORT",0xff1e7552);
+        body.addView(shareReport,new LinearLayout.LayoutParams(-1,dp(55)));
+        shareReport.setOnClickListener(v->safeScan(true));
         gap(body,9);
         scanResult=text("No scan yet. Safe scan checks connection metadata only.",12,MUTED,false);
         body.addView(scanResult);
@@ -284,7 +300,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             .setNeutralButton("CANCEL",(d,w)->{})
             .show());
         gap(body,7);
-        touchResult=text("Ford touchscreen: not yet tested with v0.8.6.",12,MUTED,false);
+        touchResult=text("Ford touchscreen: not yet tested with v0.8.7.",12,MUTED,false);
         body.addView(touchResult);
         gap(body,17);
         body.addView(text("REAL FORD RPM / ODOMETER: NOT CONNECTED",12,ORANGE,true));
@@ -348,13 +364,15 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         }
     }
 
-    private void safeScan(){
+    private void safeScan(boolean shareAfterSave){
         try{
             JSONObject j=new JSONObject();
-            j.put("report_format","Vehicle Capability Explorer safe dashboard scan v1");
-            j.put("app_version","0.8.6");
+            j.put("report_format","Vehicle Capability Explorer safe dashboard scan v2");
+            j.put("app_version","0.8.7");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
+            j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
+            j.put("storm_overlay_status",new JSONObject().put("ford_native_map_overlay","not_supported_by_public_api").put("newswire_android_auto_weather_map","separate_future_build").put("phone_warning_map_experiment","nws_alert_polygons_not_storm_tracks"));
             j.put("bluetooth_audio_link_check",bluetoothLinkPanel==null?JSONObject.NULL:bluetoothLinkPanel.snapshot());
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
@@ -406,7 +424,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             lastSafeReport=j;
             refreshConnectionStatus();
 
-            String fileName="Vehicle-Capability-Explorer-v0.8.6-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
+            String fileName="Vehicle-Capability-Explorer-v0.8.7-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
             ContentValues cv=new ContentValues();
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME,fileName);
             cv.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
@@ -419,6 +437,18 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             }
             scanResult.setText("SAFE SCAN COMPLETE • USB not opened\nSaved: Downloads/VehiclePortTester/"+fileName);
             scanResult.setTextColor(GREEN);
+            if(shareAfterSave){
+                Intent share=new Intent(Intent.ACTION_SEND);
+                share.setType("application/json");
+                share.putExtra(Intent.EXTRA_STREAM,dest);
+                share.setClipData(android.content.ClipData.newUri(
+                    getContentResolver(),"Explorer capability report",dest));
+                share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                try{startActivity(Intent.createChooser(share,"Share Explorer report"));}
+                catch(Exception e){
+                    scanResult.setText("REPORT SAVED but share sheet couldn't open. Use Samsung My Files > Download > VehiclePortTester > "+fileName);
+                }
+            }
         }catch(Exception ex){
             scanResult.setText("Scan export failed: "+ex.getClass().getSimpleName()+" — "+ex.getMessage());
             scanResult.setTextColor(ORANGE);
