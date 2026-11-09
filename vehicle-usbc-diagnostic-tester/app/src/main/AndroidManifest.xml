@@ -3,6 +3,7 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -17,6 +18,8 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
              services and activities are deliberately NOT registered. -->
+        <activity android:name=".ExplorerResearchActivity" android:exported="false" />
+        <activity android:name=".StormWarningMapLabActivity" android:exported="false" />
         <activity android:name=".CameraTachometerActivity" android:exported="false" />
         <activity android:name=".SafeDashboardActivity" android:exported="true">
             <intent-filter>
