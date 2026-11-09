@@ -2,7 +2,7 @@ name: Build SYNC3 Vehicle Explorer 0.9.1
 on:
   push:
     branches:
-      - vehicle-capability-explorer-v0.9.1-sync3-applink
+      - vehicle-capability-explorer-v0.9.2-screen-visibility
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
           sha256sum "$APK"
       - uses: actions/upload-artifact@v4
         with:
-          name: Vehicle-Explorer-0.9.1-SYNC3-APK
+          name: Vehicle-Explorer-0.9.2-SYNC3-APK
           path: vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
