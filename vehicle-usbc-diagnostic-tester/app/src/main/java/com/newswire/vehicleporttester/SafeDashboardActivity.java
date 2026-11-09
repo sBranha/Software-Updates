@@ -69,6 +69,8 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private String touchCheck="not_tested";
     private long startedAt=SystemClock.elapsedRealtime();
     private JSONObject lastSafeReport;
+    private MotionTripLab motionLab;
+    private VehicleVersionPanel vehicleVersionPanel;
 
     private int dp(float value){return (int)(value*getResources().getDisplayMetrics().density+0.5f);}
 
@@ -85,10 +87,13 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         super.onResume();
         wasResumed=true;
         if(locationEnabled)beginGps();
+        if(motionLab!=null)motionLab.onResume();
+        if(vehicleVersionPanel!=null)vehicleVersionPanel.refresh();
         refreshConnectionStatus();
     }
     @Override protected void onPause(){
         stopGpsUpdates();
+        if(motionLab!=null)motionLab.onPause();
         wasResumed=false;
         super.onPause();
     }
@@ -131,7 +136,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Instrument Lab",30,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.5   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.6   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -147,6 +152,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         body.addView(linkStatus);
         gap(body,5);
         body.addView(text("Connected means Android sees a USB accessory — not that it can read Ford sensors.",11,MUTED,false));
+        gap(body,13);
+        vehicleVersionPanel=new VehicleVersionPanel(this);
+        body.addView(vehicleVersionPanel.view());
         gap(body,17);
 
         LinearLayout gauges=new LinearLayout(this);
@@ -175,6 +183,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gpsButton=button("ENABLE PHONE GPS SPEED",0xff145d74);
         body.addView(gpsButton,new LinearLayout.LayoutParams(-1,dp(49)));
         gpsButton.setOnClickListener(v->toggleGps());
+        gap(body,14);
+        motionLab=new MotionTripLab(this);
+        body.addView(motionLab.view());
         gap(body,15);
 
         LinearLayout demo=vertical();
@@ -269,7 +280,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             .setNeutralButton("CANCEL",(d,w)->{})
             .show());
         gap(body,7);
-        touchResult=text("Ford touchscreen: not yet tested with v0.8.5.",12,MUTED,false);
+        touchResult=text("Ford touchscreen: not yet tested with v0.8.6.",12,MUTED,false);
         body.addView(touchResult);
         gap(body,17);
         body.addView(text("REAL FORD RPM / ODOMETER: NOT CONNECTED",12,ORANGE,true));
@@ -337,7 +348,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format","Vehicle Capability Explorer safe dashboard scan v1");
-            j.put("app_version","0.8.5");
+            j.put("app_version","0.8.6");
+            j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
+            j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
             j.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
@@ -388,7 +401,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             lastSafeReport=j;
             refreshConnectionStatus();
 
-            String fileName="Vehicle-Capability-Explorer-v0.8.5-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
+            String fileName="Vehicle-Capability-Explorer-v0.8.6-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
             ContentValues cv=new ContentValues();
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME,fileName);
             cv.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
@@ -463,6 +476,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     }
     @Override public void onLocationChanged(Location loc){
         if(!locationEnabled||loc==null)return;
+        if(motionLab!=null)motionLab.onGps(loc);
         if(!loc.hasAccuracy()||loc.getAccuracy()>40){
             gpsStatus.setText("Waiting for accurate phone GPS (<40 m).");
             return;
