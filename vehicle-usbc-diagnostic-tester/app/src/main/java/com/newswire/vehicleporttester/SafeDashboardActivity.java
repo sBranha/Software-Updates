@@ -71,6 +71,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private JSONObject lastSafeReport;
     private MotionTripLab motionLab;
     private VehicleVersionPanel vehicleVersionPanel;
+    private BluetoothLinkPanel bluetoothLinkPanel;
 
     private int dp(float value){return (int)(value*getResources().getDisplayMetrics().density+0.5f);}
 
@@ -155,6 +156,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,13);
         vehicleVersionPanel=new VehicleVersionPanel(this);
         body.addView(vehicleVersionPanel.view());
+        gap(body,12);
+        bluetoothLinkPanel=new BluetoothLinkPanel(this);
+        body.addView(bluetoothLinkPanel.view());
         gap(body,17);
 
         LinearLayout gauges=new LinearLayout(this);
@@ -351,6 +355,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             j.put("app_version","0.8.6");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
+            j.put("bluetooth_audio_link_check",bluetoothLinkPanel==null?JSONObject.NULL:bluetoothLinkPanel.snapshot());
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
             j.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
@@ -443,6 +448,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){
         super.onRequestPermissionsResult(request,permissions,grants);
+        if(request==BluetoothLinkPanel.PERMISSION_REQUEST&&bluetoothLinkPanel!=null
+                &&grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)
+            bluetoothLinkPanel.check();
         if(request==REQ_GPS){
             if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){
                 locationEnabled=true;
