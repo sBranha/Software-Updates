@@ -21,6 +21,7 @@ import com.smartdevicelink.proxy.rpc.enums.Language;
 import com.smartdevicelink.proxy.rpc.enums.TriggerSource;
 import com.smartdevicelink.proxy.rpc.listeners.OnRPCResponseListener;
 import com.smartdevicelink.transport.MultiplexTransportConfig;
+import com.smartdevicelink.transport.enums.TransportType;
 import com.smartdevicelink.util.SystemInfo;
 import java.util.Collections;
 import java.util.Vector;
@@ -59,6 +60,7 @@ public final class SdlService extends Service {
         try {
             MultiplexTransportConfig transport = new MultiplexTransportConfig(
                     this, APP_ID, MultiplexTransportConfig.FLAG_MULTI_SECURITY_OFF);
+            transport.setPrimaryTransports(Collections.singletonList(TransportType.BLUETOOTH));
             Vector<AppHMIType> types = new Vector<>();
             types.add(AppHMIType.INFORMATION);
             SdlManagerListener listener = new SdlManagerListener() {
