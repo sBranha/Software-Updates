@@ -58,8 +58,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private TextView linkStatus, gpsStatus, tripText, scanResult, touchResult, rpmValueText;
     private NeedleGauge gpsGauge, rpmGauge;
     private Button gpsButton;
-    private SeekBar rpmSlider;
-    private int demoRpm=0;
+    private boolean waitingForAuditBluetoothPermission=false;
     private float cameraOpticalRpm=Float.NaN, cameraOpticalConfidence=0;
     private String cameraOpticalSource="not_tested";
     private LocationManager locationManager;
@@ -137,9 +136,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         TextView kicker=text("VEHICLE CAPABILITY EXPLORER",12,CYAN,true);
         kicker.setLetterSpacing(0.10f);body.addView(kicker);
         gap(body,5);
-        body.addView(text("Instrument Lab",30,TEXT,true));
+        body.addView(text("Explorer Audit & Instruments",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.7   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.8   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -169,6 +168,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         stormsButton.setOnClickListener(v->startActivity(
             new Intent(this,StormWarningMapLabActivity.class)));
         gap(body,12);
+        Button completeAudit=button("COMPLETE EXPLORER AUDIT • SCAN & SHARE",0xff177a72);
+        body.addView(completeAudit,new LinearLayout.LayoutParams(-1,dp(64)));
+        completeAudit.setOnClickListener(v->runFullAudit());
+        gap(body,8);
+        body.addView(text("One report: phone USB, Android Auto, Bluetooth, GPS, motion and every Ford diagnostic access check. Unavailable protocols are explicitly marked unverified.",11,MUTED,false));
+        gap(body,12);
         bluetoothLinkPanel=new BluetoothLinkPanel(this);
         body.addView(bluetoothLinkPanel.view());
         gap(body,17);
@@ -176,7 +181,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         LinearLayout gauges=new LinearLayout(this);
         gauges.setOrientation(LinearLayout.HORIZONTAL);
         gpsGauge=new NeedleGauge(this,"PHONE GPS","MPH",140,CYAN);
-        rpmGauge=new NeedleGauge(this,"ENGINE RPM","DEMO ×1000",8,ORANGE);
+        rpmGauge=new NeedleGauge(this,"ENGINE RPM","NO ECU LINK",8,ORANGE);
         LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,dp(206),1);
         left.rightMargin=dp(6);
         LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,dp(206),1);
@@ -204,62 +209,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         body.addView(motionLab.view());
         gap(body,15);
 
-        LinearLayout demo=vertical();
-        demo.setBackground(panel(PANEL,EDGE));
-        demo.setPadding(dp(15),dp(13),dp(15),dp(13));
-        demo.addView(text("RPM NEEDLE TEST — DEMO ONLY",13,ORANGE,true));
-        gap(demo,5);
-        demo.addView(text("Tap a preset or slide the orange dot. Watch the number and the needle change together. This is NOT live Ford engine RPM.",12,MUTED,false));
-        gap(demo,9);
-        rpmValueText=text("0 RPM • DEMO",22,ORANGE,true);
-        demo.addView(rpmValueText);
-        gap(demo,7);
-        rpmSlider=new SeekBar(this);
-        rpmSlider.setMax(8000);
-        rpmSlider.setProgress(0);
-        rpmSlider.setProgressTintList(android.content.res.ColorStateList.valueOf(ORANGE));
-        rpmSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(ORANGE));
-        rpmSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            @Override public void onProgressChanged(SeekBar seek,int value,boolean user){
-                updateDemoRpm(value,false);
-            }
-            @Override public void onStartTrackingTouch(SeekBar seek){
-                seek.getParent().requestDisallowInterceptTouchEvent(true);
-            }
-            @Override public void onStopTrackingTouch(SeekBar seek){
-                seek.getParent().requestDisallowInterceptTouchEvent(false);
-            }
-        });
-        rpmSlider.setOnTouchListener((view,event)->{
-            switch(event.getActionMasked()){
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_MOVE:
-                    view.getParent().requestDisallowInterceptTouchEvent(true);
-                    break;
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    view.getParent().requestDisallowInterceptTouchEvent(false);
-                    break;
-                default:break;
-            }
-            return false;
-        });
-        demo.addView(rpmSlider,new LinearLayout.LayoutParams(-1,dp(50)));
-        gap(demo,5);
-        LinearLayout row1=new LinearLayout(this);
-        row1.setOrientation(LinearLayout.HORIZONTAL);
-        addPreset(row1,"0 RPM",0);
-        addPreset(row1,"800 RPM",800);
-        addPreset(row1,"1,500 RPM",1500);
-        demo.addView(row1);
-        gap(demo,7);
-        LinearLayout row2=new LinearLayout(this);
-        row2.setOrientation(LinearLayout.HORIZONTAL);
-        addPreset(row2,"3,000 RPM",3000);
-        addPreset(row2,"6,000 RPM",6000);
-        demo.addView(row2);
-        body.addView(demo);
-        updateDemoRpm(0,true);
+        rpmValueText=text("ENGINE RPM: NOT CONNECTED TO FORD",13,ORANGE,true);
+        body.addView(rpmValueText);
+        rpmGauge.setReading(0,"NO ECU LINK",false);
         gap(body,13);
 
         LinearLayout cameraPanel=vertical();
@@ -300,30 +252,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             .setNeutralButton("CANCEL",(d,w)->{})
             .show());
         gap(body,7);
-        touchResult=text("Ford touchscreen: not yet tested with v0.8.7.",12,MUTED,false);
+        touchResult=text("Ford touchscreen: confirm when parked after updating.",12,MUTED,false);
         body.addView(touchResult);
         gap(body,17);
         body.addView(text("REAL FORD RPM / ODOMETER: NOT CONNECTED",12,ORANGE,true));
         gap(body,3);
-        body.addView(text("Android Auto does not expose actual engine-RPM or odometer readings. PHONE GPS is real phone data. RPM presets are DEMO; CAMERA RPM is an optical estimate after calibration, never a Ford ECU reading.",12,MUTED,false));
-    }
-
-    private void addPreset(LinearLayout row,String label,int rpm){
-        Button b=button(label,0xff2c4358);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(43),1);
-        lp.setMargins(dp(2),0,dp(2),0);
-        row.addView(b,lp);
-        b.setOnClickListener(v->updateDemoRpm(rpm,true));
-    }
-    private void updateDemoRpm(int rpm,boolean setSlider){
-        demoRpm=Math.max(0,Math.min(8000,rpm));
-        // Returning to a demo preset explicitly overrides an old camera estimate.
-        if(rpmValueText!=null)
-            rpmValueText.setText(String.format(Locale.US,"%,d RPM • DEMO",demoRpm));
-        if(rpmGauge!=null)
-            rpmGauge.setReading(demoRpm/1000f,"DEMO ONLY",true);
-        if(setSlider && rpmSlider!=null && rpmSlider.getProgress()!=demoRpm)
-            rpmSlider.setProgress(demoRpm);
+        body.addView(text("No Ford RPM, odometer or trouble-code link is established. AppLink and Android Auto car data require separately authorized integrations. Camera RPM is an optical estimate, never an ECU reading.",12,MUTED,false));
     }
 
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
@@ -364,11 +298,27 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         }
     }
 
-    private void safeScan(boolean shareAfterSave){
+    private void runFullAudit(){
+        if(bluetoothLinkPanel!=null){
+            if(Build.VERSION.SDK_INT>=31 &&
+                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){
+                waitingForAuditBluetoothPermission=true;
+                bluetoothLinkPanel.check();
+                if(scanResult!=null)scanResult.setText("Bluetooth permission requested. Audit continues after your choice.");
+                return;
+            }
+            bluetoothLinkPanel.check();
+        }
+        if(scanResult!=null)scanResult.setText("Collecting all permitted phone-side tests. Ford diagnostic access will be listed as unverified where no protocol connection exists.");
+        new android.os.Handler(android.os.Looper.getMainLooper())
+            .postDelayed(()->safeScan(true,true),2200);
+    }
+    private void safeScan(boolean shareAfterSave){safeScan(shareAfterSave,false);}
+    private void safeScan(boolean shareAfterSave,boolean fullAudit){
         try{
             JSONObject j=new JSONObject();
-            j.put("report_format","Vehicle Capability Explorer safe dashboard scan v2");
-            j.put("app_version","0.8.7");
+            j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
+            j.put("app_version","0.8.8");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
@@ -389,8 +339,8 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
             j.put("phone_gps_speed_enabled",locationEnabled);
             j.put("phone_gps_speed_mph",Double.isFinite(latestPhoneSpeedMph)?latestPhoneSpeedMph:JSONObject.NULL);
             j.put("phone_gps_trip_miles",tripMiles);
-            j.put("rpm_gauge_source","user_controlled_demo_presets_or_slider");
-            j.put("rpm_demo_value_only_not_from_vehicle",demoRpm);
+            j.put("rpm_gauge_source","no_live_vehicle_rpm_link");
+            j.put("rpm_demo_controls_removed",true);
             j.put("camera_optical_rpm_estimate",Float.isFinite(cameraOpticalRpm)?cameraOpticalRpm:JSONObject.NULL);
             j.put("camera_optical_confidence",cameraOpticalConfidence);
             j.put("camera_optical_source",cameraOpticalSource);
@@ -421,10 +371,11 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
                 if(adapter!=null&&permitted)j.put("bluetooth_enabled",adapter.isEnabled());
             }catch(Exception e){j.put("bluetooth_status","unavailable");}
             j.put("interpretation","Passive phone-side metadata only. This scan does not hijack Android Auto or read any ECU, Ford SYNC firmware, engine RPM or odometer.");
+            if(fullAudit)j.put("complete_audit",CompleteAuditReport.build(j));
             lastSafeReport=j;
             refreshConnectionStatus();
 
-            String fileName="Vehicle-Capability-Explorer-v0.8.7-SAFE-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
+            String fileName="Vehicle-Capability-Explorer-v0.8.8-"+(fullAudit?"COMPLETE-":"SAFE-")+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json";
             ContentValues cv=new ContentValues();
             cv.put(MediaStore.MediaColumns.DISPLAY_NAME,fileName);
             cv.put(MediaStore.MediaColumns.MIME_TYPE,"application/json");
@@ -435,7 +386,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
                 if(out==null)throw new IllegalStateException("Downloads stream missing");
                 out.write(j.toString(2).getBytes(StandardCharsets.UTF_8));
             }
-            scanResult.setText("SAFE SCAN COMPLETE • USB not opened\nSaved: Downloads/VehiclePortTester/"+fileName);
+            scanResult.setText((fullAudit?"COMPLETE AUDIT SAVED • all available phone checks recorded":"SAFE SCAN COMPLETE")+" • USB not opened\nSaved: Downloads/VehiclePortTester/"+fileName);
             scanResult.setTextColor(GREEN);
             if(shareAfterSave){
                 Intent share=new Intent(Intent.ACTION_SEND);
@@ -478,9 +429,15 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){
         super.onRequestPermissionsResult(request,permissions,grants);
-        if(request==BluetoothLinkPanel.PERMISSION_REQUEST&&bluetoothLinkPanel!=null
-                &&grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)
-            bluetoothLinkPanel.check();
+        if(request==BluetoothLinkPanel.PERMISSION_REQUEST&&bluetoothLinkPanel!=null){
+            if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)
+                bluetoothLinkPanel.check();
+            if(waitingForAuditBluetoothPermission){
+                waitingForAuditBluetoothPermission=false;
+                new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(()->safeScan(true,true),2200);
+            }
+        }
         if(request==REQ_GPS){
             if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){
                 locationEnabled=true;
