@@ -139,7 +139,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Explorer Audit & Instruments",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.8   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.8.9   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -169,6 +169,10 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         stormsButton.setOnClickListener(v->startActivity(
             new Intent(this,StormWarningMapLabActivity.class)));
         gap(body,12);
+        Button interfaces=button("OFFICIAL INTERFACES • 10 SAFE READINESS CHECKS",0xff215c74);
+        body.addView(interfaces,new LinearLayout.LayoutParams(-1,dp(55)));
+        interfaces.setOnClickListener(v->startActivity(new Intent(this,OfficialInterfaceActivity.class)));
+        gap(body,9);
         Button completeAudit=button("COMPLETE EXPLORER AUDIT • SCAN & SHARE",0xff177a72);
         body.addView(completeAudit,new LinearLayout.LayoutParams(-1,dp(64)));
         completeAudit.setOnClickListener(v->runFullAudit());
@@ -338,12 +342,13 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
-            j.put("app_version","0.8.8");
+            j.put("app_version","0.8.9");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
             j.put("storm_overlay_status",new JSONObject().put("ford_native_map_overlay","not_supported_by_public_api").put("newswire_android_auto_weather_map","separate_future_build").put("phone_warning_map_experiment","nws_alert_polygons_not_storm_tracks"));
             j.put("bluetooth_audio_link_check",bluetoothLinkPanel==null?JSONObject.NULL:bluetoothLinkPanel.snapshot());
+            j.put("official_interface_readiness_previous_scan",OfficialInterfaceActivity.lastReport(this));
             j.put("scan_mode","safe_metadata_only_no_usb_accessory_open");
             j.put("utc",iso());
             j.put("phone_model",Build.MANUFACTURER+" "+Build.MODEL);
