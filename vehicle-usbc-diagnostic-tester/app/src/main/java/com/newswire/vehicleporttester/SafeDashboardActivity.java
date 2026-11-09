@@ -59,6 +59,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     private NeedleGauge gpsGauge, rpmGauge;
     private Button gpsButton;
     private boolean waitingForAuditBluetoothPermission=false;
+    private boolean waitingForAuditGpsPermission=false,bluetoothAuditPermissionHandled=false,fullAuditCollecting=false;
     private float cameraOpticalRpm=Float.NaN, cameraOpticalConfidence=0;
     private String cameraOpticalSource="not_tested";
     private LocationManager locationManager;
@@ -299,19 +300,38 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     }
 
     private void runFullAudit(){
-        if(bluetoothLinkPanel!=null){
-            if(Build.VERSION.SDK_INT>=31 &&
-                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){
-                waitingForAuditBluetoothPermission=true;
-                bluetoothLinkPanel.check();
-                if(scanResult!=null)scanResult.setText("Bluetooth permission requested. Audit continues after your choice.");
-                return;
-            }
-            bluetoothLinkPanel.check();
+        if(fullAuditCollecting)return;
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+            waitingForAuditGpsPermission=true;
+            if(scanResult!=null)scanResult.setText("Complete audit needs GPS permission to capture phone speed and sensors. It will continue after your choice.");
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},REQ_GPS);
+            return;
         }
-        if(scanResult!=null)scanResult.setText("Collecting all permitted phone-side tests. Ford diagnostic access will be listed as unverified where no protocol connection exists.");
+        if(bluetoothLinkPanel!=null&&Build.VERSION.SDK_INT>=31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED &&
+            !bluetoothAuditPermissionHandled){
+            waitingForAuditBluetoothPermission=true;
+            bluetoothLinkPanel.check();
+            if(scanResult!=null)scanResult.setText("Bluetooth permission requested. Audit will continue even if declined.");
+            return;
+        }
+        if(!locationEnabled){
+            locationEnabled=true;
+            gpsButton.setText("DISABLE PHONE GPS");
+            if(wasResumed)beginGps();
+        }
+        if(motionLab!=null)motionLab.onResume();
+        if(bluetoothLinkPanel!=null &&
+            (Build.VERSION.SDK_INT<31||checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED))
+            bluetoothLinkPanel.check();
+        fullAuditCollecting=true;
+        if(scanResult!=null)scanResult.setText("COMPLETE AUDIT RUNNING • collecting GPS, phone motion, USB and Bluetooth observations for 12 seconds. Keep parked. No Ford modules are being queried.");
         new android.os.Handler(android.os.Looper.getMainLooper())
-            .postDelayed(()->safeScan(true,true),2200);
+            .postDelayed(()->{
+                if(!fullAuditCollecting||isFinishing())return;
+                fullAuditCollecting=false;
+                safeScan(true,true);
+            },12000);
     }
     private void safeScan(boolean shareAfterSave){safeScan(shareAfterSave,false);}
     private void safeScan(boolean shareAfterSave,boolean fullAudit){
@@ -430,12 +450,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){
         super.onRequestPermissionsResult(request,permissions,grants);
         if(request==BluetoothLinkPanel.PERMISSION_REQUEST&&bluetoothLinkPanel!=null){
-            if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)
-                bluetoothLinkPanel.check();
+            bluetoothAuditPermissionHandled=true;
             if(waitingForAuditBluetoothPermission){
                 waitingForAuditBluetoothPermission=false;
-                new android.os.Handler(android.os.Looper.getMainLooper())
-                    .postDelayed(()->safeScan(true,true),2200);
+                runFullAudit();
+            }else if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED){
+                bluetoothLinkPanel.check();
             }
         }
         if(request==REQ_GPS){
@@ -443,8 +463,32 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
                 locationEnabled=true;
                 gpsButton.setText("DISABLE PHONE GPS");
                 if(wasResumed)beginGps();
-            }else gpsStatus.setText("GPS permission declined. Speed remains unavailable.");
+            }else gpsStatus.setText("GPS permission declined. Phone speed unavailable.");
+            if(waitingForAuditGpsPermission){
+                waitingForAuditGpsPermission=false;
+                if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
+                    runFullAudit();
+                else{
+                    // Continue other checks, without falsely reporting a GPS fix.
+                    bluetoothAuditPermissionHandled=true;
+                    runFullAuditWithoutGps();
+                }
+            }
         }
+    }
+    private void runFullAuditWithoutGps(){
+        if(fullAuditCollecting)return;
+        if(bluetoothLinkPanel!=null &&
+           (Build.VERSION.SDK_INT<31||checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED))
+           bluetoothLinkPanel.check();
+        fullAuditCollecting=true;
+        if(scanResult!=null)scanResult.setText("COMPLETE AUDIT • GPS declined. Checking permitted USB, Android Auto, Bluetooth and phone sensors for 12 seconds.");
+        if(motionLab!=null)motionLab.onResume();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->{
+            if(!fullAuditCollecting||isFinishing())return;
+            fullAuditCollecting=false;
+            safeScan(true,true);
+        },12000);
     }
     private void beginGps(){
         if(!locationEnabled||receivingGps||locationManager==null)return;
