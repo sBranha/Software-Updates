@@ -137,9 +137,9 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         TextView kicker=text("VEHICLE CAPABILITY EXPLORER",12,CYAN,true);
         kicker.setLetterSpacing(0.10f);body.addView(kicker);
         gap(body,5);
-        body.addView(text("Explorer Audit & Instruments",27,TEXT,true));
+        body.addView(text("Ford Vehicle Discovery",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.8.9   •   NON-INTRUSIVE USB MODE",12,GREEN,true));
+        body.addView(text("v0.9.0   •   REAL FORD DATA FIRST",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -150,6 +150,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         note.addView(text("This version NEVER opens or reads Android Auto's USB accessory. The Ford touchscreen should remain responsive.",12,TEXT,false));
         body.addView(note);
         gap(body,16);
+        Button fordData=button("FORD VEHICLE DATA • CONNECT & DISCOVER",0xff138c78);
+        body.addView(fordData,new LinearLayout.LayoutParams(-1,dp(68)));
+        fordData.setOnClickListener(v->startActivity(new Intent(this,FordVehicleDataActivity.class)));
+        gap(body,6);
+        body.addView(text("READ REAL ECU VALUES • Supports paired Bluetooth Classic OBD-II adapters. No phone GPS readings or simulated Ford sensors.",12,GREEN,false));
+        gap(body,14);
 
         linkStatus=text("Checking USB connection…",14,TEXT,true);
         body.addView(linkStatus);
@@ -173,7 +179,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         body.addView(interfaces,new LinearLayout.LayoutParams(-1,dp(55)));
         interfaces.setOnClickListener(v->startActivity(new Intent(this,OfficialInterfaceActivity.class)));
         gap(body,9);
-        Button completeAudit=button("COMPLETE EXPLORER AUDIT • SCAN & SHARE",0xff177a72);
+        Button completeAudit=button("LEGACY PHONE & USB AUDIT • OPTIONAL",0xff3e6372);
         body.addView(completeAudit,new LinearLayout.LayoutParams(-1,dp(64)));
         completeAudit.setOnClickListener(v->runFullAudit());
         gap(body,8);
@@ -342,7 +348,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
-            j.put("app_version","0.8.9");
+            j.put("app_version","0.9.0");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
