@@ -4,7 +4,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import com.smartdevicelink.proxy.SdlBroadcastReceiver;
+import com.smartdevicelink.transport.SdlBroadcastReceiver;
 import com.smartdevicelink.transport.TransportConstants;
 
 public final class SdlReceiver extends SdlBroadcastReceiver {
