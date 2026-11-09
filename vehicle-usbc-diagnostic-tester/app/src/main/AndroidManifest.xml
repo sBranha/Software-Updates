@@ -4,6 +4,10 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -16,11 +20,23 @@
         <intent><action android:name="sdl.router.startservice" /></intent>
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Ford Vehicle Explorer 0.9.0" android:allowBackup="false"
+        android:label="Ford Vehicle Explorer 0.9.1" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
              services and activities are deliberately NOT registered. -->
+        <activity android:name=".SdlTestActivity" android:exported="false" />
+        <service android:name=".SdlService" android:exported="true" android:enabled="true" android:foregroundServiceType="connectedDevice" />
+        <service android:name=".SdlRouterService" android:enabled="true" android:exported="true" android:foregroundServiceType="connectedDevice" android:process="com.smartdevicelink.router">
+            <intent-filter><action android:name="com.smartdevicelink.router.service"/></intent-filter>
+            <meta-data android:name="sdl_router_version" android:value="@integer/sdl_router_service_version_value"/>
+        </service>
+        <receiver android:name=".SdlReceiver" android:exported="true" android:enabled="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED"/>
+                <action android:name="sdl.router.startservice"/>
+            </intent-filter>
+        </receiver>
         <activity android:name=".FordVehicleDataActivity" android:exported="false" />
         <activity android:name=".OfficialInterfaceActivity" android:exported="false" />
         <activity android:name=".ExplorerResearchActivity" android:exported="false" />
