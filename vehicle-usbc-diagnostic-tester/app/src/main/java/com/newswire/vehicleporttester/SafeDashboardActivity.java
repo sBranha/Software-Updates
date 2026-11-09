@@ -139,7 +139,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Ford Vehicle Discovery",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.9.0   •   REAL FORD DATA FIRST",12,GREEN,true));
+        body.addView(text("v0.9.1   •   SYNC 3 ON-SCREEN TEST",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -150,7 +150,13 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         note.addView(text("This version NEVER opens or reads Android Auto's USB accessory. The Ford touchscreen should remain responsive.",12,TEXT,false));
         body.addView(note);
         gap(body,16);
-        Button fordData=button("FORD VEHICLE DATA • CONNECT & DISCOVER",0xff138c78);
+        Button sdl=button("SYNC 3 DISPLAY • REAL APPLINK TEST",0xff137a9e);
+        body.addView(sdl,new LinearLayout.LayoutParams(-1,dp(68)));
+        sdl.setOnClickListener(v->startActivity(new Intent(this,SdlTestActivity.class)));
+        gap(body,7);
+        body.addView(text("Test whether Vehicle Explorer registers and displays in the Ford SYNC 3 Apps menu; inspect real SDL connection status.",12,GREEN,false));
+        gap(body,12);
+        Button fordData=button("FORD OBD-II DATA • ADAPTER TEST",0xff138c78);
         body.addView(fordData,new LinearLayout.LayoutParams(-1,dp(68)));
         fordData.setOnClickListener(v->startActivity(new Intent(this,FordVehicleDataActivity.class)));
         gap(body,6);
@@ -348,7 +354,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
-            j.put("app_version","0.9.0");
+            j.put("app_version","0.9.1");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
