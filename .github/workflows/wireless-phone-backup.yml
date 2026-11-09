@@ -2,6 +2,8 @@ name: Wireless Phone Backup installers
 on:
   push:
     branches: [wireless-phone-backup-v0.1]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
