@@ -25,6 +25,7 @@ import java.util.Locale;
 final class VehicleVersionPanel {
     private static final String ANDROID_AUTO="com.google.android.projection.gearhead";
     private static final String PREFS="vehicle_explorer_manual_ford_version";
+    private static final String FROM_VEHICLE_PHOTO="SYNC 3 v3.4 • build 23188_PRODUCT";
     private final Activity activity;
     private final LinearLayout panel;
     private final TextView androidVersion,fordVersion;
@@ -45,7 +46,7 @@ final class VehicleVersionPanel {
         androidVersion.setPadding(0,dp(12),0,dp(5));panel.addView(androidVersion);
         fordVersion=label("FORD SYNC: not supplied",15,Color.WHITE,true);
         panel.addView(fordVersion);
-        panel.addView(label("SYNC firmware is NOT automatically readable through the Android Auto USB accessory.",11,0xffffb864,false));
+        panel.addView(label("SYNC version comes from your About SYNC photo—not an automatic vehicle computer scan.",11,0xffffb864,false));
         Button enter=new Button(activity);enter.setText("ENTER FORD SYNC VERSION");
         enter.setAllCaps(false);enter.setTextColor(Color.WHITE);
         enter.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff216276));
@@ -56,7 +57,7 @@ final class VehicleVersionPanel {
         refresh.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff304c62));
         panel.addView(refresh,new LinearLayout.LayoutParams(-1,dp(45)));
         refresh.setOnClickListener(v->refresh());
-        panel.addView(label("On the parked Ford screen, look for Settings → General → About SYNC (or Settings → About). Enter the displayed SYNC software version/build, not a guessed model year.",11,0xffaac1ce,false));
+        panel.addView(label("From your photo: SYNC 3.4 build 23188_PRODUCT. To update, check Ford Settings → General → About SYNC while parked.",11,0xffaac1ce,false));
         fordSaved=activity.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
             .getString("ford_sync_version","").trim();
         updateFordText();
@@ -91,9 +92,10 @@ final class VehicleVersionPanel {
         }
     }
     private void updateFordText(){
-        fordVersion.setText(fordSaved.isEmpty()?"FORD SYNC: not entered":
+        fordVersion.setText(fordSaved.isEmpty()?
+            "FORD SYNC (FROM YOUR PHOTO): "+FROM_VEHICLE_PHOTO:
             "FORD SYNC (USER ENTERED): "+fordSaved);
-        fordVersion.setTextColor(fordSaved.isEmpty()?0xffffbd70:0xffc1d5e3);
+        fordVersion.setTextColor(0xffc1d5e3);
     }
     private void askFord(){
         EditText edit=new EditText(activity);
@@ -131,9 +133,9 @@ final class VehicleVersionPanel {
             j.put("android_auto_version_code",autoCode.isEmpty()?JSONObject.NULL:autoCode);
             j.put("android_auto_source","android_package_manager_installed_phone_app");
             j.put("android_auto_status",autoStatus);
-            j.put("ford_sync_version",fordSaved.isEmpty()?JSONObject.NULL:fordSaved);
+            j.put("ford_sync_version",fordSaved.isEmpty()?FROM_VEHICLE_PHOTO:fordSaved);
             j.put("ford_sync_version_source",fordSaved.isEmpty()?
-                "not_available_no_public_api":"user_entered_from_vehicle_screen");
+                "user_supplied_about_sync_photo":"user_entered_from_vehicle_screen");
             j.put("ford_sync_version_verified_by_app",false);
             j.put("ford_sync_version_auto_detected",false);
             j.put("note","Android Auto version is the phone app, NOT the Ford head-unit firmware version.");
