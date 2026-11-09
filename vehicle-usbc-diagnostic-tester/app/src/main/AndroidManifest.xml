@@ -9,17 +9,19 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <queries>
         <package android:name="com.google.android.projection.gearhead" />
         <intent><action android:name="com.smartdevicelink.router.service" /></intent>
         <intent><action android:name="sdl.router.startservice" /></intent>
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Vehicle Explorer 0.8.9 Test" android:allowBackup="false"
+        android:label="Ford Vehicle Explorer 0.9.0" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
              services and activities are deliberately NOT registered. -->
+        <activity android:name=".FordVehicleDataActivity" android:exported="false" />
         <activity android:name=".OfficialInterfaceActivity" android:exported="false" />
         <activity android:name=".ExplorerResearchActivity" android:exported="false" />
         <activity android:name=".StormWarningMapLabActivity" android:exported="false" />
