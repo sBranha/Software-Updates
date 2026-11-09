@@ -4,14 +4,18 @@ android {
     namespace 'com.newswire.vehicleporttester'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.newswire.vehicleporttester.experiment.forddata'
+        applicationId 'com.newswire.vehicleporttester.experiment.sync3'
         minSdk 26
         targetSdk 34
-        versionCode 26
-        versionName '0.9.0'
+        versionCode 27
+        versionName '0.9.1'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation 'com.smartdevicelink:sdl_android:5.8.0'
 }
