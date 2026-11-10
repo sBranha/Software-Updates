@@ -1,5 +1,5 @@
 #define MyAppName "Wireless Phone Backup"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "0.4.0"
 [Setup]
 AppId=WirelessPhoneBackupLocal
 AppName={#MyAppName}
