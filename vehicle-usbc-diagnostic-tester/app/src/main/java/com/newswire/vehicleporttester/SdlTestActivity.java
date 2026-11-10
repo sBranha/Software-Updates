@@ -23,7 +23,12 @@ import java.util.Locale;
 
 public final class SdlTestActivity extends Activity {
     private static final int ASK_BT=919, ASK_NOTIFY=920, SAVE=921;
-    private TextView state, detail;
+    private TextView state, detail, auditInfo;
+    private boolean requestedAudit=false;
+    private final android.os.Handler uiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable refreshLoop=new Runnable(){
+        @Override public void run(){refresh();uiHandler.postDelayed(this,750);}
+    };
     private int dp(int d){return (int)(d*getResources().getDisplayMetrics().density+0.5f);}
     private Button button(String title){
         Button b=new Button(this);b.setText(title);b.setAllCaps(false);
@@ -41,10 +46,14 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.3 • SmartDeviceLink",13,0xff66e2ad));
-        layout.addView(label("Vehicle Explorer is now visible on the Ford screen. This version has native SYNC 3 menus for individual vehicle readings and permissions. All unavailable fields remain blank.",15,Color.WHITE));
-        layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open 'Vehicle Explorer', then use its Ford data menus.",14,0xffbed1e0));
+        layout.addView(label("Vehicle Explorer v0.9.4 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("ONE TAP checks SYNC 3, seven Ford fields, cloud authorization and OBD-II availability. Real progress, one final report and no simulated values.",15,Color.WHITE));
+        layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open Vehicle Explorer and select TEST EVERYTHING. You may also run it from this phone.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
+        Button testEverything=button("TEST EVERYTHING - ONE TAP");layout.addView(testEverything);
+        testEverything.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff0b785e));
+        auditInfo=label("Audit not run yet.",15,0xff56e2c3);layout.addView(auditInfo);
+        testEverything.setOnClickListener(v->checkAndStart(true));
         Button start=button("START FORD APPLINK CONNECTION");layout.addView(start);
         Button stop=button("STOP APPLINK TEST");layout.addView(stop);
         Button refresh=button("REFRESH ACTUAL CONNECTION STATUS");layout.addView(refresh);
@@ -62,7 +71,7 @@ public final class SdlTestActivity extends Activity {
                 }).setNegativeButton("Cancel",null).show();
         });
         Button save=button("SAVE SYNC 3 CONNECTION REPORT");layout.addView(save);
-        start.setOnClickListener(v->checkAndStart());
+        start.setOnClickListener(v->checkAndStart(false));
         stop.setOnClickListener(v->{
             stopService(new Intent(this,SdlService.class));
             SdlService.record(this,"MANUAL_STOP","AppLink test stopped by user");
@@ -72,12 +81,16 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.3-SYNC3-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.4-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
+        if(getIntent()!=null && getIntent().getBooleanExtra("start_full_audit",false))
+            uiHandler.post(()->checkAndStart(true));
     }
-    private void checkAndStart(){
+    private void checkAndStart(){checkAndStart(false);}
+    private void checkAndStart(boolean launchAudit){
+        requestedAudit=launchAudit;
         if(Build.VERSION.SDK_INT>=31 &&
                 checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},ASK_BT);return;
@@ -88,6 +101,7 @@ public final class SdlTestActivity extends Activity {
         }
         try{
             Intent svc=new Intent(this,SdlService.class);
+            if(launchAudit)svc.setAction(SdlService.ACTION_TEST_ALL);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(svc);else startService(svc);
             refresh();
         }catch(Exception ex){
@@ -97,11 +111,17 @@ public final class SdlTestActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int request,String[] names,int[] results){
         super.onRequestPermissionsResult(request,names,results);
-        if((request==ASK_BT||request==ASK_NOTIFY)&&results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)checkAndStart();
+        if((request==ASK_BT||request==ASK_NOTIFY)&&results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)checkAndStart(requestedAudit);
         else refresh();
     }
     private SharedPreferences prefs(){return getSharedPreferences("sdl_discovery_v091",MODE_PRIVATE);}
     private void refresh(){
+        android.content.SharedPreferences a=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
+        if(auditInfo!=null) auditInfo.setText("ONE TAP: "+a.getString("status","NOT_RUN")+
+            "   "+a.getInt("complete",0)+"/7 vehicle fields\n"+
+            a.getString("stage","Tap TEST EVERYTHING to start")+
+            "\nFord cloud: "+a.getString("fordconnect_cloud","NOT_TESTED")+
+            "\nOBD-II: "+a.getString("obd2_live","NOT_TESTED"));
         String x=prefs().getString("state","NOT_STARTED");
         state.setText("ACTUAL SDL STATUS: "+x);
         detail.setText("HMI level: "+prefs().getString("hmi_level","NOT_RECEIVED")+
@@ -118,7 +138,7 @@ public final class SdlTestActivity extends Activity {
         JSONObject j=new JSONObject();
         try{
             j.put("format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.3");
+            j.put("version","0.9.4");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
@@ -156,5 +176,13 @@ public final class SdlTestActivity extends Activity {
             }catch(Exception ex){new AlertDialog.Builder(this).setMessage("Save failed: "+ex.getClass().getSimpleName()).setPositiveButton("OK",null).show();}
         }
     }
-    @Override protected void onResume(){super.onResume();if(state!=null)refresh();}
+    @Override protected void onResume(){
+        super.onResume();
+        uiHandler.removeCallbacks(refreshLoop);
+        if(state!=null){refresh();uiHandler.postDelayed(refreshLoop,750);}
+    }
+    @Override protected void onPause(){
+        uiHandler.removeCallbacks(refreshLoop);
+        super.onPause();
+    }
 }
