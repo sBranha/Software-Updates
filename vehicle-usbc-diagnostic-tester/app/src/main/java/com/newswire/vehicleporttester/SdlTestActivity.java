@@ -137,7 +137,29 @@ public final class SdlTestActivity extends Activity {
     private JSONObject export(){
         JSONObject j=new JSONObject();
         try{
-            j.put("format","Vehicle Explorer SYNC 3 AppLink connection report v1");
+            j.put("format","Vehicle Explorer one tap audit v0.9.4");
+            android.content.SharedPreferences all=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
+            JSONObject audit=new JSONObject();
+            for(String key:new String[]{"status","stage","sync_transport","sync_hmi_at_start",
+                    "bluetooth_permission","fordconnect_cloud","ford_app_data","obd2_live",
+                    "obd2_saved_snapshot","usb"}){
+                audit.put(key,all.getString(key,"NOT_CHECKED"));
+            }
+            for(String key:new String[]{"complete","total","verified","disallowed","other"})
+                audit.put(key,all.getInt(key,0));
+            audit.put("started_ms",all.getLong("started_ms",0));
+            audit.put("ended_ms",all.getLong("ended_ms",0));
+            JSONObject auditFields=new JSONObject();
+            for(String key:OneTapAudit.KEYS){
+                auditFields.put(key,new JSONObject()
+                    .put("result",all.getString("result_"+key,"NOT_TESTED"))
+                    .put("value",all.getString("value_"+key,""))
+                    .put("detail",all.getString("detail_"+key,""))
+                    .put("tested_ms",all.getLong("time_"+key,0)));
+            }
+            audit.put("ford_fields",auditFields);
+            j.put("one_tap_audit",audit);
+            j.put("legacy_format","Vehicle Explorer SYNC 3 AppLink connection report v1");
             j.put("version","0.9.4");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
