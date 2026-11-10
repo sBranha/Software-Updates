@@ -154,6 +154,10 @@ public final class SdlTestActivity extends Activity {
                 audit.put(key,all.getInt(key,0));
             audit.put("started_ms",all.getLong("started_ms",0));
             audit.put("ended_ms",all.getLong("ended_ms",0));
+            audit.put("fordconnect_setup_steps_user_reported",
+                all.getInt("fordconnect_setup_steps_user_reported",0));
+            audit.put("fordconnect_access_verification",
+                all.getString("fordconnect_access_verification","NOT_VERIFIED"));
             audit.put("ford_app_manual_snapshot_ms",all.getLong("ford_app_manual_snapshot_ms",0));
             JSONObject auditFields=new JSONObject();
             for(String key:OneTapAudit.KEYS){
