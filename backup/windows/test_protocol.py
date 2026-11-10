@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from backup import run_server, read_exact
+from backup import run_server, read_exact, discovery_service
 
 
 def u32(n):
@@ -55,6 +55,33 @@ def simulate_android(pin, payload):
 
 
 class TestBackup(unittest.TestCase):
+    def test_discovery_tcp_and_udp(self):
+        """Phone should discover PC without consuming the file-transfer connection."""
+        stop = threading.Event()
+        thread = threading.Thread(target=discovery_service, args=(stop,), daemon=True)
+        thread.start()
+        try:
+            reply = None
+            for attempt in range(30):
+                try:
+                    with socket.create_connection(("127.0.0.1", 38473), timeout=0.3) as connection:
+                        connection.settimeout(2)
+                        connection.sendall(b"WPB_STATUS_V4")
+                        reply = connection.recv(64)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            self.assertEqual(reply, b"WPB_READY_V4", "Direct TCP status not responding")
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+                udp.settimeout(2)
+                udp.sendto(b"WPB_DISCOVER_V4", ("127.0.0.1", 38472))
+                response, _ = udp.recvfrom(64)
+                self.assertEqual(response, b"WPB_READY_V4", "UDP discovery not responding")
+        finally:
+            stop.set()
+            thread.join(3)
+            self.assertFalse(thread.is_alive(), "Discovery listener failed to close")
+
     def test_six_digit_secure_transfer_and_report(self):
         with tempfile.TemporaryDirectory() as temp:
             values = []
