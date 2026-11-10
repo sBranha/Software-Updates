@@ -40,11 +40,11 @@ public final class SdlTestActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(0xff081421);
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
-        layout.addView(label("FORD SYNC 3 • ON-SCREEN TEST",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.2 • SmartDeviceLink",13,0xff66e2ad));
-        layout.addView(label("PURPOSE: Make Vehicle Explorer show on the car's SYNC 3 Apps screen, not just the phone. The initial Ford screen is a simple text/menu interface, not the full custom concept dashboard.",15,Color.WHITE));
-        layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Look for 'Vehicle Explorer'. If shown, open it and use its menu > Read Ford data.",14,0xffbed1e0));
-        layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may require a registered/approved AppLink ID before showing this test app or allowing vehicle-data requests. A failure to appear does NOT mean Ford vehicle modules lack the requested data.",13,0xffffc674));
+        layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
+        layout.addView(label("Vehicle Explorer v0.9.3 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer is now visible on the Ford screen. This version has native SYNC 3 menus for individual vehicle readings and permissions. All unavailable fields remain blank.",15,Color.WHITE));
+        layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open 'Vehicle Explorer', then use its Ford data menus.",14,0xffbed1e0));
+        layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
         Button start=button("START FORD APPLINK CONNECTION");layout.addView(start);
         Button stop=button("STOP APPLINK TEST");layout.addView(stop);
         Button refresh=button("REFRESH ACTUAL CONNECTION STATUS");layout.addView(refresh);
@@ -72,7 +72,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.2-SYNC3-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.3-SYNC3-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -118,7 +118,7 @@ public final class SdlTestActivity extends Activity {
         JSONObject j=new JSONObject();
         try{
             j.put("format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.2");
+            j.put("version","0.9.3");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
@@ -127,6 +127,17 @@ public final class SdlTestActivity extends Activity {
             j.put("ford_screen_observation",prefs().getString("ford_screen_observation","not_recorded"));
             j.put("ford_screen_observed_at_ms",prefs().getLong("ford_screen_observed_at_ms",0));
             j.put("event_history",new org.json.JSONArray(prefs().getString("event_history","[]")));
+            android.content.SharedPreferences fp=getSharedPreferences("ford_data_v093",MODE_PRIVATE);
+            JSONObject fields=new JSONObject();
+            for(String key:new String[]{"rpm","speed","fuel_level","odometer","engine_oil_life","tire_pressure","body_information"}){
+                fields.put(key,new JSONObject()
+                    .put("permission",fp.getString("permission_"+key,"NOT_TESTED"))
+                    .put("value",fp.getString("value_"+key,""))
+                    .put("sample_time_ms",fp.getLong("sample_time_"+key,0)));
+            }
+            j.put("ford_field_results",fields);
+            j.put("obd_verified_snapshot_present",!getSharedPreferences("ford_obd_verified",MODE_PRIVATE)
+                    .getString("last_verified_readings","").isEmpty());
             j.put("app_link_event_epoch_ms",prefs().getLong("updated_at_ms",0));
             j.put("sdl_development_app_id",SdlService.APP_ID);
             j.put("oem_approval_verified",false);
