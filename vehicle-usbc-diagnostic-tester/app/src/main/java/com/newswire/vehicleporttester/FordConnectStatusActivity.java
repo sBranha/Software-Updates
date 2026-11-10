@@ -13,6 +13,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -35,6 +38,7 @@ public final class FordConnectStatusActivity extends Activity {
     private static final int WHITE=0xffeaf4ff, MUTED=0xffa4bad0, BG=0xff071522, GREEN=0xff62e1ae;
     private TextView result;
     private EditText fuel,oil,mileage,tires;
+    private CheckBox developerAccount,accessRequested,approvalReceived,docsReceived;
 
     static boolean hasInternet(Context c) {
         try {
@@ -71,7 +75,7 @@ public final class FordConnectStatusActivity extends Activity {
         layout.setPadding(dp(17),dp(17),dp(17),dp(30));
         scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORDCONNECT • CONNECTED VEHICLE",23,0xff4cdbed));
-        layout.addView(label("Vehicle Explorer v0.9.5",13,GREEN));
+        layout.addView(label("Vehicle Explorer v0.9.6",13,GREEN));
         layout.addView(label("Ford's official FordConnect Query API supports authorized vehicle-data access using owner consent and OAuth. Our app is NOT approved or connected to that API yet. A normal Ford app login cannot be reused by a separate app.",14,WHITE));
         layout.addView(label("Before cloud data can load: 1) register the application with Ford Developer Marketplace; 2) obtain the approved client configuration and scopes; 3) implement Ford's documented authorization flow; 4) grant vehicle-owner consent.",13,MUTED));
         Button check=button("CHECK CLOUD CONNECTION READINESS",0xff126b7e);layout.addView(check);
@@ -83,6 +87,38 @@ public final class FordConnectStatusActivity extends Activity {
             catch(Exception e){new AlertDialog.Builder(this).setMessage("Open "+PORTAL+" in your browser.").setPositiveButton("OK",null).show();}
         });
 
+        layout.addView(label("FORDCONNECT ACCESS SETUP",18,0xff4cdbed));
+        layout.addView(label("Track completed steps. All ticks are SELF-REPORTED, not verification from Ford. No passwords or developer secrets are stored.",13,MUTED));
+        SharedPreferences setup=getSharedPreferences(CLOUD_PREFS,MODE_PRIVATE);
+        developerAccount=milestone("I registered with Ford Developer Marketplace",
+            setup.getBoolean("developer_account_user_reported",false),layout);
+        accessRequested=milestone("I requested FordConnect Query API access",
+            setup.getBoolean("access_requested_user_reported",false),layout);
+        approvalReceived=milestone("Ford approved my application (self-reported)",
+            setup.getBoolean("approval_user_reported",false),layout);
+        docsReceived=milestone("I received Ford's official OAuth and API details",
+            setup.getBoolean("docs_received_user_reported",false),layout);
+        Button store=button("SAVE FORD ACCESS SETUP",0xff16745f);layout.addView(store);
+        store.setOnClickListener(v->{
+            setup.edit()
+                .putBoolean("developer_account_user_reported",developerAccount.isChecked())
+                .putBoolean("access_requested_user_reported",accessRequested.isChecked())
+                .putBoolean("approval_user_reported",approvalReceived.isChecked())
+                .putBoolean("docs_received_user_reported",docsReceived.isChecked())
+                .putLong("setup_updated_ms",System.currentTimeMillis()).apply();
+            updateStatus();
+            new AlertDialog.Builder(this).setMessage("Setup milestones saved locally. No Ford authorization has been verified.")
+                .setPositiveButton("OK",null).show();
+        });
+        Button copy=button("COPY REQUEST FOR FORD DATA ACCESS",0xff1d637f);layout.addView(copy);
+        copy.setOnClickListener(v->{
+            String request="I am developing Vehicle Explorer, an Android app that already uses SmartDeviceLink to show a read-only menu on a 2021 Ford Explorer Limited running SYNC 3. I would like developer access to FordConnect Query for owner-consented, read-only vehicle status: fuel, oil life, odometer, tire status, and other supported fields. Please advise on eligibility, pricing, supported vehicle models/years, official OAuth authorization-code flow, redirect URI and client requirements, scopes, endpoints, and data schema. I do not need remote control.";
+            ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            if(cm!=null)cm.setPrimaryClip(ClipData.newPlainText("FordConnect request",request));
+            new AlertDialog.Builder(this).setMessage("Request copied. You can paste it into Ford's official developer contact form.")
+                .setPositiveButton("OK",null).show();
+        });
+        layout.addView(label("FordConnect live data remains blocked until Ford provides an approved application and documented authorization details. Do not enter your Ford account password, API secret, VIN or tokens here.",13,MUTED));
         layout.addView(label("OPTIONAL: FORD APP STATUS SNAPSHOT",18,0xff4cdbed));
         layout.addView(label("If your Ford app already shows these values, you can enter them here to display a saved snapshot on your SYNC screen without any new hardware. This is MANUAL, not live or automatically synchronized. Leave unknown values blank.",13,MUTED));
         SharedPreferences m=getSharedPreferences(MANUAL_PREFS,MODE_PRIVATE);
@@ -103,6 +139,13 @@ public final class FordConnectStatusActivity extends Activity {
         layout.addView(label("Privacy: This screen does not request your Ford app password, VIN, developer secret, or authorization token. Your manual snapshot remains on this phone and is labeled user-entered on SYNC 3.",12,MUTED));
         updateStatus();
     }
+    private CheckBox milestone(String title,boolean checked,LinearLayout parent){
+        CheckBox c=new CheckBox(this);
+        c.setText(title);c.setTextColor(WHITE);c.setTextSize(14);
+        c.setButtonTintList(android.content.res.ColorStateList.valueOf(GREEN));
+        c.setPadding(0,dp(3),0,dp(3));c.setChecked(checked);
+        parent.addView(c);return c;
+    }
     private void updateStatus(){
         String net=internetState(this);
         SharedPreferences p=getSharedPreferences(CLOUD_PREFS,MODE_PRIVATE);
@@ -110,10 +153,12 @@ public final class FordConnectStatusActivity extends Activity {
             .putString("oauth","NOT_AUTHORIZED").putString("vehicle_api_response","NOT_TESTED_NO_APPROVED_CREDENTIALS")
             .putLong("checked_ms",System.currentTimeMillis()).apply();
         result.setText("Phone internet: "+(hasInternet(this)?"AVAILABLE":"NOT VALIDATED")+
-                "\nFordConnect approval: NOT CONFIGURED"+
+                "\nDeveloper account: "+(p.getBoolean("developer_account_user_reported",false)?"USER-REPORTED":"NOT RECORDED")+
+                "\nFordConnect request: "+(p.getBoolean("access_requested_user_reported",false)?"USER-REPORTED":"NOT RECORDED")+
+                "\nFord approval: "+(p.getBoolean("approval_user_reported",false)?"USER-REPORTED, UNVERIFIED":"NOT VERIFIED")+
+                "\nOAuth/API documentation: "+(p.getBoolean("docs_received_user_reported",false)?"USER-REPORTED":"NOT RECORDED")+
                 "\nFord OAuth: NOT AUTHORIZED"+
-                "\nCloud vehicle data: NOT TESTED"+
-                "\nNo data received from Ford's servers.");
+                "\nFord cloud readings: NOT TESTED (no approved API connection).");
     }
     private static boolean validRange(String raw,double min,double max){
         if(raw.isEmpty())return true;
