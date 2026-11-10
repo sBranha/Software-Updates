@@ -46,7 +46,7 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.4 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer v0.9.5 • SmartDeviceLink",13,0xff66e2ad));
         layout.addView(label("ONE TAP checks SYNC 3, seven Ford fields, cloud authorization and OBD-II availability. Real progress, one final report and no simulated values.",15,Color.WHITE));
         layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open Vehicle Explorer and select TEST EVERYTHING. You may also run it from this phone.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
@@ -54,6 +54,9 @@ public final class SdlTestActivity extends Activity {
         testEverything.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff0b785e));
         auditInfo=label("Audit not run yet.",15,0xff56e2c3);layout.addView(auditInfo);
         testEverything.setOnClickListener(v->checkAndStart(true));
+        Button cloud=button("FORDCONNECT - OFFICIAL DATA ACCESS");layout.addView(cloud);
+        cloud.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff246987));
+        cloud.setOnClickListener(v->startActivity(new Intent(this,FordConnectStatusActivity.class)));
         Button start=button("START FORD APPLINK CONNECTION");layout.addView(start);
         Button stop=button("STOP APPLINK TEST");layout.addView(stop);
         Button refresh=button("REFRESH ACTUAL CONNECTION STATUS");layout.addView(refresh);
@@ -81,7 +84,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.4-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.5-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -141,7 +144,9 @@ public final class SdlTestActivity extends Activity {
             android.content.SharedPreferences all=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
             JSONObject audit=new JSONObject();
             for(String key:new String[]{"status","stage","sync_transport","sync_hmi_at_start",
-                    "bluetooth_permission","fordconnect_cloud","ford_app_data","obd2_live",
+                    "bluetooth_permission","fordconnect_cloud","fordconnect_phone_internet",
+                    "fordconnect_oauth","fordconnect_api_response",
+                    "ford_app_data","ford_app_manual_snapshot","obd2_live",
                     "obd2_saved_snapshot","usb"}){
                 audit.put(key,all.getString(key,"NOT_CHECKED"));
             }
@@ -149,6 +154,7 @@ public final class SdlTestActivity extends Activity {
                 audit.put(key,all.getInt(key,0));
             audit.put("started_ms",all.getLong("started_ms",0));
             audit.put("ended_ms",all.getLong("ended_ms",0));
+            audit.put("ford_app_manual_snapshot_ms",all.getLong("ford_app_manual_snapshot_ms",0));
             JSONObject auditFields=new JSONObject();
             for(String key:OneTapAudit.KEYS){
                 auditFields.put(key,new JSONObject()
@@ -159,8 +165,18 @@ public final class SdlTestActivity extends Activity {
             }
             audit.put("ford_fields",auditFields);
             j.put("one_tap_audit",audit);
+            j.put("fordconnect_readiness",new JSONObject()
+                .put("phone_internet",FordConnectStatusActivity.internetState(this))
+                .put("ford_developer_approval","NOT_CONFIGURED")
+                .put("owner_oauth_consent","NOT_AUTHORIZED")
+                .put("ford_api_readings_received",false)
+                .put("note","No Ford API endpoint or token was used."));
+            android.content.SharedPreferences manual=getSharedPreferences(
+                FordConnectStatusActivity.MANUAL_PREFS,MODE_PRIVATE);
+            j.put("manual_snapshot_present",manual.getLong("saved_ms",0)>0);
+            j.put("manual_snapshot_source","USER_ENTERED_ONLY_NOT_FORD_API");
             j.put("legacy_format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.4");
+            j.put("version","0.9.5");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
