@@ -7,8 +7,8 @@ android {
         applicationId 'com.newswire.vehicleporttester.experiment.sync3'
         minSdk 26
         targetSdk 34
-        versionCode 31
-        versionName '0.9.5'
+        versionCode 32
+        versionName '0.9.6'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
