@@ -61,7 +61,10 @@ final class OneTapAudit {
             .putLong("started_ms",System.currentTimeMillis())
             .putLong("ended_ms",0)
             .putString("sync_transport","SMARTDEVICELINK_BLUETOOTH_REGISTERED")
-            .putString("fordconnect_cloud","NOT_CONFIGURED_OAUTH_AND_FORD_APPROVAL_REQUIRED")
+            .putString("fordconnect_cloud",FordConnectStatusActivity.cloudState())
+            .putString("fordconnect_phone_internet",FordConnectStatusActivity.internetState(context))
+            .putString("fordconnect_oauth","NOT_AUTHORIZED")
+            .putString("fordconnect_api_response","NOT_TESTED_NO_APPROVED_CLIENT")
             .putString("ford_app_data","NOT_ACCESSIBLE_VIA_ANOTHER_APP_SESSION")
             .putString("obd2_live","NOT_TESTED_NO_OBD2_ADAPTER_CONNECTED")
             .putString("usb","NOT_TOUCHED_ANDROID_AUTO_UNINTERRUPTED");
@@ -73,16 +76,20 @@ final class OneTapAudit {
         boolean hasSnapshot=!context.getSharedPreferences("ford_obd_verified",Context.MODE_PRIVATE)
                 .getString("last_verified_readings","").isEmpty();
         e.putString("obd2_saved_snapshot",hasSnapshot?"PRIOR_VERIFIED_SNAPSHOT":"NO_VERIFIED_SNAPSHOT");
+        long manualAt=context.getSharedPreferences(FordConnectStatusActivity.MANUAL_PREFS,Context.MODE_PRIVATE)
+            .getLong("saved_ms",0);
+        e.putString("ford_app_manual_snapshot",manualAt>0?"USER_ENTERED_SNAPSHOT":"NONE");
+        e.putLong("ford_app_manual_snapshot_ms",manualAt);
         for(String key:KEYS) e.putString("result_"+key,"PENDING").putString("value_"+key,"");
         e.apply();
         SdlService.record(context,"ALL_TEST_START",
                 "One-tap Ford scan; 7 single-field ECU requests, cloud and OBD status");
-        display("TEST EVERYTHING STARTED","SYNC 3 connected; 7 vehicle fields","Ford cloud and OBD status recorded");
+        display("TEST EVERYTHING STARTED","SYNC 3 connected; 7 vehicle fields","Ford cloud authorization checked");
         handler.postDelayed(this::testNext,300);
     }
     private void display(String line2,String line3,String line4){
         try{
-            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.4");
+            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.5");
             sdl.getScreenManager().setTextField2(line2);
             sdl.getScreenManager().setTextField3(line3);
             sdl.getScreenManager().setTextField4(line4);
