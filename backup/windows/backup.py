@@ -209,11 +209,11 @@ def main():
     def update_status(message):
         def update():
             status.set(message)
-            match = re.search(r"(\\d+)/(\\d+) saved", message)
+            match = re.search(r"(\d+)/(\d+) saved", message)
             if match and int(match.group(2)):
                 bar["value"] = round(100 * int(match.group(1)) / int(match.group(2)))
             elif message.startswith("Finished:"):
-                match = re.search(r"Finished: (\\d+)/(\\d+)", message)
+                match = re.search(r"Finished: (\d+)/(\d+)", message)
                 if match and int(match.group(2)):
                     bar["value"] = round(100 * int(match.group(1)) / int(match.group(2)))
         root.after(0, update)
