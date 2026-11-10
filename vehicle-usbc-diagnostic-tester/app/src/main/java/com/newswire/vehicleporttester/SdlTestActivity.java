@@ -46,7 +46,7 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.5 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer v0.9.6 • SmartDeviceLink",13,0xff66e2ad));
         layout.addView(label("ONE TAP checks SYNC 3, seven Ford fields, cloud authorization and OBD-II availability. Real progress, one final report and no simulated values.",15,Color.WHITE));
         layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open Vehicle Explorer and select TEST EVERYTHING. You may also run it from this phone.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
@@ -84,7 +84,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.5-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.6-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -140,7 +140,7 @@ public final class SdlTestActivity extends Activity {
     private JSONObject export(){
         JSONObject j=new JSONObject();
         try{
-            j.put("format","Vehicle Explorer one tap audit v0.9.4");
+            j.put("format","Vehicle Explorer one tap audit v0.9.6");
             android.content.SharedPreferences all=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
             JSONObject audit=new JSONObject();
             for(String key:new String[]{"status","stage","sync_transport","sync_hmi_at_start",
@@ -165,7 +165,16 @@ public final class SdlTestActivity extends Activity {
             }
             audit.put("ford_fields",auditFields);
             j.put("one_tap_audit",audit);
+            j.put("audit_format_version","0.9.6");
+            j.put("audit_results_authoritative",true);
+            android.content.SharedPreferences setup=getSharedPreferences(
+                FordConnectStatusActivity.CLOUD_PREFS,MODE_PRIVATE);
             j.put("fordconnect_readiness",new JSONObject()
+                .put("developer_account_user_reported",setup.getBoolean("developer_account_user_reported",false))
+                .put("access_requested_user_reported",setup.getBoolean("access_requested_user_reported",false))
+                .put("approval_user_reported_unverified",setup.getBoolean("approval_user_reported",false))
+                .put("docs_received_user_reported",setup.getBoolean("docs_received_user_reported",false))
+                .put("setup_updated_ms",setup.getLong("setup_updated_ms",0))
                 .put("phone_internet",FordConnectStatusActivity.internetState(this))
                 .put("ford_developer_approval","NOT_CONFIGURED")
                 .put("owner_oauth_consent","NOT_AUTHORIZED")
@@ -176,7 +185,7 @@ public final class SdlTestActivity extends Activity {
             j.put("manual_snapshot_present",manual.getLong("saved_ms",0)>0);
             j.put("manual_snapshot_source","USER_ENTERED_ONLY_NOT_FORD_API");
             j.put("legacy_format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.5");
+            j.put("version","0.9.6");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
@@ -187,12 +196,23 @@ public final class SdlTestActivity extends Activity {
             j.put("event_history",new org.json.JSONArray(prefs().getString("event_history","[]")));
             android.content.SharedPreferences fp=getSharedPreferences("ford_data_v093",MODE_PRIVATE);
             JSONObject fields=new JSONObject();
-            for(String key:new String[]{"rpm","speed","fuel_level","odometer","engine_oil_life","tire_pressure","body_information"}){
+            boolean useFullAudit = "COMPLETE".equals(all.getString("status","NOT_RUN"))
+                    && all.getInt("complete",0)==7;
+            for(String key:OneTapAudit.KEYS){
+                String result=useFullAudit?all.getString("result_"+key,"NOT_TESTED"):
+                    fp.getString("permission_"+key,"NOT_TESTED");
+                String value=useFullAudit?all.getString("value_"+key,""):
+                    fp.getString("value_"+key,"");
+                long tested=useFullAudit?all.getLong("time_"+key,0):
+                    fp.getLong("sample_time_"+key,0);
                 fields.put(key,new JSONObject()
-                    .put("permission",fp.getString("permission_"+key,"NOT_TESTED"))
-                    .put("value",fp.getString("value_"+key,""))
-                    .put("sample_time_ms",fp.getLong("sample_time_"+key,0)));
+                    .put("permission",result)
+                    .put("value",value)
+                    .put("sample_time_ms",tested)
+                    .put("source",useFullAudit?"ONE_TAP_AUDIT":"SINGLE_FIELD_TEST"));
             }
+            j.put("ford_field_results_source",useFullAudit?
+                "LATEST_COMPLETED_ONE_TAP_AUDIT":"SINGLE_FIELD_RESULTS_OR_UNTESTED");
             j.put("ford_field_results",fields);
             j.put("obd_verified_snapshot_present",!getSharedPreferences("ford_obd_verified",MODE_PRIVATE)
                     .getString("last_verified_readings","").isEmpty());
