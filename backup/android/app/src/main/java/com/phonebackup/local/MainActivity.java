@@ -18,6 +18,21 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ScrollView;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.util.TypedValue;
+import java.net.DatagramSocket;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.io.DataInputStream;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyFactory;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.X509EncodedKeySpec;
+import javax.crypto.KeyAgreement;
+import javax.crypto.Mac;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -70,14 +85,21 @@ public class MainActivity extends Activity {
         private final Cipher cipher;
         private final SecretKeySpec key;
         private long counter = 0;
-        Crypto(String code, byte[] salt) throws Exception {
-            this.salt = salt;
-            SecretKeyFactory factory=SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            PBEKeySpec spec=new PBEKeySpec(code.toCharArray(),salt,180000,256);
-            byte[] raw=factory.generateSecret(spec).getEncoded();
-            spec.clearPassword();
-            key=new SecretKeySpec(raw,"AES");
-            Arrays.fill(raw,(byte)0);
+        Crypto(String code, byte[] salt, byte[] shared) throws Exception {
+            this.salt=salt;
+            // HKDF SHA256: ECDH gives a strong session secret even with a short pairing code.
+            Mac extract=Mac.getInstance("HmacSHA256");
+            extract.init(new SecretKeySpec(salt,"HmacSHA256"));
+            byte[] prk=extract.doFinal(shared);
+            Mac expand=Mac.getInstance("HmacSHA256");
+            expand.init(new SecretKeySpec(prk,"HmacSHA256"));
+            byte[] info=("WPB3-data-"+code).getBytes(StandardCharsets.US_ASCII);
+            expand.update(info);
+            expand.update((byte)1);
+            byte[] material=expand.doFinal();
+            key=new SecretKeySpec(material,"AES");
+            Arrays.fill(prk,(byte)0);
+            Arrays.fill(material,(byte)0);
             cipher=Cipher.getInstance("AES/GCM/NoPadding");
         }
         byte[] encrypt(byte[] plain) throws Exception {
@@ -89,20 +111,29 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        ScrollView screen=new ScrollView(this);
+        screen.setFillViewport(true);
         LinearLayout layout=new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(30,24,30,20);
+        layout.setPadding(32,30,32,36);
+        screen.addView(layout);
         TextView intro=new TextView(this);
-        intro.setText("Wireless Phone Backup 0.2 — the phone and Windows PC must share Wi-Fi.");
+        intro.setText("WIRELESS PHONE BACKUP 0.3\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
         layout.addView(intro);
         host=new EditText(this);
-        host.setHint("Windows computer IP address");
+        host.setHint("Windows computer IP (or use Find Computer)");
         host.setSingleLine(true);
         layout.addView(host);
         pairingCode=new EditText(this);
-        pairingCode.setHint("One-time pairing code shown on Windows");
+        pairingCode.setHint("Six-digit code from Windows");
+        pairingCode.setInputType(InputType.TYPE_CLASS_NUMBER);
+        pairingCode.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
         pairingCode.setSingleLine(true);
         layout.addView(pairingCode);
+        Button find=new Button(this);
+        find.setText("FIND WINDOWS COMPUTER");
+        layout.addView(find);
+        find.setOnClickListener(v->discover());
         Button choose=new Button(this);
         choose.setText("Choose photos, videos and documents");
         layout.addView(choose);
@@ -129,9 +160,20 @@ public class MainActivity extends Activity {
         backupButton.setText("Backup Now");
         layout.addView(backupButton);
         status=new TextView(this);
-        status.setText("Select files if desired, then click Backup Now.");
+        status.setText("READY. Open Windows backup first, then tap FIND WINDOWS COMPUTER.");
         layout.addView(status);
-        setContentView(layout);
+        for(int i=0;i<layout.getChildCount();i++) {
+            android.view.View view=layout.getChildAt(i);
+            if(view instanceof TextView) {
+                TextView label=(TextView)view;
+                label.setTextSize(TypedValue.COMPLEX_UNIT_SP, view==intro?21:19);
+                label.setPadding(8,12,8,12);
+                label.setMinHeight(62);
+            }
+            if(view instanceof Button) ((Button)view).setTextSize(TypedValue.COMPLEX_UNIT_SP,21);
+        }
+        status.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
+        setContentView(screen);
         backupButton.setOnClickListener(v->startBackup());
     }
 
@@ -149,6 +191,28 @@ public class MainActivity extends Activity {
         runOnUiThread(()->status.setText(text));
     }
 
+    private void discover() {
+        show("SEARCHING for Windows computer on your Wi-Fi... Make sure BACKUP NOW is open on Windows.");
+        new Thread(()->{
+            try(DatagramSocket udp=new DatagramSocket()) {
+                udp.setBroadcast(true);
+                udp.setSoTimeout(7000);
+                byte[] request="WPB_DISCOVER_V3".getBytes(StandardCharsets.US_ASCII);
+                udp.send(new DatagramPacket(request,request.length,InetAddress.getByName("255.255.255.255"),38472));
+                byte[] reply=new byte[128];
+                DatagramPacket packet=new DatagramPacket(reply,reply.length);
+                udp.receive(packet);
+                String response=new String(reply,0,packet.getLength(),StandardCharsets.US_ASCII);
+                if(!"WPB_READY_V3".equals(response)) throw new Exception("Unexpected response");
+                final String ip=packet.getAddress().getHostAddress();
+                runOnUiThread(()->host.setText(ip));
+                show("FOUND Windows computer at "+ip+". Enter the six-digit code shown on Windows.");
+            } catch(Exception e) {
+                show("Computer not found automatically. Enter the Windows IPv4 address shown on your PC. Make sure Windows Firewall allows the backup app on Private Wi-Fi.");
+            }
+        }).start();
+    }
+
     private void startBackup() {
         ArrayList<String> ask=new ArrayList<>();
         if(sms.isChecked() && checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED)
@@ -156,11 +220,12 @@ public class MainActivity extends Activity {
         if(contacts.isChecked() && checkSelfPermission(Manifest.permission.READ_CONTACTS)!=PackageManager.PERMISSION_GRANTED)
             ask.add(Manifest.permission.READ_CONTACTS);
         if(!ask.isEmpty()) {
+            show("Grant the requested message/contact permissions or turn their checkboxes off.");
             requestPermissions(ask.toArray(new String[0]),PERMISSIONS);
             return;
         }
-        if(host.getText().toString().trim().length()==0 || pairingCode.getText().toString().trim().length()<12) {
-            show("Enter the Windows IP address and full pairing code before starting.");
+        if(host.getText().toString().trim().length()==0 || !pairingCode.getText().toString().trim().matches("[0-9]{6}")) {
+            show("Enter the Windows computer IP address and the 6-digit pairing code.");
             return;
         }
         final String ip=host.getText().toString().trim();
@@ -169,6 +234,7 @@ public class MainActivity extends Activity {
         final boolean includeMessages=sms.isChecked();
         final boolean includeContacts=contacts.isChecked();
         backupButton.setEnabled(false);
+        show("STEP 1/4: Scanning selected phone content. This may take a few minutes.");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         new Thread(()->{
             try { transfer(ip,code,includeApps,includeMessages,includeContacts); }
@@ -184,7 +250,18 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] grants) {
         super.onRequestPermissionsResult(request,permissions,grants);
-        if(request==PERMISSIONS) startBackup();
+        if(request==PERMISSIONS) {
+            boolean denied=false;
+            for(int i=0;i<permissions.length;i++) {
+                if(grants[i]!=PackageManager.PERMISSION_GRANTED) {
+                    denied=true;
+                    if(Manifest.permission.READ_SMS.equals(permissions[i])) sms.setChecked(false);
+                    if(Manifest.permission.READ_CONTACTS.equals(permissions[i])) contacts.setChecked(false);
+                }
+            }
+            if(denied) show("Some permissions were denied; those categories were turned off. Continuing with allowed data.");
+            startBackup();
+        }
     }
 
     private InputStream open(Source source) throws Exception {
@@ -240,7 +317,7 @@ public class MainActivity extends Activity {
             catalog.put(entry);
         }
         inline(sources,"apps","installed-app-catalog.json",catalog);
-        show("Located "+count+" accessible app APK files. Preparing checksums...");
+        show("STEP 1/4: Found "+count+" accessible app installation packages. Checking file sizes...");
     }
 
     private void collectContacts(List<Source> sources, JSONArray skipped) throws Exception {
@@ -368,7 +445,7 @@ public class MainActivity extends Activity {
                 item.put("sha256",candidate.sha256);
                 files.put(item);
                 ready.add(candidate);
-                if(ready.size()%10==0) show("Prepared "+ready.size()+" files for backup...");
+                show("STEP 2/4: Scanned "+ready.size()+" readable files. Current: "+candidate.name);
             } catch(Exception e) {
                 skipped.put(candidate.category+"/"+candidate.name+": "+e.getMessage());
             }
@@ -381,14 +458,32 @@ public class MainActivity extends Activity {
         byte[] salt=new byte[16];
         new SecureRandom().nextBytes(salt);
         Crypto crypto=new Crypto(code,salt);
-        byte[] encryptedManifest=crypto.encrypt(manifest.toString().getBytes(StandardCharsets.UTF_8));
-        show("Connecting to Windows... "+ready.size()+" files to transfer");
+        // The session is encrypted after the phone and Windows exchange ECDH public keys.
+        show("STEP 3/4: Connecting to Windows for "+ready.size()+" files...");
         try(Socket socket=new Socket()) {
             socket.connect(new InetSocketAddress(ip,PORT),15000);
             socket.setSoTimeout(120000);
             try(DataOutputStream output=new DataOutputStream(socket.getOutputStream())) {
-                output.write(new byte[]{'W','P','B','2'});
+                DataInputStream input=new DataInputStream(socket.getInputStream());
+                KeyPairGenerator gen=KeyPairGenerator.getInstance("EC");
+                gen.initialize(new ECGenParameterSpec("secp256r1"));
+                KeyPair ephemeral=gen.generateKeyPair();
+                byte[] myPublic=ephemeral.getPublic().getEncoded();
+                output.write(new byte[]{'W','P','B','3'});
+                output.writeShort(myPublic.length);
+                output.write(myPublic);
                 output.write(salt);
+                output.flush();
+                int keyLength=input.readUnsignedShort();
+                if(keyLength<60||keyLength>256) throw new Exception("Invalid Windows pairing reply");
+                byte[] remotePublic=new byte[keyLength];
+                input.readFully(remotePublic);
+                KeyFactory factory=KeyFactory.getInstance("EC");
+                KeyAgreement agreement=KeyAgreement.getInstance("ECDH");
+                agreement.init(ephemeral.getPrivate());
+                agreement.doPhase(factory.generatePublic(new X509EncodedKeySpec(remotePublic)),true);
+                Crypto crypto=new Crypto(code,salt,agreement.generateSecret());
+                byte[] encryptedManifest=crypto.encrypt(manifest.toString().getBytes(StandardCharsets.UTF_8));
                 output.writeInt(encryptedManifest.length);
                 output.write(encryptedManifest);
                 for(int i=0;i<ready.size();i++) {
@@ -407,12 +502,12 @@ public class MainActivity extends Activity {
                     }
                     if(transferred!=source.size) throw new IllegalStateException(
                             "Source changed during backup: "+source.name);
-                    show("Sent "+(i+1)+"/"+ready.size()+": "+source.name);
+                    show("STEP 4/4: Sent "+(i+1)+"/"+ready.size()+" files. Current: "+source.name);
                 }
                 output.flush();
             }
         }
-        show("All "+ready.size()+" files sent. Check Windows for verified backup report. "+
+        show("SENT "+ready.size()+" files. Check Windows to confirm verification. "+
              skipped.length()+" items/restrictions not backed up.");
     }
 }
