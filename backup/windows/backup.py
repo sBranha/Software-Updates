@@ -8,6 +8,7 @@ import secrets
 import sys
 import ctypes
 import socket
+import time
 import struct
 import threading
 import tkinter as tk
@@ -140,104 +141,62 @@ def restore_session(sock, folder, code, progress):
     return report
 
 
-def discovery_service(stop, status_callback=None):
-    """Answer UDP broadcasts and direct TCP status checks without consuming backup connections.
-
-    Android Find Computer first probes the typed IP, then tries broadcast, then
-    the local /24. Discovery never connects to the encrypted-transfer port.
-    """
-    listeners = []
-    try:
-        try:
-            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            udp.bind(("0.0.0.0", 38472))
-            listeners.append(udp)
-        except OSError as exc:
-            if status_callback:
-                status_callback(f"Wi-Fi broadcast discovery unavailable: {exc}. Manual IP may still work.")
-        try:
-            tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            tcp.bind(("0.0.0.0", 38473))
-            tcp.listen(32)
-            listeners.append(tcp)
-        except OSError as exc:
-            if status_callback:
-                status_callback(f"Direct computer search unavailable: {exc}. Manual IP may still work.")
-        while listeners and not stop.is_set():
-            readable, _, _ = select.select(listeners, [], [], 0.4)
-            for server in readable:
-                if server.type == socket.SOCK_DGRAM:
-                    data, address = server.recvfrom(256)
-                    if data in (b"WPB_DISCOVER_V3", b"WPB_DISCOVER_V4"):
-                        server.sendto(b"WPB_READY_V4", address)
-                else:
-                    connection, _ = server.accept()
-                    with connection:
-                        connection.settimeout(2)
-                        if connection.recv(64) == b"WPB_STATUS_V4":
-                            connection.sendall(b"WPB_READY_V4")
-    except OSError as exc:
-        if status_callback:
-            status_callback(f"Discovery listener failed: {exc}. Try entering the Windows IP directly.")
-    finally:
-        for listener in listeners:
-            listener.close()
+def discover_phone(progress=None, timeout=4):
+    """Find Android phone by Windows-initiated outbound UDP; no inbound firewall rule."""
+    payload = b"WPB_FIND_PHONE_V6"
+    targets = ["255.255.255.255"]
+    current = local_ip()
+    if current.count(".") == 3:
+        targets.append(current.rsplit(".", 1)[0] + ".255")
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+        udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        udp.settimeout(0.7)
+        for target in set(targets):
+            try:
+                udp.sendto(payload, (target, 38472))
+            except OSError:
+                pass
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            try:
+                reply, address = udp.recvfrom(256)
+                if reply == b"WPB_PHONE_READY_V6":
+                    return address[0]
+            except socket.timeout:
+                continue
+    if progress:
+        progress("Automatic phone search did not find the phone. Type its Wi-Fi IP shown in Android.")
+    return None
 
 
-def run_server(destination, code, progress):
+def run_backup(destination, code, phone_ip, progress, discovery_timeout=4):
     folder = Path(destination)
     if not str(destination).strip() or not folder.is_dir():
-        raise RuntimeError("Your selected external drive is not connected")
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind(("0.0.0.0", PORT))
-        server.listen(1)
-        server.settimeout(300)
-        progress(f"Listening for phone on Wi-Fi. Tap FIND COMPUTER then BACKUP NOW on Android.")
-        stop_discovery = threading.Event()
-        discoverer = threading.Thread(target=discovery_service, args=(stop_discovery, progress), daemon=True)
-        discoverer.start()
+        raise RuntimeError("Your selected external drive is missing. Connect it and select the folder.")
+    if not re.fullmatch(r"[0-9]{6}", code):
+        raise RuntimeError("Enter the 6-digit pairing code shown on your phone.")
+    ip = phone_ip.strip()
+    if not ip:
+        progress("Searching for phone on local Wi-Fi...")
+        ip = discover_phone(progress, timeout=discovery_timeout)
+    if not ip:
+        raise RuntimeError("Phone not found automatically. On Android tap MAKE PHONE READY; then type the phone's Wi-Fi IP in the Windows box.")
+    progress(f"Connecting OUT to your phone at {ip} (no Windows firewall change needed)...")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+        client.settimeout(10)
         try:
-            conn, address = server.accept()
-        finally:
-            stop_discovery.set()
-            discoverer.join(timeout=2)
-        with conn:
-            conn.settimeout(120)
-            progress(f"Phone connected from {address[0]}; receiving encrypted backup")
-            return restore_session(conn, folder, code, progress)
-
-
-def enable_private_firewall():
-    """Offer a user-initiated UAC request for LAN-only inbound firewall rules."""
-    if os.name != "nt":
-        raise RuntimeError("Firewall assistance is only available on Windows.")
-    program = str(Path(sys.executable).resolve()).replace("'", "''")
-    script = (
-        "Get-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private TCP' "
-        "-ErrorAction SilentlyContinue | Remove-NetFirewallRule; "
-        "Get-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private UDP' "
-        "-ErrorAction SilentlyContinue | Remove-NetFirewallRule; "
-        "New-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private TCP' "
-        "-Direction Inbound -Action Allow -Profile Private -Protocol TCP "
-        "-LocalPort 38471,38473 -Program '" + program + "'; "
-        "New-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private UDP' "
-        "-Direction Inbound -Action Allow -Profile Private -Protocol UDP "
-        "-LocalPort 38472 -Program '" + program + "'"
-    )
-    # The button triggers Windows UAC; no firewall modifications happen without approval.
-    command = '-NoProfile -ExecutionPolicy Bypass -Command "' + script + '"'
-    launched = ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", command, None, 1)
-    if launched <= 32:
-        raise RuntimeError("Windows did not open the administrator permission prompt.")
+            client.connect((ip, PORT))
+        except OSError as exc:
+            raise ConnectionError(f"Cannot reach phone at {ip}: {exc}. On Android tap MAKE PHONE READY and confirm both devices share the same Wi-Fi.") from exc
+        client.settimeout(1800)
+        progress("Connected to phone! Waiting for phone scan and encrypted transfer...")
+        return restore_session(client, folder, code, progress)
 
 
 def main():
     root = tk.Tk()
-    root.title("Wireless Phone Backup 0.4")
-    root.geometry("840x650")
+    root.title("Wireless Phone Backup 0.6")
+    root.geometry("840x610")
     root.minsize(780, 540)
     style = ttk.Style(root)
     style.configure(".", font=("Segoe UI", 15))
@@ -245,33 +204,28 @@ def main():
     style.configure("Big.TLabel", font=("Segoe UI", 16))
     style.configure("Code.TLabel", font=("Segoe UI", 28, "bold"))
     destination = tk.StringVar()
-    status = tk.StringVar(value="Select your 8 TB drive folder, then click Backup Now")
-    code = tk.StringVar(value=f"{secrets.randbelow(1000000):06d}")
+    status = tk.StringVar(value="On phone: MAKE PHONE READY. Then enter phone code and press FIND PHONE & BACKUP NOW.")
+    code = tk.StringVar()
+    phone_ip = tk.StringVar()
 
-    ttk.Label(root, text="1. Connect your 8 TB drive and choose its folder", style="Big.TLabel").pack(pady=(16, 5))
-    ttk.Entry(root, textvariable=destination, width=65, font=("Segoe UI", 16)).pack(pady=6)
-    ttk.Button(root, text="Choose External Drive Folder", style="Big.TButton",
+    ttk.Label(root, text="WIRELESS PHONE BACKUP v0.6", font=("Segoe UI", 24, "bold")).pack(pady=(13, 7))
+    ttk.Label(root, text="1. On your phone tap MAKE PHONE READY.", style="Big.TLabel").pack(pady=5)
+    ttk.Label(root, text="2. Connect your 8 TB drive and choose its folder.", style="Big.TLabel").pack(pady=4)
+    ttk.Entry(root, textvariable=destination, width=61, font=("Segoe UI", 16)).pack(pady=5)
+    ttk.Button(root, text="Choose Backup Drive Folder", style="Big.TButton",
                command=lambda: destination.set(filedialog.askdirectory())).pack(pady=4)
-    ttk.Label(root, text="2. Windows computer IP: " + local_ip(), style="Big.TLabel").pack(pady=(18, 2))
-    ttk.Label(root, text="3. Type this six-digit pairing code on your phone", style="Big.TLabel").pack(pady=(10, 2))
-    ttk.Label(root, textvariable=code, style="Code.TLabel").pack(pady=5)
-    ttk.Label(root, text="4. Press BACKUP NOW here, then FIND COMPUTER / BACKUP NOW on the phone.",
-              style="Big.TLabel", wraplength=780).pack(pady=(4, 8))
-    button = ttk.Button(root, text="BACKUP NOW", style="Big.TButton")
-    button.pack(pady=10)
+    ttk.Label(root, text="3. Enter the 6-digit code shown on your PHONE:", style="Big.TLabel").pack(pady=(11,2))
+    ttk.Entry(root, textvariable=code, width=9, justify="center",
+              font=("Segoe UI", 27, "bold")).pack(pady=2)
+    ttk.Label(root, text="Phone IP (optional, only if automatic search fails):", font=("Segoe UI", 13)).pack(pady=(7,2))
+    ttk.Entry(root, textvariable=phone_ip, width=25, font=("Segoe UI", 15)).pack(pady=2)
+    button = ttk.Button(root, text="FIND PHONE & BACKUP NOW", style="Big.TButton")
+    button.pack(pady=11)
     bar = ttk.Progressbar(root, length=740, maximum=100)
-    bar.pack(pady=6)
-    ttk.Label(root, textvariable=status, font=("Segoe UI", 15, "bold"), wraplength=790).pack(pady=6)
-    ttk.Label(root, text="If Windows Firewall asks, allow this app on PRIVATE networks.", font=("Segoe UI", 12)).pack(pady=3)
-    def fix_firewall():
-        if not messagebox.askyesno("Allow Private Wi-Fi", "Windows will ask for administrator approval to allow THIS backup app through Windows Firewall on PRIVATE networks only. Continue?"):
-            return
-        try:
-            enable_private_firewall()
-            status.set("Windows security approval requested. After approving, click BACKUP NOW again.")
-        except Exception as exc:
-            messagebox.showerror("Firewall adjustment failed", str(exc))
-    ttk.Button(root, text="FIX WINDOWS FIREWALL (Private Wi-Fi)", command=fix_firewall).pack(pady=(8, 0))
+    bar.pack(pady=7)
+    ttk.Label(root, textvariable=status, font=("Segoe UI", 15, "bold"), wraplength=790).pack(pady=7)
+    ttk.Label(root, text="No Windows firewall configuration needed. Windows connects OUT to your phone.",
+              font=("Segoe UI", 12)).pack(pady=3)
 
     def update_status(message):
         def update():
@@ -294,7 +248,7 @@ def main():
         button.config(state="disabled")
         def worker():
             try:
-                run_server(directory, code.get(), update_status)
+                run_backup(directory, code.get().strip(), phone_ip.get().strip(), update_status)
             except Exception as error:
                 update_status("Backup failed: " + str(error))
             finally:
