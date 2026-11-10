@@ -2,6 +2,9 @@ package com.phonebackup.local;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
+import android.net.wifi.WifiManager;
+import android.os.PowerManager;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -78,6 +81,10 @@ public class MainActivity extends Activity {
     private TextView status;
     private CheckBox apps, sms, contacts;
     private Button backupButton;
+    private ScrollView backupScreen;
+    private PowerManager.WakeLock cpuWakeLock;
+    private WifiManager.WifiLock wifiWakeLock;
+    private boolean backupActive = false;
 
     private static class Source {
         String category, name, sha256;
@@ -123,13 +130,14 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         ScrollView screen=new ScrollView(this);
+        backupScreen=screen;
         screen.setFillViewport(true);
         LinearLayout layout=new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(32,30,32,36);
         screen.addView(layout);
         TextView intro=new TextView(this);
-        intro.setText("WIRELESS PHONE BACKUP 0.4\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
+        intro.setText("WIRELESS PHONE BACKUP 0.5\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
         layout.addView(intro);
         host=new EditText(this);
         host.setHint("Windows computer IP (or use Find Computer)");
@@ -171,7 +179,7 @@ public class MainActivity extends Activity {
         backupButton.setText("Backup Now");
         layout.addView(backupButton);
         status=new TextView(this);
-        status.setText("READY. First press BACKUP NOW on Windows. Then FIND WINDOWS COMPUTER.");
+        status.setText("READY. First press BACKUP NOW on Windows. Then FIND WINDOWS COMPUTER. Screen will stay on during backup.");
         layout.addView(status);
         for(int i=0;i<layout.getChildCount();i++) {
             android.view.View view=layout.getChildAt(i);
@@ -326,6 +334,67 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /** Keep the screen visible, CPU running and Wi-Fi connected for the full backup.
+     * All locks are released in finishBackup(), even if transfer throws an exception.
+     */
+    private void keepPhoneAwakeForBackup() {
+        backupActive = true;
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (backupScreen != null) backupScreen.setKeepScreenOn(true);
+        try {
+            PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (power != null) {
+                cpuWakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WirelessPhoneBackup:ActiveTransfer");
+                cpuWakeLock.setReferenceCounted(false);
+                cpuWakeLock.acquire();
+            }
+        } catch (Exception e) {
+            android.util.Log.w("WirelessPhoneBackup", "Could not acquire CPU wake lock", e);
+        }
+        try {
+            WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifi != null) {
+                wifiWakeLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WirelessPhoneBackup:WifiTransfer");
+                wifiWakeLock.setReferenceCounted(false);
+                wifiWakeLock.acquire();
+            }
+        } catch (Exception e) {
+            android.util.Log.w("WirelessPhoneBackup", "Could not acquire Wi-Fi lock", e);
+        }
+    }
+
+    private void finishBackup() {
+        backupActive = false;
+        if (backupScreen != null) backupScreen.setKeepScreenOn(false);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (wifiWakeLock != null) {
+            try {
+                if (wifiWakeLock.isHeld()) wifiWakeLock.release();
+            } catch (Exception e) {
+                android.util.Log.w("WirelessPhoneBackup", "Wi-Fi lock release failed", e);
+            } finally {
+                wifiWakeLock = null;
+            }
+        }
+        if (cpuWakeLock != null) {
+            try {
+                if (cpuWakeLock.isHeld()) cpuWakeLock.release();
+            } catch (Exception e) {
+                android.util.Log.w("WirelessPhoneBackup", "CPU wake lock release failed", e);
+            } finally {
+                cpuWakeLock = null;
+            }
+        }
+    }
+
+    @Override public void onResume() {
+        super.onResume();
+        if (backupActive) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            if (backupScreen != null) backupScreen.setKeepScreenOn(true);
+        }
+    }
+
     private void startBackup() {
         ArrayList<String> ask=new ArrayList<>();
         if(sms.isChecked() && checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED)
@@ -347,15 +416,15 @@ public class MainActivity extends Activity {
         final boolean includeMessages=sms.isChecked();
         final boolean includeContacts=contacts.isChecked();
         backupButton.setEnabled(false);
-        show("STEP 1/4: Scanning selected phone content. This may take a few minutes.");
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        keepPhoneAwakeForBackup();
+        show("BACKUP RUNNING: Phone screen, CPU and Wi-Fi are being kept awake until backup finishes. STEP 1/4: Starting...");
         new Thread(()->{
             try { transfer(ip,code,includeApps,includeMessages,includeContacts); }
             catch(Exception e) { show("Backup FAILED: "+e.getClass().getSimpleName()+": "+e.getMessage()); }
             finally {
                 runOnUiThread(()->{
+                    finishBackup();
                     backupButton.setEnabled(true);
-                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 });
             }
         }).start();
