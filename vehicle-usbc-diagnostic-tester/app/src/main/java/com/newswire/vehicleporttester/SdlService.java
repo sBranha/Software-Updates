@@ -40,6 +40,9 @@ import java.util.Vector;
 public final class SdlService extends Service {
     static final String APP_ID = "VCEXP2026TEST";
     static final String APP_NAME = "Vehicle Explorer";
+    static final String ACTION_TEST_ALL = "com.newswire.vehicleporttester.action.TEST_EVERYTHING";
+    private boolean pendingFullAudit=false, sdlReady=false;
+    private OneTapAudit oneTapAudit;
     private volatile SdlManager manager;
 
     public static synchronized void record(Context c, String state, String detail) {
@@ -71,7 +74,7 @@ public final class SdlService extends Service {
                 .putBoolean("hmi_ever_full", level == HMILevel.HMI_FULL || prefs.getBoolean("hmi_ever_full", false))
                 .apply();
         record(this, "HMI_" + name, "Actual Ford head-unit HMI level changed: " + name);
-        if (level == HMILevel.HMI_FULL) showFirstScreen();
+        if (level == HMILevel.HMI_FULL && (oneTapAudit==null || !oneTapAudit.isRunning())) showFirstScreen();
     }
     @Override public void onCreate() {
         super.onCreate();
@@ -88,7 +91,21 @@ public final class SdlService extends Service {
         }
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (manager != null) return START_STICKY;
+        if(intent!=null && ACTION_TEST_ALL.equals(intent.getAction())){
+            pendingFullAudit=true;
+            OneTapAudit.waiting(this);
+        }
+        if(manager!=null){
+            if(pendingFullAudit && sdlReady) mainHandler.post(this::beginFullAudit);
+            return START_STICKY;
+        }
+        if(pendingFullAudit) mainHandler.postDelayed(()->{
+            if(pendingFullAudit && !sdlReady){
+                pendingFullAudit=false;
+                OneTapAudit.noSync(this);
+                record(this,"ALL_TEST_NO_SYNC","No Ford AppLink session, no ECU query sent");
+            }
+        },20000);
         record(this, "STARTING", "Waiting for an authorized SmartDeviceLink session.");
         try {
             MultiplexTransportConfig transport = new MultiplexTransportConfig(
@@ -98,9 +115,11 @@ public final class SdlService extends Service {
             types.add(AppHMIType.INFORMATION);
             SdlManagerListener listener = new SdlManagerListener() {
                 @Override public void onStart() {
+                    sdlReady=true;
                     record(SdlService.this, "SDL_SDK_STARTED",
                             "SDL manager reported startup. Check the HMI level before claiming the app is visible.");
                     showFirstScreen();
+                    if(pendingFullAudit) mainHandler.post(SdlService.this::beginFullAudit);
                 }
                 @Override public void onDestroy() {
                     record(SdlService.this, "DISCONNECTED", "AppLink manager disconnected.");
@@ -134,7 +153,7 @@ public final class SdlService extends Service {
     }
     // An AppLink foreground template is not an Android Auto custom view.
     // All screens below are native SYNC 3 text fields and touch/voice menus.
-    private static final String VERSION = "0.9.3";
+    private static final String VERSION = "0.9.4";
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final java.util.concurrent.atomic.AtomicBoolean diagnosticBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final String[] DATA_LABELS = {
@@ -162,6 +181,8 @@ public final class SdlService extends Service {
                     "Open Menu for Ford vehicle data",
                     "No sensor values assumed");
             java.util.List<MenuCell> menu = new java.util.ArrayList<>();
+            menu.add(cell("TEST EVERYTHING - ONE TAP", this::beginFullAudit));
+            menu.add(cell("Last full test results", this::showFullAuditResult));
             menu.add(cell("Vehicle overview", this::showOverview));
             menu.add(cell("Engine RPM", () -> readOne(0)));
             menu.add(cell("Vehicle speed", () -> readOne(1)));
@@ -197,6 +218,21 @@ public final class SdlService extends Service {
     }
     private android.content.SharedPreferences vehiclePrefs() {
         return getSharedPreferences("ford_data_v093", MODE_PRIVATE);
+    }
+    private void beginFullAudit() {
+        if(!sdlReady || manager==null) {
+            pendingFullAudit=true;
+            OneTapAudit.waiting(this);
+            showLines("SYNC 3 not connected", "Connect Ford Bluetooth first","Test will wait for connection");
+            return;
+        }
+        pendingFullAudit=false;
+        if(oneTapAudit==null) oneTapAudit=new OneTapAudit(this,manager);
+        oneTapAudit.start();
+    }
+    private void showFullAuditResult() {
+        if(oneTapAudit==null) oneTapAudit=new OneTapAudit(this,manager);
+        oneTapAudit.showLast();
     }
     private void showOverview() {
         android.content.SharedPreferences p = vehiclePrefs();
@@ -274,6 +310,10 @@ public final class SdlService extends Service {
         return request;
     }
     private void readOne(final int which) {
+        if(oneTapAudit!=null && oneTapAudit.isRunning()){
+            showLines("Full audit in progress","Wait until TEST EVERYTHING finishes","7 fields tested automatically");
+            return;
+        }
         if (manager == null || which < 0 || which >= DATA_KEYS.length) return;
         if (!diagnosticBusy.compareAndSet(false,true)) {
             showLines("Request already running", "Wait for Ford's response", "Please try again");
@@ -351,6 +391,11 @@ public final class SdlService extends Service {
     }
     @Override public void onDestroy(){
         mainHandler.removeCallbacksAndMessages(null);
+        if(oneTapAudit!=null && oneTapAudit.isRunning()){
+            getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE).edit()
+                .putString("status","INTERRUPTED")
+                .putString("stage","SYNC 3 service disconnected before completing audit").apply();
+        }
         SdlManager old=manager;manager=null;
         if(old!=null)try{old.dispose();}catch(Exception ignored){}
         super.onDestroy();
