@@ -5,6 +5,8 @@ import select
 import os
 import re
 import secrets
+import sys
+import ctypes
 import socket
 import struct
 import threading
@@ -195,21 +197,47 @@ def run_server(destination, code, progress):
         server.settimeout(300)
         progress(f"Listening for phone on Wi-Fi. Tap FIND COMPUTER then BACKUP NOW on Android.")
         stop_discovery = threading.Event()
-        threading.Thread(target=discovery_service, args=(stop_discovery, progress), daemon=True).start()
+        discoverer = threading.Thread(target=discovery_service, args=(stop_discovery, progress), daemon=True)
+        discoverer.start()
         try:
             conn, address = server.accept()
         finally:
             stop_discovery.set()
+            discoverer.join(timeout=2)
         with conn:
             conn.settimeout(120)
             progress(f"Phone connected from {address[0]}; receiving encrypted backup")
             return restore_session(conn, folder, code, progress)
 
 
+def enable_private_firewall():
+    """Offer a user-initiated UAC request for LAN-only inbound firewall rules."""
+    if os.name != "nt":
+        raise RuntimeError("Firewall assistance is only available on Windows.")
+    program = str(Path(sys.executable).resolve()).replace("'", "''")
+    script = (
+        "Get-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private TCP' "
+        "-ErrorAction SilentlyContinue | Remove-NetFirewallRule; "
+        "Get-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private UDP' "
+        "-ErrorAction SilentlyContinue | Remove-NetFirewallRule; "
+        "New-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private TCP' "
+        "-Direction Inbound -Action Allow -Profile Private -Protocol TCP "
+        "-LocalPort 38471,38473 -Program '" + program + "'; "
+        "New-NetFirewallRule -DisplayName 'WirelessPhoneBackup Private UDP' "
+        "-Direction Inbound -Action Allow -Profile Private -Protocol UDP "
+        "-LocalPort 38472 -Program '" + program + "'"
+    )
+    # The button triggers Windows UAC; no firewall modifications happen without approval.
+    command = '-NoProfile -ExecutionPolicy Bypass -Command "' + script + '"'
+    launched = ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", command, None, 1)
+    if launched <= 32:
+        raise RuntimeError("Windows did not open the administrator permission prompt.")
+
+
 def main():
     root = tk.Tk()
     root.title("Wireless Phone Backup 0.4")
-    root.geometry("840x590")
+    root.geometry("840x650")
     root.minsize(780, 540)
     style = ttk.Style(root)
     style.configure(".", font=("Segoe UI", 15))
@@ -235,6 +263,15 @@ def main():
     bar.pack(pady=6)
     ttk.Label(root, textvariable=status, font=("Segoe UI", 15, "bold"), wraplength=790).pack(pady=6)
     ttk.Label(root, text="If Windows Firewall asks, allow this app on PRIVATE networks.", font=("Segoe UI", 12)).pack(pady=3)
+    def fix_firewall():
+        if not messagebox.askyesno("Allow Private Wi-Fi", "Windows will ask for administrator approval to allow THIS backup app through Windows Firewall on PRIVATE networks only. Continue?"):
+            return
+        try:
+            enable_private_firewall()
+            status.set("Windows security approval requested. After approving, click BACKUP NOW again.")
+        except Exception as exc:
+            messagebox.showerror("Firewall adjustment failed", str(exc))
+    ttk.Button(root, text="FIX WINDOWS FIREWALL (Private Wi-Fi)", command=fix_firewall).pack(pady=(8, 0))
 
     def update_status(message):
         def update():
