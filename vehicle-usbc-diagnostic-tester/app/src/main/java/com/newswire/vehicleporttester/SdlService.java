@@ -153,7 +153,7 @@ public final class SdlService extends Service {
     }
     // An AppLink foreground template is not an Android Auto custom view.
     // All screens below are native SYNC 3 text fields and touch/voice menus.
-    private static final String VERSION = "0.9.5";
+    private static final String VERSION = "0.9.6";
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final java.util.concurrent.atomic.AtomicBoolean diagnosticBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final String[] DATA_LABELS = {
@@ -239,13 +239,18 @@ public final class SdlService extends Service {
     private void showFordCloudStatus() {
         android.content.SharedPreferences p=getSharedPreferences(
                 FordConnectStatusActivity.CLOUD_PREFS,MODE_PRIVATE);
+        int count=0;
+        for(String key:new String[]{"developer_account_user_reported",
+            "access_requested_user_reported","approval_user_reported",
+            "docs_received_user_reported"})
+            if(p.getBoolean(key,false))count++;
         String internet=FordConnectStatusActivity.internetState(this);
-        showLines("FordConnect not authorized",
+        showLines("Ford developer setup "+count+"/4",
             internet.equals("PHONE_INTERNET_VALIDATED")?
-                "Phone internet: available":"Phone internet: not validated",
-            "See phone to request Ford API access");
+                "Phone online; OAuth NOT authorized":"Phone offline; OAuth NOT authorized",
+            "No Ford API data. Setup on phone");
         record(this,"FORDCONNECT_STATUS_VIEWED",
-            "Ford API not configured; no cloud vehicle readings retrieved");
+            "Ford developer checklist "+count+"/4 user-reported; no authorized Ford API session");
     }
     private void showFordManualSnapshot() {
         android.content.SharedPreferences p=getSharedPreferences(
