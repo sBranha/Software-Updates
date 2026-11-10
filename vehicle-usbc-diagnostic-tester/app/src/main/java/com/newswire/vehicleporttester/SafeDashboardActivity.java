@@ -139,7 +139,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Ford Vehicle Discovery",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.9.4   •   TEST EVERYTHING",12,GREEN,true));
+        body.addView(text("v0.9.5   •   FORDCONNECT READINESS",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -160,6 +160,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,6);
         body.addView(text("Tests Ford SYNC and 7 vehicle data permissions; reports cloud and OBD-II readiness. Park before testing.",12,GREEN,false));
         gap(body,13);
+        Button cloud=button("FORDCONNECT - CLOUD VEHICLE DATA",0xff176587);
+        body.addView(cloud,new LinearLayout.LayoutParams(-1,dp(64)));
+        cloud.setOnClickListener(v->startActivity(new Intent(this,FordConnectStatusActivity.class)));
+        gap(body,6);
+        body.addView(text("Check official Ford API readiness and optional manual Ford app snapshot. No unauthorized login or vehicle commands.",12,GREEN,false));
+        gap(body,14);
         Button sdl=button("SYNC 3 • VEHICLE INFO & DIAGNOSTICS",0xff137a9e);
         body.addView(sdl,new LinearLayout.LayoutParams(-1,dp(68)));
         sdl.setOnClickListener(v->startActivity(new Intent(this,SdlTestActivity.class)));
@@ -364,7 +370,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
-            j.put("app_version","0.9.4");
+            j.put("app_version","0.9.5");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
