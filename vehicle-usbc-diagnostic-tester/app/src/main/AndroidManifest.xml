@@ -20,11 +20,12 @@
         <intent><action android:name="sdl.router.startservice" /></intent>
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Ford Vehicle Explorer 0.9.4" android:allowBackup="false"
+        android:label="Ford Vehicle Explorer 0.9.5" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
              services and activities are deliberately NOT registered. -->
+        <activity android:name=".FordConnectStatusActivity" android:exported="false" />
         <activity android:name=".SdlTestActivity" android:exported="false" />
         <service android:name=".SdlService" android:exported="true" android:enabled="true" android:foregroundServiceType="connectedDevice" />
         <service android:name=".SdlRouterService" android:enabled="true" android:exported="true" android:foregroundServiceType="connectedDevice" android:process="com.smartdevicelink.router">
