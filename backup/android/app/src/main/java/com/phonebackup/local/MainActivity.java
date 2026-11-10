@@ -58,6 +58,8 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.ServerSocket;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -77,10 +79,14 @@ public class MainActivity extends Activity {
     private static final int PERMISSIONS = 42;
     private static final int PORT = 38471;
     private final ArrayList<Uri> selected = new ArrayList<>();
-    private EditText host, pairingCode;
+    private EditText pairingCode;
+    private TextView phoneAddress;
     private TextView status;
     private CheckBox apps, sms, contacts;
     private Button backupButton;
+    private volatile boolean cancelRequested = false;
+    private volatile boolean phoneIsReady = false;
+    private volatile ServerSocket backupServer;
     private ScrollView backupScreen;
     private PowerManager.WakeLock cpuWakeLock;
     private WifiManager.WifiLock wifiWakeLock;
@@ -129,32 +135,39 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        ScrollView screen=new ScrollView(this);
-        backupScreen=screen;
-        screen.setFillViewport(true);
+        ScrollView scroll=new ScrollView(this);
+        backupScreen=scroll;
+        scroll.setFillViewport(true);
         LinearLayout layout=new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(32,30,32,36);
-        screen.addView(layout);
-        TextView intro=new TextView(this);
-        intro.setText("WIRELESS PHONE BACKUP 0.5\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
-        layout.addView(intro);
-        host=new EditText(this);
-        host.setHint("Windows computer IP (or use Find Computer)");
-        host.setSingleLine(true);
-        layout.addView(host);
+        layout.setPadding(30,24,30,34);
+        scroll.addView(layout);
+        TextView headline=new TextView(this);
+        headline.setText("WIRELESS PHONE BACKUP v0.6");
+        headline.setTextSize(TypedValue.COMPLEX_UNIT_SP,25);
+        headline.setPadding(0,6,0,12);
+        layout.addView(headline);
+        TextView howto=new TextView(this);
+        howto.setText("1. Tap MAKE PHONE READY below.\n2. On Windows, choose your backup drive, enter this code and click FIND PHONE & BACKUP.\nYour phone stays awake through the backup.");
+        howto.setTextSize(TypedValue.COMPLEX_UNIT_SP,19);
+        layout.addView(howto);
+        phoneAddress=new TextView(this);
+        phoneAddress.setText("Phone Wi-Fi IP address: "+phoneWifiAddress());
+        phoneAddress.setTextSize(TypedValue.COMPLEX_UNIT_SP,22);
+        phoneAddress.setPadding(0,16,0,6);
+        layout.addView(phoneAddress);
+        TextView pairLabel=new TextView(this);
+        pairLabel.setText("Your 6-DIGIT pairing code:");
+        pairLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
+        layout.addView(pairLabel);
         pairingCode=new EditText(this);
-        pairingCode.setHint("Six-digit code from Windows");
-        pairingCode.setInputType(InputType.TYPE_CLASS_NUMBER);
-        pairingCode.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
-        pairingCode.setSingleLine(true);
+        pairingCode.setText(String.format(java.util.Locale.US,"%06d",new SecureRandom().nextInt(1000000)));
+        pairingCode.setEnabled(false);
+        pairingCode.setTextSize(TypedValue.COMPLEX_UNIT_SP,30);
         layout.addView(pairingCode);
-        Button find=new Button(this);
-        find.setText("FIND WINDOWS COMPUTER");
-        layout.addView(find);
-        find.setOnClickListener(v->discover());
         Button choose=new Button(this);
         choose.setText("Choose photos, videos and documents");
+        choose.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
         layout.addView(choose);
         choose.setOnClickListener(view->{
             Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -164,36 +177,78 @@ public class MainActivity extends Activity {
             startActivityForResult(intent,PICK);
         });
         apps=new CheckBox(this);
-        apps.setText("Backup actual installed app APKs (including split APKs)");
+        apps.setText("Backup accessible installed app APKs (including splits)");
+        apps.setTextSize(TypedValue.COMPLEX_UNIT_SP,19);
         apps.setChecked(true);
         layout.addView(apps);
         sms=new CheckBox(this);
-        sms.setText("Backup SMS/MMS messages and available attachments");
+        sms.setText("Backup accessible SMS/MMS messages and attachments");
+        sms.setTextSize(TypedValue.COMPLEX_UNIT_SP,19);
         sms.setChecked(true);
         layout.addView(sms);
         contacts=new CheckBox(this);
         contacts.setText("Backup contacts");
+        contacts.setTextSize(TypedValue.COMPLEX_UNIT_SP,19);
         contacts.setChecked(true);
         layout.addView(contacts);
         backupButton=new Button(this);
-        backupButton.setText("Backup Now");
+        backupButton.setText("MAKE PHONE READY");
+        backupButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,23);
         layout.addView(backupButton);
         status=new TextView(this);
-        status.setText("READY. First press BACKUP NOW on Windows. Then FIND WINDOWS COMPUTER. Screen will stay on during backup.");
-        layout.addView(status);
-        for(int i=0;i<layout.getChildCount();i++) {
-            android.view.View view=layout.getChildAt(i);
-            if(view instanceof TextView) {
-                TextView label=(TextView)view;
-                label.setTextSize(TypedValue.COMPLEX_UNIT_SP, view==intro?21:19);
-                label.setPadding(8,12,8,12);
-                label.setMinHeight(62);
-            }
-            if(view instanceof Button) ((Button)view).setTextSize(TypedValue.COMPLEX_UNIT_SP,21);
-        }
+        status.setText("READY TO START. No Windows firewall setup is required.");
         status.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
-        setContentView(screen);
-        backupButton.setOnClickListener(v->startBackup());
+        status.setPadding(0,14,0,20);
+        layout.addView(status);
+        setContentView(scroll);
+        backupButton.setOnClickListener(v->{
+            if(backupActive && phoneIsReady) {
+                cancelRequested=true;
+                try { if(backupServer!=null) backupServer.close(); } catch(Exception ignored) {}
+                show("Stopping phone listener...");
+            } else if(!backupActive) {
+                startBackup();
+            }
+        });
+    }
+
+    private String phoneWifiAddress() {
+        try {
+            WifiManager wifi=(WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if(wifi!=null && wifi.getConnectionInfo()!=null) {
+                int ip=wifi.getConnectionInfo().getIpAddress();
+                if(ip!=0) return (ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+"."+((ip>>24)&255);
+            }
+            for(Enumeration<NetworkInterface> interfaces=NetworkInterface.getNetworkInterfaces();interfaces!=null&&interfaces.hasMoreElements();) {
+                NetworkInterface iface=interfaces.nextElement();
+                if(!iface.isUp() || iface.isLoopback()) continue;
+                for(InterfaceAddress addr:iface.getInterfaceAddresses()) {
+                    if(addr.getAddress() instanceof Inet4Address && addr.getAddress().isSiteLocalAddress())
+                        return addr.getAddress().getHostAddress();
+                }
+            }
+        } catch(Exception ignored) {}
+        return "Connect your phone to Wi-Fi";
+    }
+
+    private void respondToDiscovery() {
+        try(DatagramSocket udp=new DatagramSocket(38472)) {
+            udp.setSoTimeout(1000);
+            byte[] buffer=new byte[128];
+            while(backupActive && !cancelRequested) {
+                try {
+                    DatagramPacket packet=new DatagramPacket(buffer,buffer.length);
+                    udp.receive(packet);
+                    String query=new String(packet.getData(),0,packet.getLength(),StandardCharsets.US_ASCII);
+                    if(query.equals("WPB_FIND_PHONE_V6")) {
+                        byte[] response="WPB_PHONE_READY_V6".getBytes(StandardCharsets.US_ASCII);
+                        udp.send(new DatagramPacket(response,response.length,packet.getAddress(),packet.getPort()));
+                    }
+                } catch(SocketTimeoutException ignored) {}
+            }
+        } catch(Exception e) {
+            android.util.Log.w("WirelessPhoneBackup","Phone discovery unavailable: direct phone IP still works",e);
+        }
     }
 
     @Override protected void onActivityResult(int request,int result,Intent data) {
@@ -212,128 +267,6 @@ public class MainActivity extends Activity {
 
     /** Status port is separate from the file transfer port so a connection check
      * cannot consume Windows' one-shot backup listener. */
-    private boolean checkReady(String ip) {
-        if(ip==null || ip.trim().length()==0) return false;
-        try(Socket socket=new Socket()) {
-            socket.connect(new InetSocketAddress(ip.trim(),38473),500);
-            socket.setSoTimeout(800);
-            byte[] query="WPB_STATUS_V4".getBytes(StandardCharsets.US_ASCII);
-            socket.getOutputStream().write(query);
-            socket.getOutputStream().flush();
-            byte[] reply=new byte[12];
-            int length=0;
-            while(length<reply.length) {
-                int n=socket.getInputStream().read(reply,length,reply.length-length);
-                if(n<0) return false;
-                length+=n;
-            }
-            return "WPB_READY_V4".equals(new String(reply,StandardCharsets.US_ASCII));
-        } catch(Exception e) {
-            return false;
-        }
-    }
-
-    private String broadcastDiscovery() {
-        try(DatagramSocket udp=new DatagramSocket()) {
-            udp.setBroadcast(true);
-            udp.setSoTimeout(1000);
-            byte[] query="WPB_DISCOVER_V4".getBytes(StandardCharsets.US_ASCII);
-            HashSet<InetAddress> addresses=new HashSet<>();
-            addresses.add(InetAddress.getByName("255.255.255.255"));
-            for(Enumeration<NetworkInterface> it=NetworkInterface.getNetworkInterfaces();it!=null&&it.hasMoreElements();) {
-                NetworkInterface network=it.nextElement();
-                if(!network.isUp()||network.isLoopback()) continue;
-                for(InterfaceAddress networkAddress:network.getInterfaceAddresses()) {
-                    if(networkAddress.getBroadcast()!=null)
-                        addresses.add(networkAddress.getBroadcast());
-                }
-            }
-            for(InetAddress address:addresses) {
-                try { udp.send(new DatagramPacket(query,query.length,address,38472)); }
-                catch(Exception ignored) {}
-            }
-            long end=System.currentTimeMillis()+1500;
-            while(System.currentTimeMillis()<end) {
-                try {
-                    byte[] buf=new byte[64];
-                    DatagramPacket packet=new DatagramPacket(buf,buf.length);
-                    udp.receive(packet);
-                    if("WPB_READY_V4".equals(new String(buf,0,packet.getLength(),StandardCharsets.US_ASCII)))
-                        return packet.getAddress().getHostAddress();
-                } catch(SocketTimeoutException timeout) { break; }
-            }
-        } catch(Exception ignored) {}
-        return null;
-    }
-
-    private String scanLocalSubnet() {
-        ArrayList<String> candidates=new ArrayList<>();
-        try {
-            HashSet<String> prefixes=new HashSet<>();
-            for(Enumeration<NetworkInterface> it=NetworkInterface.getNetworkInterfaces();it!=null&&it.hasMoreElements();) {
-                NetworkInterface network=it.nextElement();
-                if(!network.isUp() || network.isLoopback()) continue;
-                for(InterfaceAddress interfaceAddress:network.getInterfaceAddresses()) {
-                    InetAddress addr=interfaceAddress.getAddress();
-                    if(!(addr instanceof Inet4Address)) continue;
-                    String[] parts=addr.getHostAddress().split("\\.");
-                    if(parts.length==4) {
-                        String prefix=parts[0]+"."+parts[1]+"."+parts[2]+".";
-                        // Scan only private LAN addresses on an explicit Find Computer tap.
-                        int a=Integer.parseInt(parts[0]);
-                        int b=Integer.parseInt(parts[1]);
-                        if(a==10 || (a==172&&b>=16&&b<=31) || (a==192&&b==168))
-                            prefixes.add(prefix);
-                    }
-                }
-            }
-            for(String prefix:prefixes) for(int n=1;n<=254;n++)
-                candidates.add(prefix+n);
-        } catch(Exception ignored) {}
-        if(candidates.isEmpty()) return null;
-        show("Computer search: checking the local Wi-Fi network. Please wait...");
-        ExecutorService pool=Executors.newFixedThreadPool(24);
-        ExecutorCompletionService<String> completed=new ExecutorCompletionService<>(pool);
-        try {
-            for(String candidate:candidates) completed.submit(
-                ()->checkReady(candidate)?candidate:null);
-            long deadline=System.currentTimeMillis()+11000;
-            for(int n=0;n<candidates.size() && System.currentTimeMillis()<deadline;n++) {
-                long remaining=deadline-System.currentTimeMillis();
-                Future<String> result=completed.poll(remaining,TimeUnit.MILLISECONDS);
-                if(result==null) break;
-                String ip=result.get();
-                if(ip!=null) return ip;
-            }
-        } catch(Exception ignored) {
-        } finally {
-            pool.shutdownNow();
-        }
-        return null;
-    }
-
-    private void discover() {
-        final String typedIp=host.getText().toString().trim();
-        show("FINDING Windows computer... On Windows click BACKUP NOW first.");
-        new Thread(()->{
-            String ip=null;
-            try {
-                if(checkReady(typedIp)) ip=typedIp;
-                if(ip==null) ip=broadcastDiscovery();
-                if(ip==null) ip=scanLocalSubnet();
-                if(ip!=null) {
-                    final String found=ip;
-                    runOnUiThread(()->host.setText(found));
-                    show("CONNECTED: Found the Windows receiver at "+found+". Enter its 6-digit code and tap BACKUP NOW.");
-                } else {
-                    show("NO WINDOWS RECEIVER FOUND. On Windows: connect your drive, choose its folder, press BACKUP NOW, and allow Windows Firewall access on PRIVATE networks. Then try Find again.");
-                }
-            } catch(Exception e) {
-                show("Computer search failed: "+e.getMessage()+". You can enter the Windows IPv4 address manually.");
-            }
-        }).start();
-    }
-
     /** Keep the screen visible, CPU running and Wi-Fi connected for the full backup.
      * All locks are released in finishBackup(), even if transfer throws an exception.
      */
@@ -402,32 +335,66 @@ public class MainActivity extends Activity {
         if(contacts.isChecked() && checkSelfPermission(Manifest.permission.READ_CONTACTS)!=PackageManager.PERMISSION_GRANTED)
             ask.add(Manifest.permission.READ_CONTACTS);
         if(!ask.isEmpty()) {
-            show("Grant the requested message/contact permissions or turn their checkboxes off.");
+            show("Grant requested permissions or turn off the categories you don't want.");
             requestPermissions(ask.toArray(new String[0]),PERMISSIONS);
             return;
         }
-        if(host.getText().toString().trim().length()==0 || !pairingCode.getText().toString().trim().matches("[0-9]{6}")) {
-            show("Enter the Windows computer IP address and the 6-digit pairing code.");
-            return;
-        }
-        final String ip=host.getText().toString().trim();
         final String code=pairingCode.getText().toString().trim();
         final boolean includeApps=apps.isChecked();
         final boolean includeMessages=sms.isChecked();
         final boolean includeContacts=contacts.isChecked();
-        backupButton.setEnabled(false);
+        cancelRequested=false;
         keepPhoneAwakeForBackup();
-        show("BACKUP RUNNING: Phone screen, CPU and Wi-Fi are being kept awake until backup finishes. STEP 1/4: Starting...");
+        phoneIsReady=true;
+        backupButton.setText("CANCEL WAITING");
+        chooseOptionsEnabled(false);
+        show("PHONE READY: Now on Windows click FIND PHONE & BACKUP. Your phone stays awake.");
         new Thread(()->{
-            try { transfer(ip,code,includeApps,includeMessages,includeContacts); }
-            catch(Exception e) { show("Backup FAILED: "+e.getClass().getSimpleName()+": "+e.getMessage()); }
-            finally {
+            try(ServerSocket server=new ServerSocket(PORT)) {
+                backupServer=server;
+                server.setSoTimeout(1000);
+                new Thread(this::respondToDiscovery).start();
+                phoneAddress.post(()->phoneAddress.setText("Phone Wi-Fi IP address: "+phoneWifiAddress()));
+                long deadline=System.currentTimeMillis()+15*60*1000;
+                Socket client=null;
+                while(!cancelRequested && System.currentTimeMillis()<deadline) {
+                    try {
+                        client=server.accept();
+                        break;
+                    } catch(SocketTimeoutException ignored) {}
+                }
+                if(cancelRequested) {
+                    show("Cancelled. Tap MAKE PHONE READY to try again.");
+                } else if(client==null) {
+                    show("Waiting expired after 15 minutes. Tap MAKE PHONE READY again.");
+                } else {
+                    phoneIsReady=false;
+                    final Socket incoming=client;
+                    runOnUiThread(()->backupButton.setEnabled(false));
+                    show("WINDOWS CONNECTED. Scanning the selected phone content...");
+                    transfer(incoming,code,includeApps,includeMessages,includeContacts);
+                }
+            } catch(Exception e) {
+                if(!cancelRequested)
+                    show("Backup failed: "+e.getClass().getSimpleName()+": "+e.getMessage());
+            } finally {
+                phoneIsReady=false;
+                backupServer=null;
                 runOnUiThread(()->{
                     finishBackup();
                     backupButton.setEnabled(true);
+                    backupButton.setText("MAKE PHONE READY");
+                    chooseOptionsEnabled(true);
+                    pairingCode.setText(String.format(java.util.Locale.US,"%06d",new SecureRandom().nextInt(1000000)));
                 });
             }
         }).start();
+    }
+
+    private void chooseOptionsEnabled(boolean enabled) {
+        apps.setEnabled(enabled);
+        sms.setEnabled(enabled);
+        contacts.setEnabled(enabled);
     }
 
     @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] grants) {
@@ -586,12 +553,9 @@ public class MainActivity extends Activity {
         return str.toString();
     }
 
-    private void transfer(String ip,String code,boolean includeApps,boolean includeMessages,
+    private void transfer(Socket socket,String code,boolean includeApps,boolean includeMessages,
                           boolean includeContacts) throws Exception {
-        show("STEP 1/4: Checking whether Windows backup is ready...");
-        if(!checkReady(ip))
-            throw new java.io.IOException("Windows app is not listening at "+ip+". On Windows: connect your external drive, select its folder, and click BACKUP NOW. If it still fails, allow the backup app on PRIVATE networks in Windows Firewall.");
-        show("STEP 2/4: Windows is ready. Scanning your phone files...");
+        show("STEP 1/3: Windows is connected. Scanning phone files...");
         ArrayList<Source> candidates=new ArrayList<>();
         JSONArray skipped=new JSONArray();
         for(Uri uri:selected)
@@ -644,10 +608,9 @@ public class MainActivity extends Activity {
         byte[] salt=new byte[16];
         new SecureRandom().nextBytes(salt);
         // ECDH constructs a new encrypted session after pairing.
-        show("STEP 3/4: Connecting to Windows for "+ready.size()+" files...");
-        try(Socket socket=new Socket()) {
-            socket.connect(new InetSocketAddress(ip,PORT),15000);
-            socket.setSoTimeout(120000);
+        show("STEP 2/3: Preparing secured backup of "+ready.size()+" files...");
+        try(Socket transferSocket=socket) {
+            socket.setSoTimeout(1800000);
             try(DataOutputStream output=new DataOutputStream(socket.getOutputStream())) {
                 DataInputStream input=new DataInputStream(socket.getInputStream());
                 KeyPairGenerator gen=KeyPairGenerator.getInstance("EC");
@@ -687,7 +650,7 @@ public class MainActivity extends Activity {
                     }
                     if(transferred!=source.size) throw new IllegalStateException(
                             "Source changed during backup: "+source.name);
-                    show("STEP 4/4: Sent "+(i+1)+"/"+ready.size()+" files. Current: "+source.name);
+                    show("STEP 3/3: Sent "+(i+1)+"/"+ready.size()+" files. Current: "+source.name);
                 }
                 output.flush();
             }
