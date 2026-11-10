@@ -1,6 +1,7 @@
 """Wireless Phone Backup receiver -- prototype 0.2, local encrypted one-shot backup."""
 import hashlib
 import json
+import select
 import os
 import re
 import secrets
@@ -137,22 +138,51 @@ def restore_session(sock, folder, code, progress):
     return report
 
 
-def discovery_service(stop):
-    """Respond to local Wi-Fi discovery only while a backup is waiting."""
+def discovery_service(stop, status_callback=None):
+    """Answer UDP broadcasts and direct TCP status checks without consuming backup connections.
+
+    Android Find Computer first probes the typed IP, then tries broadcast, then
+    the local /24. Discovery never connects to the encrypted-transfer port.
+    """
+    listeners = []
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+        try:
+            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             udp.bind(("0.0.0.0", 38472))
-            udp.settimeout(1)
-            while not stop.is_set():
-                try:
-                    request, address = udp.recvfrom(256)
-                    if request == b"WPB_DISCOVER_V3":
-                        udp.sendto(b"WPB_READY_V3", address)
-                except socket.timeout:
-                    pass
-    except OSError:
-        return
+            listeners.append(udp)
+        except OSError as exc:
+            if status_callback:
+                status_callback(f"Wi-Fi broadcast discovery unavailable: {exc}. Manual IP may still work.")
+        try:
+            tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            tcp.bind(("0.0.0.0", 38473))
+            tcp.listen(32)
+            listeners.append(tcp)
+        except OSError as exc:
+            if status_callback:
+                status_callback(f"Direct computer search unavailable: {exc}. Manual IP may still work.")
+        while listeners and not stop.is_set():
+            readable, _, _ = select.select(listeners, [], [], 0.4)
+            for server in readable:
+                if server.type == socket.SOCK_DGRAM:
+                    data, address = server.recvfrom(256)
+                    if data in (b"WPB_DISCOVER_V3", b"WPB_DISCOVER_V4"):
+                        server.sendto(b"WPB_READY_V4", address)
+                else:
+                    connection, _ = server.accept()
+                    with connection:
+                        connection.settimeout(2)
+                        if connection.recv(64) == b"WPB_STATUS_V4":
+                            connection.sendall(b"WPB_READY_V4")
+    except OSError as exc:
+        if status_callback:
+            status_callback(f"Discovery listener failed: {exc}. Try entering the Windows IP directly.")
+    finally:
+        for listener in listeners:
+            listener.close()
+
 
 def run_server(destination, code, progress):
     folder = Path(destination)
@@ -163,9 +193,9 @@ def run_server(destination, code, progress):
         server.bind(("0.0.0.0", PORT))
         server.listen(1)
         server.settimeout(300)
-        progress(f"Waiting for phone. On Android tap FIND COMPUTER, then BACKUP NOW.")
+        progress(f"Listening for phone on Wi-Fi. Tap FIND COMPUTER then BACKUP NOW on Android.")
         stop_discovery = threading.Event()
-        threading.Thread(target=discovery_service, args=(stop_discovery,), daemon=True).start()
+        threading.Thread(target=discovery_service, args=(stop_discovery, progress), daemon=True).start()
         try:
             conn, address = server.accept()
         finally:
@@ -178,7 +208,7 @@ def run_server(destination, code, progress):
 
 def main():
     root = tk.Tk()
-    root.title("Wireless Phone Backup 0.3")
+    root.title("Wireless Phone Backup 0.4")
     root.geometry("840x590")
     root.minsize(780, 540)
     style = ttk.Style(root)
@@ -204,7 +234,7 @@ def main():
     bar = ttk.Progressbar(root, length=740, maximum=100)
     bar.pack(pady=6)
     ttk.Label(root, textvariable=status, font=("Segoe UI", 15, "bold"), wraplength=790).pack(pady=6)
-    ttk.Label(root, text="If Windows Firewall asks, allow access on Private networks.", font=("Segoe UI", 12)).pack(pady=3)
+    ttk.Label(root, text="If Windows Firewall asks, allow this app on PRIVATE networks.", font=("Segoe UI", 12)).pack(pady=3)
 
     def update_status(message):
         def update():
