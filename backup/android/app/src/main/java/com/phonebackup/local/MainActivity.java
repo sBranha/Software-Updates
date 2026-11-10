@@ -457,8 +457,7 @@ public class MainActivity extends Activity {
         manifest.put("unavailable",skipped);
         byte[] salt=new byte[16];
         new SecureRandom().nextBytes(salt);
-        Crypto crypto=new Crypto(code,salt);
-        // The session is encrypted after the phone and Windows exchange ECDH public keys.
+        // ECDH constructs a new encrypted session after pairing.
         show("STEP 3/4: Connecting to Windows for "+ready.size()+" files...");
         try(Socket socket=new Socket()) {
             socket.connect(new InetSocketAddress(ip,PORT),15000);
