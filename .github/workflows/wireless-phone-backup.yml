@@ -17,6 +17,7 @@ jobs:
       - name: Build standalone Windows application
         run: |
           python -m pip install --upgrade pyinstaller cryptography
+          python -m unittest discover -s backup/windows -p "test_*.py" -v
           pyinstaller --onefile --windowed --name WirelessPhoneBackup backup/windows/backup.py
       - name: Package Inno Setup installer
         shell: pwsh
