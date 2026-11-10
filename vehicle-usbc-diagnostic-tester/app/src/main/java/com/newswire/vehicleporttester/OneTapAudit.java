@@ -76,6 +76,14 @@ final class OneTapAudit {
         boolean hasSnapshot=!context.getSharedPreferences("ford_obd_verified",Context.MODE_PRIVATE)
                 .getString("last_verified_readings","").isEmpty();
         e.putString("obd2_saved_snapshot",hasSnapshot?"PRIOR_VERIFIED_SNAPSHOT":"NO_VERIFIED_SNAPSHOT");
+        SharedPreferences developer=context.getSharedPreferences(
+            FordConnectStatusActivity.CLOUD_PREFS,Context.MODE_PRIVATE);
+        int declared=0;
+        for(String key:new String[]{"developer_account_user_reported","access_requested_user_reported",
+                "approval_user_reported","docs_received_user_reported"})
+            if(developer.getBoolean(key,false))declared++;
+        e.putInt("fordconnect_setup_steps_user_reported",declared);
+        e.putString("fordconnect_access_verification","UNVERIFIED_NO_OAUTH_SESSION");
         long manualAt=context.getSharedPreferences(FordConnectStatusActivity.MANUAL_PREFS,Context.MODE_PRIVATE)
             .getLong("saved_ms",0);
         e.putString("ford_app_manual_snapshot",manualAt>0?"USER_ENTERED_SNAPSHOT":"NONE");
@@ -89,7 +97,7 @@ final class OneTapAudit {
     }
     private void display(String line2,String line3,String line4){
         try{
-            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.5");
+            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.6");
             sdl.getScreenManager().setTextField2(line2);
             sdl.getScreenManager().setTextField3(line3);
             sdl.getScreenManager().setTextField4(line4);
