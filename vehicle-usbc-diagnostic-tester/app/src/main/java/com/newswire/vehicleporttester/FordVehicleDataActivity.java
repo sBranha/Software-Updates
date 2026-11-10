@@ -184,7 +184,7 @@ public final class FordVehicleDataActivity extends Activity {
         while(readings.length()>0)readings.remove(readings.length()-1);
         report=new JSONObject();
         put(report,"report_format","Vehicle Capability Explorer Ford OBD-II discovery v1");
-        put(report,"app_version","0.9.0");
+        put(report,"app_version","0.9.3");
         put(report,"started_at_utc",utc());
         put(report,"transport","Bluetooth Classic RFCOMM Serial Port Profile");
         put(report,"source","actual_ECU_replies_only");
@@ -385,6 +385,21 @@ public final class FordVehicleDataActivity extends Activity {
             put(report,"finished_at_utc",utc());
             put(report,"diagnostic_requests_and_adapter_commands_sent",requestCount);
             put(report,"readings",readings);
+            // Preserve only real ECU values for a clearly labeled SYNC snapshot.
+            try {
+                boolean sensorVerified=false;
+                for(int n=0;n<readings.length();n++){
+                    JSONObject item=readings.optJSONObject(n);
+                    if(item!=null && "VERIFIED_ECU_VALUE".equals(item.optString("status"))){
+                        sensorVerified=true;break;
+                    }
+                }
+                if(sensorVerified){
+                    getSharedPreferences("ford_obd_verified",MODE_PRIVATE).edit()
+                        .putString("last_verified_readings",readings.toString())
+                        .putLong("last_verified_at_ms",System.currentTimeMillis()).apply();
+                }
+            }catch(Exception ignored){}
             runOnUiThread(()->{
                 running=false;connect.setEnabled(selected!=null);
                 choose.setEnabled(true);disconnect.setEnabled(false);
@@ -402,7 +417,7 @@ public final class FordVehicleDataActivity extends Activity {
         if(report==null||running)return;
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Capability-Explorer-v0.9.0-FORD-DATA-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+        i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Capability-Explorer-v0.9.3-FORD-DATA-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
         startActivityForResult(i,SAVE);
     }
     @Override protected void onActivityResult(int req,int result,Intent data){
