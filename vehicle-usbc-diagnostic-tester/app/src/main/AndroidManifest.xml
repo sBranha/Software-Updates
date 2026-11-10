@@ -20,7 +20,7 @@
         <intent><action android:name="sdl.router.startservice" /></intent>
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Ford Vehicle Explorer 0.9.3" android:allowBackup="false"
+        android:label="Ford Vehicle Explorer 0.9.4" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
