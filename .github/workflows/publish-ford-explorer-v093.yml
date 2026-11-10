@@ -2,7 +2,7 @@ name: Publish Vehicle Explorer v0.9.3 direct APK download
 on:
   push:
     branches:
-      - vehicle-capability-explorer-v0.9.3-screen-visibility
+      - vehicle-capability-explorer-v0.9.3-ford-screen-data
     paths:
       - '.github/workflows/publish-ford-explorer-v093.yml'
       - 'vehicle-usbc-diagnostic-tester/**'
