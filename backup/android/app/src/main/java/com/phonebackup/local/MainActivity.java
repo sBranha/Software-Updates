@@ -25,6 +25,17 @@ import android.util.TypedValue;
 import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.InterfaceAddress;
+import java.net.Inet4Address;
+import java.net.SocketTimeoutException;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
 import java.io.DataInputStream;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -118,7 +129,7 @@ public class MainActivity extends Activity {
         layout.setPadding(32,30,32,36);
         screen.addView(layout);
         TextView intro=new TextView(this);
-        intro.setText("WIRELESS PHONE BACKUP 0.3\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
+        intro.setText("WIRELESS PHONE BACKUP 0.4\n1. On Windows, click BACKUP NOW.\n2. On the phone, tap FIND COMPUTER, enter the six-digit code, then BACKUP NOW.");
         layout.addView(intro);
         host=new EditText(this);
         host.setHint("Windows computer IP (or use Find Computer)");
@@ -160,7 +171,7 @@ public class MainActivity extends Activity {
         backupButton.setText("Backup Now");
         layout.addView(backupButton);
         status=new TextView(this);
-        status.setText("READY. Open Windows backup first, then tap FIND WINDOWS COMPUTER.");
+        status.setText("READY. First press BACKUP NOW on Windows. Then FIND WINDOWS COMPUTER.");
         layout.addView(status);
         for(int i=0;i<layout.getChildCount();i++) {
             android.view.View view=layout.getChildAt(i);
@@ -191,24 +202,126 @@ public class MainActivity extends Activity {
         runOnUiThread(()->status.setText(text));
     }
 
+    /** Status port is separate from the file transfer port so a connection check
+     * cannot consume Windows' one-shot backup listener. */
+    private boolean checkReady(String ip) {
+        if(ip==null || ip.trim().length()==0) return false;
+        try(Socket socket=new Socket()) {
+            socket.connect(new InetSocketAddress(ip.trim(),38473),500);
+            socket.setSoTimeout(800);
+            byte[] query="WPB_STATUS_V4".getBytes(StandardCharsets.US_ASCII);
+            socket.getOutputStream().write(query);
+            socket.getOutputStream().flush();
+            byte[] reply=new byte[12];
+            int length=0;
+            while(length<reply.length) {
+                int n=socket.getInputStream().read(reply,length,reply.length-length);
+                if(n<0) return false;
+                length+=n;
+            }
+            return "WPB_READY_V4".equals(new String(reply,StandardCharsets.US_ASCII));
+        } catch(Exception e) {
+            return false;
+        }
+    }
+
+    private String broadcastDiscovery() {
+        try(DatagramSocket udp=new DatagramSocket()) {
+            udp.setBroadcast(true);
+            udp.setSoTimeout(1000);
+            byte[] query="WPB_DISCOVER_V4".getBytes(StandardCharsets.US_ASCII);
+            HashSet<InetAddress> addresses=new HashSet<>();
+            addresses.add(InetAddress.getByName("255.255.255.255"));
+            for(Enumeration<NetworkInterface> it=NetworkInterface.getNetworkInterfaces();it!=null&&it.hasMoreElements();) {
+                NetworkInterface network=it.nextElement();
+                if(!network.isUp()||network.isLoopback()) continue;
+                for(InterfaceAddress networkAddress:network.getInterfaceAddresses()) {
+                    if(networkAddress.getBroadcast()!=null)
+                        addresses.add(networkAddress.getBroadcast());
+                }
+            }
+            for(InetAddress address:addresses) {
+                try { udp.send(new DatagramPacket(query,query.length,address,38472)); }
+                catch(Exception ignored) {}
+            }
+            long end=System.currentTimeMillis()+1500;
+            while(System.currentTimeMillis()<end) {
+                try {
+                    byte[] buf=new byte[64];
+                    DatagramPacket packet=new DatagramPacket(buf,buf.length);
+                    udp.receive(packet);
+                    if("WPB_READY_V4".equals(new String(buf,0,packet.getLength(),StandardCharsets.US_ASCII)))
+                        return packet.getAddress().getHostAddress();
+                } catch(SocketTimeoutException timeout) { break; }
+            }
+        } catch(Exception ignored) {}
+        return null;
+    }
+
+    private String scanLocalSubnet() {
+        ArrayList<String> candidates=new ArrayList<>();
+        try {
+            HashSet<String> prefixes=new HashSet<>();
+            for(Enumeration<NetworkInterface> it=NetworkInterface.getNetworkInterfaces();it!=null&&it.hasMoreElements();) {
+                NetworkInterface network=it.nextElement();
+                if(!network.isUp() || network.isLoopback()) continue;
+                for(InterfaceAddress interfaceAddress:network.getInterfaceAddresses()) {
+                    InetAddress addr=interfaceAddress.getAddress();
+                    if(!(addr instanceof Inet4Address)) continue;
+                    String[] parts=addr.getHostAddress().split("\\.");
+                    if(parts.length==4) {
+                        String prefix=parts[0]+"."+parts[1]+"."+parts[2]+".";
+                        // Scan only private LAN addresses on an explicit Find Computer tap.
+                        int a=Integer.parseInt(parts[0]);
+                        int b=Integer.parseInt(parts[1]);
+                        if(a==10 || (a==172&&b>=16&&b<=31) || (a==192&&b==168))
+                            prefixes.add(prefix);
+                    }
+                }
+            }
+            for(String prefix:prefixes) for(int n=1;n<=254;n++)
+                candidates.add(prefix+n);
+        } catch(Exception ignored) {}
+        if(candidates.isEmpty()) return null;
+        show("Computer search: checking the local Wi-Fi network. Please wait...");
+        ExecutorService pool=Executors.newFixedThreadPool(24);
+        ExecutorCompletionService<String> completed=new ExecutorCompletionService<>(pool);
+        try {
+            for(String candidate:candidates) completed.submit(
+                ()->checkReady(candidate)?candidate:null);
+            long deadline=System.currentTimeMillis()+11000;
+            for(int n=0;n<candidates.size() && System.currentTimeMillis()<deadline;n++) {
+                long remaining=deadline-System.currentTimeMillis();
+                Future<String> result=completed.poll(remaining,TimeUnit.MILLISECONDS);
+                if(result==null) break;
+                String ip=result.get();
+                if(ip!=null) return ip;
+            }
+        } catch(Exception ignored) {
+        } finally {
+            pool.shutdownNow();
+        }
+        return null;
+    }
+
     private void discover() {
-        show("SEARCHING for Windows computer on your Wi-Fi... Make sure BACKUP NOW is open on Windows.");
+        final String typedIp=host.getText().toString().trim();
+        show("FINDING Windows computer... On Windows click BACKUP NOW first.");
         new Thread(()->{
-            try(DatagramSocket udp=new DatagramSocket()) {
-                udp.setBroadcast(true);
-                udp.setSoTimeout(7000);
-                byte[] request="WPB_DISCOVER_V3".getBytes(StandardCharsets.US_ASCII);
-                udp.send(new DatagramPacket(request,request.length,InetAddress.getByName("255.255.255.255"),38472));
-                byte[] reply=new byte[128];
-                DatagramPacket packet=new DatagramPacket(reply,reply.length);
-                udp.receive(packet);
-                String response=new String(reply,0,packet.getLength(),StandardCharsets.US_ASCII);
-                if(!"WPB_READY_V3".equals(response)) throw new Exception("Unexpected response");
-                final String ip=packet.getAddress().getHostAddress();
-                runOnUiThread(()->host.setText(ip));
-                show("FOUND Windows computer at "+ip+". Enter the six-digit code shown on Windows.");
+            String ip=null;
+            try {
+                if(checkReady(typedIp)) ip=typedIp;
+                if(ip==null) ip=broadcastDiscovery();
+                if(ip==null) ip=scanLocalSubnet();
+                if(ip!=null) {
+                    final String found=ip;
+                    runOnUiThread(()->host.setText(found));
+                    show("CONNECTED: Found the Windows receiver at "+found+". Enter its 6-digit code and tap BACKUP NOW.");
+                } else {
+                    show("NO WINDOWS RECEIVER FOUND. On Windows: connect your drive, choose its folder, press BACKUP NOW, and allow Windows Firewall access on PRIVATE networks. Then try Find again.");
+                }
             } catch(Exception e) {
-                show("Computer not found automatically. Enter the Windows IPv4 address shown on your PC. Make sure Windows Firewall allows the backup app on Private Wi-Fi.");
+                show("Computer search failed: "+e.getMessage()+". You can enter the Windows IPv4 address manually.");
             }
         }).start();
     }
@@ -317,7 +430,7 @@ public class MainActivity extends Activity {
             catalog.put(entry);
         }
         inline(sources,"apps","installed-app-catalog.json",catalog);
-        show("STEP 1/4: Found "+count+" accessible app installation packages. Checking file sizes...");
+        show("STEP 2/4: Found "+count+" accessible app installation packages. Checking file sizes...");
     }
 
     private void collectContacts(List<Source> sources, JSONArray skipped) throws Exception {
@@ -406,6 +519,10 @@ public class MainActivity extends Activity {
 
     private void transfer(String ip,String code,boolean includeApps,boolean includeMessages,
                           boolean includeContacts) throws Exception {
+        show("STEP 1/4: Checking whether Windows backup is ready...");
+        if(!checkReady(ip))
+            throw new java.io.IOException("Windows app is not listening at "+ip+". On Windows: connect your external drive, select its folder, and click BACKUP NOW. If it still fails, allow the backup app on PRIVATE networks in Windows Firewall.");
+        show("STEP 2/4: Windows is ready. Scanning your phone files...");
         ArrayList<Source> candidates=new ArrayList<>();
         JSONArray skipped=new JSONArray();
         for(Uri uri:selected)
