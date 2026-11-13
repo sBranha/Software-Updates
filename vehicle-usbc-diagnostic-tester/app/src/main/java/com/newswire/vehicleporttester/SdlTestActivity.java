@@ -46,7 +46,7 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.6 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer v0.9.7 • SmartDeviceLink",13,0xff66e2ad));
         layout.addView(label("ONE TAP checks SYNC 3, seven Ford fields, cloud authorization and OBD-II availability. Real progress, one final report and no simulated values.",15,Color.WHITE));
         layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open Vehicle Explorer and select TEST EVERYTHING. You may also run it from this phone.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
@@ -54,6 +54,9 @@ public final class SdlTestActivity extends Activity {
         testEverything.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff0b785e));
         auditInfo=label("Audit not run yet.",15,0xff56e2c3);layout.addView(auditInfo);
         testEverything.setOnClickListener(v->checkAndStart(true));
+        Button widget=button("FORD WIDGET BRIDGE - FUEL & RANGE");layout.addView(widget);
+        widget.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff176e9a));
+        widget.setOnClickListener(v->startActivity(new Intent(this,FordWidgetBridgeActivity.class)));
         Button cloud=button("FORDCONNECT - OFFICIAL DATA ACCESS");layout.addView(cloud);
         cloud.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff246987));
         cloud.setOnClickListener(v->startActivity(new Intent(this,FordConnectStatusActivity.class)));
@@ -84,7 +87,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.6-ONE-TAP-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.7-FORD-WIDGET-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -140,7 +143,7 @@ public final class SdlTestActivity extends Activity {
     private JSONObject export(){
         JSONObject j=new JSONObject();
         try{
-            j.put("format","Vehicle Explorer one tap audit v0.9.6");
+            j.put("format","Vehicle Explorer one tap audit and Ford widget bridge v0.9.7");
             android.content.SharedPreferences all=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
             JSONObject audit=new JSONObject();
             for(String key:new String[]{"status","stage","sync_transport","sync_hmi_at_start",
@@ -169,7 +172,7 @@ public final class SdlTestActivity extends Activity {
             }
             audit.put("ford_fields",auditFields);
             j.put("one_tap_audit",audit);
-            j.put("audit_format_version","0.9.6");
+            j.put("audit_format_version","0.9.7");
             j.put("audit_results_authoritative",true);
             android.content.SharedPreferences setup=getSharedPreferences(
                 FordConnectStatusActivity.CLOUD_PREFS,MODE_PRIVATE);
@@ -188,8 +191,22 @@ public final class SdlTestActivity extends Activity {
                 FordConnectStatusActivity.MANUAL_PREFS,MODE_PRIVATE);
             j.put("manual_snapshot_present",manual.getLong("saved_ms",0)>0);
             j.put("manual_snapshot_source","USER_ENTERED_ONLY_NOT_FORD_API");
+            android.content.SharedPreferences widgetData=getSharedPreferences(
+                FordWidgetBridgeActivity.PREF,MODE_PRIVATE);
+            j.put("ford_widget_bridge",new JSONObject()
+                .put("status",widgetData.getString("status","NOT_CONNECTED"))
+                .put("provider",widgetData.getString("provider",""))
+                .put("provider_count",widgetData.getInt("provider_count",0))
+                .put("bound_widget_present",widgetData.getInt("widget_id",-1)>0)
+                .put("fuel_pct",widgetData.getInt("fuel_pct",-1))
+                .put("range_miles",widgetData.getInt("range_mi",-1))
+                .put("captured_ms",widgetData.getLong("captured_ms",0))
+                .put("readable_text_nodes",widgetData.getInt("readable_text_nodes",0))
+                .put("source",widgetData.getString("source","NONE"))
+                .put("not_live_ford_api",true));
+
             j.put("legacy_format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.6");
+            j.put("version","0.9.7");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
