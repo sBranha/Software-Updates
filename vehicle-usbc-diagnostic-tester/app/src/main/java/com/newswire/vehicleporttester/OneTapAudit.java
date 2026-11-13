@@ -61,10 +61,12 @@ final class OneTapAudit {
             .putLong("started_ms",System.currentTimeMillis())
             .putLong("ended_ms",0)
             .putString("sync_transport","SMARTDEVICELINK_BLUETOOTH_REGISTERED")
-            .putString("fordconnect_cloud",FordConnectStatusActivity.cloudState())
+            .putString("fordconnect_cloud",FordConnectClient.status(context))
             .putString("fordconnect_phone_internet",FordConnectStatusActivity.internetState(context))
-            .putString("fordconnect_oauth","NOT_AUTHORIZED")
-            .putString("fordconnect_api_response","NOT_TESTED_NO_APPROVED_CLIENT")
+            .putString("fordconnect_oauth",FordConnectClient.authorized(context)?"TOKEN_STORED":"NOT_AUTHORIZED")
+            .putString("fordconnect_api_response",FordConnectClient.lastRead(context)>0?"PREVIOUS_AUTHENTICATED_CLOUD_RESPONSE":"NO_VERIFIED_CLOUD_RESPONSE")
+            .putLong("fordconnect_cloud_read_ms",FordConnectClient.lastRead(context))
+            .putString("ford_app_dependency","NONE_DIRECT_API_NO_WIDGET")
             .putString("ford_app_data","NOT_ACCESSIBLE_VIA_ANOTHER_APP_SESSION")
             .putString("obd2_live","NOT_TESTED_NO_OBD2_ADAPTER_CONNECTED")
             .putString("usb","NOT_TOUCHED_ANDROID_AUTO_UNINTERRUPTED");
@@ -97,7 +99,7 @@ final class OneTapAudit {
     }
     private void display(String line2,String line3,String line4){
         try{
-            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.6");
+            sdl.getScreenManager().setTextField1("VEHICLE EXPLORER 0.9.8");
             sdl.getScreenManager().setTextField2(line2);
             sdl.getScreenManager().setTextField3(line3);
             sdl.getScreenManager().setTextField4(line4);
