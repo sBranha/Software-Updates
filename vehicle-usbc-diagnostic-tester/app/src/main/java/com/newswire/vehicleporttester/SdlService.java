@@ -70,11 +70,13 @@ public final class SdlService extends Service {
         HMILevel level = event.getHmiLevel();
         String name = level == null ? "UNKNOWN" : level.toString();
         android.content.SharedPreferences prefs = getSharedPreferences("sdl_discovery_v091", MODE_PRIVATE);
+        boolean transitionedToFull = level == HMILevel.HMI_FULL &&
+                !"FULL".equals(prefs.getString("hmi_level", "NOT_RECEIVED"));
         prefs.edit().putString("hmi_level", name)
                 .putBoolean("hmi_ever_full", level == HMILevel.HMI_FULL || prefs.getBoolean("hmi_ever_full", false))
                 .apply();
         record(this, "HMI_" + name, "Actual Ford head-unit HMI level changed: " + name);
-        if (level == HMILevel.HMI_FULL && (oneTapAudit==null || !oneTapAudit.isRunning())) showFirstScreen();
+        if (transitionedToFull && (oneTapAudit==null || !oneTapAudit.isRunning())) showFirstScreen();
     }
     @Override public void onCreate() {
         super.onCreate();
@@ -153,7 +155,7 @@ public final class SdlService extends Service {
     }
     // An AppLink foreground template is not an Android Auto custom view.
     // All screens below are native SYNC 3 text fields and touch/voice menus.
-    private static final String VERSION = "0.9.6";
+    private static final String VERSION = "0.9.7";
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final java.util.concurrent.atomic.AtomicBoolean diagnosticBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final String[] DATA_LABELS = {
@@ -183,6 +185,7 @@ public final class SdlService extends Service {
             java.util.List<MenuCell> menu = new java.util.ArrayList<>();
             menu.add(cell("TEST EVERYTHING - ONE TAP", this::beginFullAudit));
             menu.add(cell("Last full test results", this::showFullAuditResult));
+            menu.add(cell("FORD WIDGET FUEL + RANGE", this::showWidgetSnapshot));
             menu.add(cell("FordConnect cloud status", this::showFordCloudStatus));
             menu.add(cell("Ford app snapshot (manual)", this::showFordManualSnapshot));
             menu.add(cell("Vehicle overview", this::showOverview));
@@ -235,6 +238,28 @@ public final class SdlService extends Service {
     private void showFullAuditResult() {
         if(oneTapAudit==null) oneTapAudit=new OneTapAudit(this,manager);
         oneTapAudit.showLast();
+    }
+    private void showWidgetSnapshot() {
+        android.content.SharedPreferences w=getSharedPreferences(
+                FordWidgetBridgeActivity.PREF,MODE_PRIVATE);
+        long at=w.getLong("captured_ms",0);
+        if(at<=0){
+            showLines("Ford widget not read yet",
+                "On phone: Ford Widget Bridge",
+                "Connect and read owner widget");
+            record(this,"FORD_WIDGET_NOT_READ",
+                "No saved Ford widget data. Ford private API not used.");
+            return;
+        }
+        int f=w.getInt("fuel_pct",-1), r=w.getInt("range_mi",-1);
+        String fuel=f>=0?"Fuel: "+f+"%":"Fuel: not readable";
+        String range=r>=0?"Range: "+r+" miles":"Range: not readable";
+        long ageMinutes=Math.max(0,(System.currentTimeMillis()-at)/60000);
+        showLines("FORD WIDGET saved snapshot",
+            fuel+"  /  "+range,
+            "Captured "+ageMinutes+" min ago; NOT LIVE");
+        record(this,"FORD_WIDGET_SNAPSHOT_VIEWED",
+            "User-authorized widget snapshot; not live Ford API; age minutes="+ageMinutes);
     }
     private void showFordCloudStatus() {
         android.content.SharedPreferences p=getSharedPreferences(
