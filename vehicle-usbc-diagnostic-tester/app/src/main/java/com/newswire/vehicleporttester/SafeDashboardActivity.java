@@ -139,7 +139,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         gap(body,5);
         body.addView(text("Ford Vehicle Discovery",27,TEXT,true));
         gap(body,3);
-        body.addView(text("v0.9.6   •   FORD AUTH + AUDIT FIX",12,GREEN,true));
+        body.addView(text("v0.9.7   •   FORD WIDGET BRIDGE",12,GREEN,true));
         gap(body,16);
 
         LinearLayout note=vertical();
@@ -150,6 +150,12 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         note.addView(text("This version NEVER opens or reads Android Auto's USB accessory. The Ford touchscreen should remain responsive.",12,TEXT,false));
         body.addView(note);
         gap(body,16);
+        Button widget=button("FORD WIDGET BRIDGE • FUEL & RANGE",0xff146f96);
+        body.addView(widget,new LinearLayout.LayoutParams(-1,dp(78)));
+        widget.setOnClickListener(v->startActivity(new Intent(this,FordWidgetBridgeActivity.class)));
+        gap(body,6);
+        body.addView(text("NEW: Try Android's owner-approved Ford widget connection. If readable, show fuel and range snapshot on the Ford screen. No Ford developer login needed.",12,GREEN,false));
+        gap(body,13);
         Button oneTap=button("TEST EVERYTHING - FORD ONE TAP",0xff0f795c);
         body.addView(oneTap,new LinearLayout.LayoutParams(-1,dp(78)));
         oneTap.setOnClickListener(v->{
@@ -370,7 +376,7 @@ public final class SafeDashboardActivity extends Activity implements LocationLis
         try{
             JSONObject j=new JSONObject();
             j.put("report_format",fullAudit?"Vehicle Capability Explorer complete audit v1":"Vehicle Capability Explorer safe dashboard scan v3");
-            j.put("app_version","0.9.6");
+            j.put("app_version","0.9.7");
             j.put("phone_motion_lab",motionLab==null?JSONObject.NULL:motionLab.snapshot());
             j.put("software_versions",vehicleVersionPanel==null?JSONObject.NULL:vehicleVersionPanel.snapshot());
             j.put("explorer_vehicle_research",explorerResearchPanel==null?JSONObject.NULL:explorerResearchPanel.snapshot());
