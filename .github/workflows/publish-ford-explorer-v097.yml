@@ -36,7 +36,7 @@ jobs:
           set -e
           APK="vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.newswire.vehicleporttester.experiment.sync3' versionCode='32' versionName='0.9.7'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.newswire.vehicleporttester.experiment.sync3' versionCode='33' versionName='0.9.7'"
           mkdir -p release-assets
           cp "$APK" release-assets/Ford-Explorer-v0.9.7.apk
           cd release-assets && sha256sum Ford-Explorer-v0.9.7.apk > SHA256SUMS.txt
