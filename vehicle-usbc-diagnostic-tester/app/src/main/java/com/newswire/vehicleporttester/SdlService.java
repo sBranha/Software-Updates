@@ -70,11 +70,13 @@ public final class SdlService extends Service {
         HMILevel level = event.getHmiLevel();
         String name = level == null ? "UNKNOWN" : level.toString();
         android.content.SharedPreferences prefs = getSharedPreferences("sdl_discovery_v091", MODE_PRIVATE);
+        boolean transitionedToFull = level == HMILevel.HMI_FULL
+                && !"FULL".equals(prefs.getString("hmi_level","NOT_RECEIVED"));
         prefs.edit().putString("hmi_level", name)
                 .putBoolean("hmi_ever_full", level == HMILevel.HMI_FULL || prefs.getBoolean("hmi_ever_full", false))
                 .apply();
         record(this, "HMI_" + name, "Actual Ford head-unit HMI level changed: " + name);
-        if (level == HMILevel.HMI_FULL && (oneTapAudit==null || !oneTapAudit.isRunning())) showFirstScreen();
+        if (transitionedToFull && (oneTapAudit==null || !oneTapAudit.isRunning())) showFirstScreen();
     }
     @Override public void onCreate() {
         super.onCreate();
@@ -120,6 +122,7 @@ public final class SdlService extends Service {
                             "SDL manager reported startup. Check the HMI level before claiming the app is visible.");
                     showFirstScreen();
                     if(pendingFullAudit) mainHandler.post(SdlService.this::beginFullAudit);
+                    mainHandler.postDelayed(SdlService.this::maybeUpdateFordCloud,5000);
                 }
                 @Override public void onDestroy() {
                     record(SdlService.this, "DISCONNECTED", "AppLink manager disconnected.");
@@ -153,7 +156,7 @@ public final class SdlService extends Service {
     }
     // An AppLink foreground template is not an Android Auto custom view.
     // All screens below are native SYNC 3 text fields and touch/voice menus.
-    private static final String VERSION = "0.9.6";
+    private static final String VERSION = "0.9.8";
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final java.util.concurrent.atomic.AtomicBoolean diagnosticBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final String[] DATA_LABELS = {
@@ -183,8 +186,8 @@ public final class SdlService extends Service {
             java.util.List<MenuCell> menu = new java.util.ArrayList<>();
             menu.add(cell("TEST EVERYTHING - ONE TAP", this::beginFullAudit));
             menu.add(cell("Last full test results", this::showFullAuditResult));
-            menu.add(cell("FordConnect cloud status", this::showFordCloudStatus));
-            menu.add(cell("Ford app snapshot (manual)", this::showFordManualSnapshot));
+            menu.add(cell("FORD CLOUD - FUEL & RANGE", this::showFordCloudStatus));
+            menu.add(cell("REFRESH FORD CLOUD DATA", this::refreshFordCloudData));
             menu.add(cell("Vehicle overview", this::showOverview));
             menu.add(cell("Engine RPM", () -> readOne(0)));
             menu.add(cell("Vehicle speed", () -> readOne(1)));
@@ -236,43 +239,52 @@ public final class SdlService extends Service {
         if(oneTapAudit==null) oneTapAudit=new OneTapAudit(this,manager);
         oneTapAudit.showLast();
     }
-    private void showFordCloudStatus() {
-        android.content.SharedPreferences p=getSharedPreferences(
-                FordConnectStatusActivity.CLOUD_PREFS,MODE_PRIVATE);
-        int count=0;
-        for(String key:new String[]{"developer_account_user_reported",
-            "access_requested_user_reported","approval_user_reported",
-            "docs_received_user_reported"})
-            if(p.getBoolean(key,false))count++;
-        String internet=FordConnectStatusActivity.internetState(this);
-        showLines("Ford developer setup "+count+"/4",
-            internet.equals("PHONE_INTERNET_VALIDATED")?
-                "Phone online; OAuth NOT authorized":"Phone offline; OAuth NOT authorized",
-            "No Ford API data. Setup on phone");
-        record(this,"FORDCONNECT_STATUS_VIEWED",
-            "Ford developer checklist "+count+"/4 user-reported; no authorized Ford API session");
+    private final Runnable cloudLoop=new Runnable(){
+        @Override public void run(){
+            maybeUpdateFordCloud();
+            if(manager!=null)mainHandler.postDelayed(this,900000);
+        }
+    };
+    private void maybeUpdateFordCloud(){
+        if(FordConnectClient.authorized(this))
+            FordConnectClient.refreshAsync(this,false, result->
+                record(this,"FORD_CLOUD_BACKGROUND",result));
+        mainHandler.removeCallbacks(cloudLoop);
+        if(manager!=null)mainHandler.postDelayed(cloudLoop,900000);
     }
-    private void showFordManualSnapshot() {
-        android.content.SharedPreferences p=getSharedPreferences(
-                FordConnectStatusActivity.MANUAL_PREFS,MODE_PRIVATE);
-        long at=p.getLong("saved_ms",0);
-        if(at<=0) {
-            showLines("No Ford app snapshot saved",
-                "On phone: FordConnect section",
-                "Optional manual values, never live");
+    private void refreshFordCloudData(){
+        if(!FordConnectClient.authorized(this)){
+            showLines("FordConnect not authorized",
+                "On phone: FORDCONNECT STANDALONE",
+                "Login with Ford before refresh");
             return;
         }
-        String f=p.getString("fuel",""),o=p.getString("oil",""),
-               miles=p.getString("miles",""),t=p.getString("tires","");
-        String a=(f.isEmpty()?"":"Fuel "+f+"%")+" "+(o.isEmpty()?"":"Oil "+o+"%");
-        String b=(miles.isEmpty()?"":"Odo "+miles+"mi")+" "+(t.isEmpty()?"":"Tire "+t+"psi");
-        if(a.trim().isEmpty())a="No fuel/oil values entered";
-        if(b.trim().isEmpty())b="No odometer/tire values entered";
-        long ageHours=Math.max(0,(System.currentTimeMillis()-at)/3600000);
-        showLines("MANUAL Ford app: "+a.trim(),b.trim(),
-            "USER-ENTERED, "+ageHours+"h old; NOT LIVE");
-        record(this,"FORD_MANUAL_SNAPSHOT_VIEWED",
-            "Displayed only user-entered data, age hours="+ageHours);
+        showLines("Requesting Ford cloud data",
+            "Read-only FordConnect Query API",
+            "Waiting for an actual Ford response");
+        FordConnectClient.refreshAsync(this,true,result->{
+            String status=FordConnectClient.status(this);
+            record(this,"FORD_CLOUD_REFRESH_RESULT",status);
+            showFordCloudStatus();
+        });
+    }
+    private void showFordCloudStatus() {
+        android.content.SharedPreferences p=getSharedPreferences(FordConnectClient.PREF,MODE_PRIVATE);
+        long read=p.getLong("read_ms",0);
+        if(read<=0){
+            showLines("Standalone FordConnect: "+(FordConnectClient.authorized(this)?"AUTHORIZED":"NOT AUTHORIZED"),
+                "Sign in on phone to Ford API",
+                "No Ford widget or OBD needed");
+            record(this,"FORD_CLOUD_STATUS_VIEWED","No confirmed FordConnect vehicle data");
+            return;
+        }
+        String fuel=p.contains("fuel_pct")?p.getInt("fuel_pct",-1)+"%":"unavailable";
+        String range=p.contains("range_mi")?p.getInt("range_mi",-1)+"mi":"unavailable";
+        long age=Math.max(0,(System.currentTimeMillis()-read)/60000);
+        showLines("FordConnect REAL cloud snapshot",
+            "Fuel "+fuel+" / Range "+range,
+            "Age "+age+"min - cloud, not live ECU");
+        record(this,"FORD_CLOUD_VIEWED","Owner-authorized FordConnect data; age="+age+"min; no Ford app");
     }
     private void showOverview() {
         android.content.SharedPreferences p = vehiclePrefs();
