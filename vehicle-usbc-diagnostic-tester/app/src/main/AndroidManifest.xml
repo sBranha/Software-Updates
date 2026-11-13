@@ -3,6 +3,7 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-permission android:name="android.permission.BIND_APPWIDGET" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -16,15 +17,17 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <queries>
         <package android:name="com.google.android.projection.gearhead" />
+        <package android:name="com.ford.fordpass" />
         <intent><action android:name="com.smartdevicelink.router.service" /></intent>
         <intent><action android:name="sdl.router.startservice" /></intent>
     </queries>
     <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Ford Vehicle Explorer 0.9.6" android:allowBackup="false"
+        android:label="Ford Vehicle Explorer 0.9.7" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <!-- Only safe launcher is available in this version. Legacy USB takeover
              services and activities are deliberately NOT registered. -->
+        <activity android:name=".FordWidgetBridgeActivity" android:exported="false" />
         <activity android:name=".FordConnectStatusActivity" android:exported="false" />
         <activity android:name=".SdlTestActivity" android:exported="false" />
         <service android:name=".SdlService" android:exported="true" android:enabled="true" android:foregroundServiceType="connectedDevice" />
