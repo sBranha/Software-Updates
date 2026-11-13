@@ -157,6 +157,14 @@ public final class SdlTestActivity extends Activity {
                 audit.put(key,all.getInt(key,0));
             audit.put("started_ms",all.getLong("started_ms",0));
             audit.put("ended_ms",all.getLong("ended_ms",0));
+            audit.put("ford_widget_bridge_status",
+                all.getString("ford_widget_bridge_status","NOT_TESTED"));
+            audit.put("ford_widget_bridge_source",
+                all.getString("ford_widget_bridge_source","NONE"));
+            audit.put("ford_widget_bridge_captured_ms",
+                all.getLong("ford_widget_bridge_captured_ms",0));
+            audit.put("ford_widget_fuel_pct",all.getInt("ford_widget_fuel_pct",-1));
+            audit.put("ford_widget_range_mi",all.getInt("ford_widget_range_mi",-1));
             audit.put("fordconnect_setup_steps_user_reported",
                 all.getInt("fordconnect_setup_steps_user_reported",0));
             audit.put("fordconnect_access_verification",
