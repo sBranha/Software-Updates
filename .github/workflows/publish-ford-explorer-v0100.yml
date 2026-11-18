@@ -1,0 +1,47 @@
+name: Publish Vehicle Explorer v0.10.0 direct APK download
+on:
+  push:
+    branches:
+      - vehicle-capability-explorer-v0.10.0-diagnostic-test
+    paths:
+      - '.github/workflows/publish-ford-explorer-v0100.yml'
+      - 'vehicle-usbc-diagnostic-tester/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-direct-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Install Android SDK if needed
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          if [ -n "$SDKMANAGER" ]; then "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"; fi
+      - name: Restore launcher JPEG
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("vehicle-usbc-diagnostic-tester/app/src/main/res/drawable/vehicle_explorer_icon.jpg"); b=p.read_bytes(); assert len(b)==2528; p.write_bytes(b[:155]+bytes([118,118,118])+b[155:])'
+      - name: Compile debug signed APK
+        run: gradle -p vehicle-usbc-diagnostic-tester --no-daemon assembleDebug
+      - name: Verify and stage direct APK
+        run: |
+          set -e
+          APK="vehicle-usbc-diagnostic-tester/app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.newswire.vehicleporttester.experiment.sync3' versionCode='35' versionName='0.10.0'"
+          mkdir -p release-assets
+          cp "$APK" release-assets/Ford-Explorer-v0.10.0.apk
+          cd release-assets && sha256sum Ford-Explorer-v0.10.0.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ford-Explorer-v0.10.0
+          path: release-assets/
+          if-no-files-found: error
