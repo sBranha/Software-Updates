@@ -198,7 +198,7 @@ public final class SdlService extends Service {
             menu.add(cell("Body information", () -> readOne(6)));
             menu.add(cell("Read permissions", this::showPermissionSummary));
             menu.add(cell("OBD-II saved results", this::showObdSnapshot));
-            menu.add(cell("Diagnostics / codes", this::showDiagnosticsHelp));
+            menu.add(cell("Read engine trouble codes", this::readEngineCodes));
             menu.add(cell("Connection status", this::showConnectionStatus));
             manager.getScreenManager().setMenu(menu);
             record(this, "FORD_MENU_READY", "SYNC 3 menu created. Ford policy may still restrict individual readings.");
@@ -299,6 +299,65 @@ public final class SdlService extends Service {
         showLines("AppLink connected", "Ford HMI: " + hmi, "USB not opened by Vehicle Explorer");
         record(this, "CONNECTION_STATUS_VIEWED", "SYNC 3 HMI level " + hmi);
     }
+    // One read-only request to the candidate powertrain module. A denial or absent
+    // payload must never be reported as a clean diagnostic scan.
+    private int dtcRun;
+    private boolean dtcPending;
+    private void saveCodes(String status, java.util.List<?> codes) {
+        android.content.SharedPreferences.Editor edit = vehiclePrefs().edit()
+                .putString("dtc_status", status).putLong("dtc_time", System.currentTimeMillis())
+                .remove("dtc_codes");
+        if (codes != null) edit.putString("dtc_codes", new JSONArray(codes).toString());
+        edit.apply();
+        record(this, "GET_DTCS", status);
+    }
+
+    private void finishCodes(int run, String status, java.util.List<?> codes) {
+        if (!dtcPending || run != dtcRun) return;
+        dtcPending = false;
+        diagnosticBusy.set(false);
+        saveCodes(status, codes);
+        showLines("Engine trouble codes", status,
+                codes == null ? "See report on phone" : "Codes returned: " + codes.size());
+    }
+
+    private void readEngineCodes() {
+        if (manager == null || !sdlReady) {
+            saveCodes("NO_SESSION", null);
+            return;
+        }
+        if ((oneTapAudit != null && oneTapAudit.isRunning()) || !diagnosticBusy.compareAndSet(false, true)) {
+            showLines("Another request is running", "Wait for its result", "Then retry");
+            return;
+        }
+        final int run = ++dtcRun;
+        dtcPending = true;
+        saveCodes("WAITING", null);
+        showLines("Engine trouble codes", "Waiting for SYNC", "Read only");
+        mainHandler.postDelayed(() -> finishCodes(run, "TIMEOUT", null), 15000);
+        try {
+            com.smartdevicelink.proxy.rpc.GetDTCs request = new com.smartdevicelink.proxy.rpc.GetDTCs();
+            request.setEcuName(0x7E0);
+            request.setOnRPCResponseListener(new OnRPCResponseListener() {
+                @Override public void onResponse(int id, RPCResponse reply) {
+                    mainHandler.post(() -> {
+                        if (reply == null || !Boolean.TRUE.equals(reply.getSuccess())) {
+                            finishCodes(run, reply == null ? "NO_RESPONSE" : String.valueOf(reply.getResultCode()), null);
+                            return;
+                        }
+                        java.util.List<?> codes = reply instanceof com.smartdevicelink.proxy.rpc.GetDTCsResponse
+                                ? ((com.smartdevicelink.proxy.rpc.GetDTCsResponse) reply).getDtc() : null;
+                        finishCodes(run, codes == null ? "NO_CODE_LIST" :
+                                codes.isEmpty() ? "ZERO_CODES_RETURNED" : "CODES_RETURNED", codes);
+                    });
+                }
+            });
+            manager.sendRPC(request);
+        } catch (RuntimeException e) {
+            finishCodes(run, "SEND_ERROR", null);
+        }
+    }
+
     private void showDiagnosticsHelp() {
         showLines("Powertrain fault codes", "Requires Bluetooth OBD-II adapter",
                 "Open Ford OBD-II test on phone");
@@ -442,6 +501,7 @@ public final class SdlService extends Service {
         }
     }
     @Override public void onDestroy(){
+        if (dtcPending) { dtcPending = false; saveCodes("INTERRUPTED", null); }
         mainHandler.removeCallbacksAndMessages(null);
         if(oneTapAudit!=null && oneTapAudit.isRunning()){
             getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE).edit()
