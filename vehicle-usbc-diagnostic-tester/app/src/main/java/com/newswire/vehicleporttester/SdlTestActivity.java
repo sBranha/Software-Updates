@@ -46,7 +46,7 @@ public final class SdlTestActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(18),dp(18),dp(18),dp(30));scroll.addView(layout);setContentView(scroll);
         layout.addView(label("FORD SYNC 3 • VEHICLE DATA",23,0xff39dded));
-        layout.addView(label("Vehicle Explorer v0.9.8 • SmartDeviceLink",13,0xff66e2ad));
+        layout.addView(label("Vehicle Explorer v0.10.0 • SmartDeviceLink",13,0xff66e2ad));
         layout.addView(label("ONE TAP checks SYNC 3, seven Ford fields, cloud authorization and OBD-II availability. Real progress, one final report and no simulated values.",15,Color.WHITE));
         layout.addView(label("1. PARK the Explorer. Pair your phone with SYNC 3 Bluetooth.\n2. Allow Bluetooth permissions in this app.\n3. Tap START FORD APPLINK below.\n4. In the vehicle, leave Android Auto if necessary and open SYNC 3 > Apps > Find Mobile Apps.\n5. Open Vehicle Explorer and select TEST EVERYTHING. You may also run it from this phone.",14,0xffbed1e0));
         layout.addView(label("Android Auto projection and SYNC 3 AppLink are different interfaces. Ford may reject each data request even while the app is visible. Each field is tested independently, and DISALLOWED means OEM permission denied.",13,0xffffc674));
@@ -54,6 +54,7 @@ public final class SdlTestActivity extends Activity {
         testEverything.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff0b785e));
         auditInfo=label("Audit not run yet.",15,0xff56e2c3);layout.addView(auditInfo);
         testEverything.setOnClickListener(v->checkAndStart(true));
+        layout.addView(label("Trouble codes: on the parked Explorer open the Vehicle Explorer menu and select Read engine trouble codes. The saved report includes the module response.",15,Color.WHITE));
         Button cloud=button("DIRECT FORDCONNECT - NO FORD APP");layout.addView(cloud);
         cloud.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff246987));
         cloud.setOnClickListener(v->startActivity(new Intent(this,FordConnectActivity.class)));
@@ -84,7 +85,7 @@ public final class SdlTestActivity extends Activity {
         save.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");
-            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.9.8-FORDCONNECT-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
+            i.putExtra(Intent.EXTRA_TITLE,"Vehicle-Explorer-v0.10.0-FORDCONNECT-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".json");
             startActivityForResult(i,SAVE);
         });
         refresh();
@@ -125,6 +126,8 @@ public final class SdlTestActivity extends Activity {
             a.getString("stage","Tap TEST EVERYTHING to start")+
             "\nFord cloud: "+a.getString("fordconnect_cloud","NOT_TESTED")+
             "\nOBD-II: "+a.getString("obd2_live","NOT_TESTED"));
+        android.content.SharedPreferences diag=getSharedPreferences("ford_data_v093", MODE_PRIVATE);
+        auditInfo.append("\nEngine trouble codes: "+diag.getString("dtc_status","NOT_TESTED")+" "+diag.getString("dtc_codes",""));
         String x=prefs().getString("state","NOT_STARTED");
         state.setText("ACTUAL SDL STATUS: "+x);
         detail.setText("HMI level: "+prefs().getString("hmi_level","NOT_RECEIVED")+
@@ -140,7 +143,7 @@ public final class SdlTestActivity extends Activity {
     private JSONObject export(){
         JSONObject j=new JSONObject();
         try{
-            j.put("format","Vehicle Explorer standalone FordConnect and SYNC audit v0.9.8");
+            j.put("format","Vehicle Explorer standalone FordConnect and SYNC audit v0.10.0");
             android.content.SharedPreferences all=getSharedPreferences(OneTapAudit.PREF,MODE_PRIVATE);
             JSONObject audit=new JSONObject();
             for(String key:new String[]{"status","stage","sync_transport","sync_hmi_at_start",
@@ -170,7 +173,7 @@ public final class SdlTestActivity extends Activity {
             }
             audit.put("ford_fields",auditFields);
             j.put("one_tap_audit",audit);
-            j.put("audit_format_version","0.9.8");
+            j.put("audit_format_version","0.10.0");
             j.put("audit_results_authoritative",true);
             android.content.SharedPreferences cloud=getSharedPreferences(
                 FordConnectClient.PREF,MODE_PRIVATE);
@@ -193,7 +196,7 @@ public final class SdlTestActivity extends Activity {
             }
             j.put("fordconnect_direct",cloudStatus);
             j.put("legacy_format","Vehicle Explorer SYNC 3 AppLink connection report v1");
-            j.put("version","0.9.8");
+            j.put("version","0.10.0");
             j.put("saved_at_epoch_ms",System.currentTimeMillis());
             j.put("app_link_state",prefs().getString("state","NOT_STARTED"));
             j.put("app_link_detail",prefs().getString("detail",""));
@@ -203,6 +206,11 @@ public final class SdlTestActivity extends Activity {
             j.put("ford_screen_observed_at_ms",prefs().getLong("ford_screen_observed_at_ms",0));
             j.put("event_history",new org.json.JSONArray(prefs().getString("event_history","[]")));
             android.content.SharedPreferences fp=getSharedPreferences("ford_data_v093",MODE_PRIVATE);
+            JSONObject dtc=new JSONObject().put("source","SYNC3_GetDTCs").put("requested_ecu",2016)
+                    .put("status",fp.getString("dtc_status","NOT_TESTED"))
+                    .put("timestamp_ms",fp.getLong("dtc_time",0));
+            if(fp.contains("dtc_codes")) dtc.put("codes", new org.json.JSONArray(fp.getString("dtc_codes","[]")));
+            j.put("powertrain_trouble_codes",dtc);
             JSONObject fields=new JSONObject();
             boolean useFullAudit = "COMPLETE".equals(all.getString("status","NOT_RUN"))
                     && all.getInt("complete",0)==7;
