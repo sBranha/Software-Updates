@@ -67,7 +67,7 @@ public final class FootballBoardActivity extends Activity {
         return b;
     }
     private void launch(String url){
-        try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
+        try{ArticleReaderActivity.open(this,url);}
         catch(Exception error){android.widget.Toast.makeText(this,"No browser available",1).show();}
     }
     @Override public void onCreate(Bundle savedInstanceState){
