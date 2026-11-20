@@ -79,7 +79,7 @@ public final class StationFinderActivity extends Activity {
         area=text(city.isEmpty()?"⌖ Save ZIP or allow location":"⌖ "+city+", "+region,12,MUTED,false);
         add(hero,area,8);add(root,hero,0);
         add(root,button("← BACK TO NEWSWIRE",this::finish),12);
-        add(root,text("VERIFIED REGIONAL STATIONS",12,CYAN,true),17);
+        add(root,text("NEARBY TV STATIONS",12,CYAN,true),17);
         stations=new LinearLayout(this);stations.setOrientation(1);add(root,stations,10);
         add(root,text("Local broadcasters stream only when their own schedules or rights allow it. "+
             "Some links lead to a station website instead of continuous live video.",12,MUTED,false),10);
@@ -89,7 +89,7 @@ public final class StationFinderActivity extends Activity {
             "https://www.google.com/search?q="+Uri.encode(city+" "+region+" local TV news stations live"))),13);
         add(root,button("↗ FCC BROADCAST STATION DIRECTORY",()->open("https://publicfiles.fcc.gov/")),9);
         add(root,text("NewsWire shows curated broadcasters only where we have sourced regional links. "+
-            "Other locally reported publishers may include newspapers; they are labeled separately.",11,MUTED,false),15);
+            "Additional station locations come from Wikidata (CC0), checked October 30, 2026. Proximity is not guaranteed reception or local news coverage. The directory is not exhaustive.",11,MUTED,false),15);
         refreshKnown();
     }
     private void station(String label,String affiliation,String source,String url){
@@ -113,12 +113,30 @@ public final class StationFinderActivity extends Activity {
                     "https://www.waff.com/livestream/");
                 station("FOX 54 / WZDX","FOX","Huntsville region · official news website",
                     "https://www.rocketcitynow.com/");
+                loadNearbyDirectory();
                 return;
             }
         }
-        add(stations,text("Verified station shortcuts for this TV market are not yet installed. "+
+        loadNearbyDirectory();
+        add(stations,text("Regional shortcuts for this TV market are not yet installed. "+
             "Use the location-based directory and publisher links below; no unsupported station is invented.",
             13,AMBER,false),6);
+    }
+    private int stationGeneration=0;
+    private void loadNearbyDirectory(){
+        final double a=lat,b=lon; final int request=++stationGeneration;
+        new Thread(()->{
+            try{
+                final java.util.List<LocalStationDirectory.Station> found=LocalStationDirectory.nearby(this,a,b);
+                runOnUiThread(()->{
+                    if(closed||request!=stationGeneration)return;
+                    if(found.isEmpty()){add(stations,text("No additional nearby stations in the offline directory.",12,MUTED,false),8);return;}
+                    add(stations,text("NEARBY DIRECTORY · WIKIDATA",12,CYAN,true),14);
+                    for(LocalStationDirectory.Station item:found)
+                        station(item.name,"TV station",Math.round(item.distance)+" miles from selected area · directory website",item.url);
+                });
+            }catch(Exception error){runOnUiThread(()->{if(!closed&&request==stationGeneration)add(stations,text("Station directory unavailable; regional shortcuts remain above.",12,AMBER,false),8);});}
+        },"newswire-local-tv-directory").start();
     }
     private void loadPublisherSources(){
         if(city.isEmpty()||region.isEmpty()){
@@ -183,7 +201,7 @@ public final class StationFinderActivity extends Activity {
     }
     private void open(String url){
         if(!url.startsWith("https://"))return;
-        try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
+        try{ArticleReaderActivity.open(this,url);}
         catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",0).show();}
     }
     @Override protected void onDestroy(){closed=true;generation++;super.onDestroy();}
