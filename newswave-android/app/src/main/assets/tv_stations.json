@@ -1,0 +1,1176 @@
+{
+  "source": "Wikidata CC0",
+  "retrieved": "2026-10-30",
+  "note": "Coordinates may be studios or transmitters; proximity is not guaranteed reception or news-market coverage. Directory is not exhaustive.",
+  "stations": [
+    {
+      "name": "Alhurra",
+      "url": "https://www.alhurra.com/",
+      "longitude": -77.2099737,
+      "latitude": 38.7391141,
+      "wikidata": "Q287331"
+    },
+    {
+      "name": "American Broadcasting Company",
+      "url": "https://abc.com",
+      "longitude": -73.980833333,
+      "latitude": 40.773333333,
+      "wikidata": "Q169889"
+    },
+    {
+      "name": "Georgia Public Broadcasting",
+      "url": "https://www.gpb.org",
+      "longitude": -84.3956,
+      "latitude": 33.7861,
+      "wikidata": "Q3103769"
+    },
+    {
+      "name": "KAAH-TV",
+      "url": "https://www.tbn.org/",
+      "longitude": -158.09666667,
+      "latitude": 21.39277778,
+      "wikidata": "Q15229956"
+    },
+    {
+      "name": "KADN-TV",
+      "url": "https://www.acadiananewsfirst.com/",
+      "longitude": -92.21480556,
+      "latitude": 30.36247222,
+      "wikidata": "Q6324824"
+    },
+    {
+      "name": "KAKW-DT",
+      "url": "https://www.univision.com/austin/kakw",
+      "longitude": -97.99036111,
+      "latitude": 30.72619444,
+      "wikidata": "Q6325029"
+    },
+    {
+      "name": "KAMC",
+      "url": "https://www.everythinglubbock.com",
+      "longitude": -101.84878,
+      "latitude": 33.51592,
+      "wikidata": "Q3191322"
+    },
+    {
+      "name": "KASA-TV",
+      "url": "https://www.telemundonuevomexico.com/",
+      "longitude": -106.45047222,
+      "latitude": 35.21394444,
+      "wikidata": "Q6325297"
+    },
+    {
+      "name": "KBCA",
+      "url": "https://www.yourcwtv.com/partners/alexandria/",
+      "longitude": -92.62444444,
+      "latitude": 30.90472222,
+      "wikidata": "Q6325665"
+    },
+    {
+      "name": "KBDI-TV",
+      "url": "https://www.pbs12.org",
+      "longitude": -105.497583333,
+      "latitude": 39.681972222,
+      "wikidata": "Q577786"
+    },
+    {
+      "name": "KBLN-TV",
+      "url": "https://www.betterlifetv.tv/",
+      "longitude": -123.27583333,
+      "latitude": 42.38194444,
+      "wikidata": "Q6325978"
+    },
+    {
+      "name": "KBSD-DT",
+      "url": "https://www.kwch.com/",
+      "longitude": -100.34416667,
+      "latitude": 37.64111111,
+      "wikidata": "Q6326209"
+    },
+    {
+      "name": "KCAL-TV",
+      "url": "https://www.cbsnews.com/losangeles/",
+      "longitude": -118.0675,
+      "latitude": 34.227222222,
+      "wikidata": "Q6326535"
+    },
+    {
+      "name": "KCAU-TV",
+      "url": "https://www.siouxlandproud.com",
+      "longitude": -96.232531,
+      "latitude": 42.586711,
+      "wikidata": "Q1420737"
+    },
+    {
+      "name": "KCBS-TV",
+      "url": "https://www.cbsnews.com/losangeles/",
+      "longitude": -118.0725,
+      "latitude": 34.231944444,
+      "wikidata": "Q3191342"
+    },
+    {
+      "name": "KCET",
+      "url": "https://www.pbssocal.org/",
+      "longitude": -118.06222222,
+      "latitude": 34.22388889,
+      "wikidata": "Q4355153"
+    },
+    {
+      "name": "KCNC-TV",
+      "url": "https://denver.cbslocal.com/",
+      "longitude": -105.232111111,
+      "latitude": 39.730722222,
+      "wikidata": "Q6327023"
+    },
+    {
+      "name": "KCTV",
+      "url": "https://www.kctv5.com/",
+      "longitude": -94.582642,
+      "latitude": 39.070689,
+      "wikidata": "Q365150"
+    },
+    {
+      "name": "KCWQ-LD",
+      "url": "https://kesq.com",
+      "longitude": -116.43486111,
+      "latitude": 33.86666667,
+      "wikidata": "Q6327515"
+    },
+    {
+      "name": "KDNL-TV",
+      "url": "https://kdnltv.com/",
+      "longitude": -90.329222222,
+      "latitude": 38.580555555,
+      "wikidata": "Q3191350"
+    },
+    {
+      "name": "KFAA-TV",
+      "url": "https://www.wfaa.com/",
+      "longitude": -96.96830556,
+      "latitude": 32.58875,
+      "wikidata": "Q14710675"
+    },
+    {
+      "name": "KFMB-TV",
+      "url": "https://www.cbs8.com/",
+      "longitude": -117.249139,
+      "latitude": 32.838,
+      "wikidata": "Q6329080"
+    },
+    {
+      "name": "KFRE-TV",
+      "url": "https://kmph.com/the-cw/cw-kfre-59",
+      "longitude": -119.43361111,
+      "latitude": 37.07694444,
+      "wikidata": "Q6329211"
+    },
+    {
+      "name": "KFTH-DT",
+      "url": "https://univision.com/local/houston-kxln",
+      "longitude": -95.51061111,
+      "latitude": 29.571,
+      "wikidata": "Q6329286"
+    },
+    {
+      "name": "KFVS-TV",
+      "url": "https://www.kfvs12.com/",
+      "longitude": -89.503888888,
+      "latitude": 37.429,
+      "wikidata": "Q14704356"
+    },
+    {
+      "name": "KGKC-LD",
+      "url": "https://telemundokc.com",
+      "longitude": -94.513805555,
+      "latitude": 39.022194444,
+      "wikidata": "Q108882480"
+    },
+    {
+      "name": "KGO-TV",
+      "url": "https://abc7news.com",
+      "longitude": -122.39995,
+      "latitude": 37.799813888,
+      "wikidata": "Q645086"
+    },
+    {
+      "name": "KHQA-TV",
+      "url": "https://khqa.com",
+      "longitude": -91.33058333,
+      "latitude": 39.97372222,
+      "wikidata": "Q6330305"
+    },
+    {
+      "name": "KIAH",
+      "url": "https://cw39.com/",
+      "longitude": -95.49916667,
+      "latitude": 29.56833333,
+      "wikidata": "Q6330510"
+    },
+    {
+      "name": "KIDY",
+      "url": "https://www.myfoxzone.com/",
+      "longitude": -100.51702778,
+      "latitude": 31.58930556,
+      "wikidata": "Q6330620"
+    },
+    {
+      "name": "KION-TV",
+      "url": "https://www.kion546.com/",
+      "longitude": -121.62055556,
+      "latitude": 36.53472222,
+      "wikidata": "Q6330983"
+    },
+    {
+      "name": "KIRO-TV",
+      "url": "https://www.kiro7.com",
+      "longitude": -122.356611111,
+      "latitude": 47.633,
+      "wikidata": "Q3191413"
+    },
+    {
+      "name": "KJJC-TV",
+      "url": "https://www.kjjc.org/",
+      "longitude": -111.35922222,
+      "latitude": 47.60686111,
+      "wikidata": "Q6338674"
+    },
+    {
+      "name": "KKTV",
+      "url": "https://www.kktv.com/",
+      "longitude": -104.861944444,
+      "latitude": 38.745,
+      "wikidata": "Q6332143"
+    },
+    {
+      "name": "KLAS-TV",
+      "url": "https://www.8newsnow.com",
+      "longitude": -115.0425,
+      "latitude": 35.94555556,
+      "wikidata": "Q6332381"
+    },
+    {
+      "name": "KLVX",
+      "url": "https://www.vegaspbs.org/",
+      "longitude": -115.00666667,
+      "latitude": 36.0075,
+      "wikidata": "Q14705156"
+    },
+    {
+      "name": "KMID",
+      "url": "https://www.yourbasin.com/",
+      "longitude": -102.28666667,
+      "latitude": 32.08636111,
+      "wikidata": "Q10313552"
+    },
+    {
+      "name": "KMIR-TV",
+      "url": "https://nbcpalmsprings.com/",
+      "longitude": -116.43394444,
+      "latitude": 33.86675,
+      "wikidata": "Q14682631"
+    },
+    {
+      "name": "KMOV",
+      "url": "https://www.firstalert4.com/",
+      "longitude": -90.299444444,
+      "latitude": 38.529722222,
+      "wikidata": "Q3191457"
+    },
+    {
+      "name": "KMPH-TV",
+      "url": "https://kmph.com/",
+      "longitude": -118.87922222,
+      "latitude": 36.66719444,
+      "wikidata": "Q14682639"
+    },
+    {
+      "name": "KMSP-TV",
+      "url": "https://www.fox9.com/",
+      "longitude": -93.1245,
+      "latitude": 45.05819444,
+      "wikidata": "Q6333888"
+    },
+    {
+      "name": "KMVT",
+      "url": "https://www.kmvt.com/",
+      "longitude": -114.415277777,
+      "latitude": 42.729694444,
+      "wikidata": "Q3191460"
+    },
+    {
+      "name": "KOLR",
+      "url": "https://www.ozarksfirst.com/",
+      "longitude": -92.94888889,
+      "latitude": 37.21888889,
+      "wikidata": "Q6335004"
+    },
+    {
+      "name": "KPBS",
+      "url": "https://www.kpbs.org/",
+      "longitude": -116.9341667,
+      "latitude": 32.69805556,
+      "wikidata": "Q6335464"
+    },
+    {
+      "name": "KPHO-TV",
+      "url": "https://www.azfamily.com/",
+      "longitude": -112.061972222,
+      "latitude": 33.33425,
+      "wikidata": "Q3191480"
+    },
+    {
+      "name": "KPJK",
+      "url": "https://norcalpublicmedia.org/",
+      "longitude": -122.45288889,
+      "latitude": 37.75522222,
+      "wikidata": "Q6327347"
+    },
+    {
+      "name": "KPOB-TV",
+      "url": "https://www.kfvs12.com/",
+      "longitude": -90.451666666,
+      "latitude": 36.801111111,
+      "wikidata": "Q141678290"
+    },
+    {
+      "name": "KPRC-TV",
+      "url": "https://www.click2houston.com/",
+      "longitude": -95.499166666,
+      "latitude": 29.568333333,
+      "wikidata": "Q6335827"
+    },
+    {
+      "name": "KREN-TV",
+      "url": "https://noticiasya.com/reno/",
+      "longitude": -119.88305556,
+      "latitude": 39.31305556,
+      "wikidata": "Q6336644"
+    },
+    {
+      "name": "KRQE",
+      "url": "https://www.krqe.com/",
+      "longitude": -106.449805555,
+      "latitude": 35.211194444,
+      "wikidata": "Q6337023"
+    },
+    {
+      "name": "KSL-TV",
+      "url": "https://www.ksl.com/",
+      "longitude": -112.201938888,
+      "latitude": 40.659169444,
+      "wikidata": "Q6337865"
+    },
+    {
+      "name": "KTAJ-TV",
+      "url": "https://www.tbn.org",
+      "longitude": -94.51361111,
+      "latitude": 39.02222222,
+      "wikidata": "Q6338461"
+    },
+    {
+      "name": "KTBW-TV",
+      "url": "https://www.tbn.org/",
+      "longitude": -122.79444444,
+      "latitude": 47.54722222,
+      "wikidata": "Q6338525"
+    },
+    {
+      "name": "KTLA",
+      "url": "https://ktla.com/",
+      "longitude": -118.316913812,
+      "latitude": 34.097437704,
+      "wikidata": "Q1140873"
+    },
+    {
+      "name": "KTTV",
+      "url": "https://www.foxla.com",
+      "longitude": -118.064166666,
+      "latitude": 34.224722222,
+      "wikidata": "Q3077406"
+    },
+    {
+      "name": "KTVB",
+      "url": "https://www.ktvb.com/espanol",
+      "longitude": -116.09888889,
+      "latitude": 43.75444444,
+      "wikidata": "Q6339250"
+    },
+    {
+      "name": "KTVH-DT",
+      "url": "https://ktvh.com",
+      "longitude": -111.71027778,
+      "latitude": 46.82638889,
+      "wikidata": "Q6339264"
+    },
+    {
+      "name": "KTVN",
+      "url": "https://www.ktvn.com/",
+      "longitude": -119.88388889,
+      "latitude": 39.31583333,
+      "wikidata": "Q6339270"
+    },
+    {
+      "name": "KTVO",
+      "url": "https://ktvo.com/",
+      "longitude": -92.44138889,
+      "latitude": 40.52972222,
+      "wikidata": "Q6339274"
+    },
+    {
+      "name": "KTVU",
+      "url": "https://www.ktvu.com/",
+      "longitude": -122.452888888,
+      "latitude": 37.755222222,
+      "wikidata": "Q766453"
+    },
+    {
+      "name": "KUSI-TV",
+      "url": "https://www.kusi.com/",
+      "longitude": -116.93444444,
+      "latitude": 32.69722222,
+      "wikidata": "Q6339743"
+    },
+    {
+      "name": "KVEO-TV",
+      "url": "https://valleycentral.com",
+      "longitude": -97.83875,
+      "latitude": 26.100777777,
+      "wikidata": "Q6339981"
+    },
+    {
+      "name": "KWDK",
+      "url": "https://www.daystar.com/",
+      "longitude": -121.96944444,
+      "latitude": 47.50452778,
+      "wikidata": "Q6340486"
+    },
+    {
+      "name": "KWHY",
+      "url": "https://universalchurchusa.org/es/canaldelafe-4/",
+      "longitude": -118.061388888,
+      "latitude": 34.213333333,
+      "wikidata": "Q6325756"
+    },
+    {
+      "name": "KWKD-LD",
+      "url": "https://www.daystar.com/",
+      "longitude": -97.31944444,
+      "latitude": 37.69805556,
+      "wikidata": "Q14689700"
+    },
+    {
+      "name": "KXAS-TV",
+      "url": "https://www.nbcdfw.com/",
+      "longitude": -96.968333333,
+      "latitude": 32.585277777,
+      "wikidata": "Q3191571"
+    },
+    {
+      "name": "NBC News",
+      "url": "https://www.nbcnews.com/",
+      "longitude": -118.360565,
+      "latitude": 34.1429637,
+      "wikidata": "Q2877626"
+    },
+    {
+      "name": "W13DQ-D",
+      "url": "https://www.hsn.com/",
+      "longitude": -84.339444444,
+      "latitude": 33.807222222,
+      "wikidata": "Q7946215"
+    },
+    {
+      "name": "WAAY-TV",
+      "url": "https://www.waff.com/",
+      "longitude": -86.53302778,
+      "latitude": 34.73686111,
+      "wikidata": "Q3301789"
+    },
+    {
+      "name": "WABC-TV",
+      "url": "https://abc7ny.com",
+      "longitude": -74.013138888,
+      "latitude": 40.713,
+      "wikidata": "Q2699014"
+    },
+    {
+      "name": "WABM",
+      "url": "https://wabm68.com/",
+      "longitude": -86.80705556,
+      "latitude": 33.48458333,
+      "wikidata": "Q7946292"
+    },
+    {
+      "name": "WAGT-CD",
+      "url": "https://www.wrdw.com/nbc26",
+      "longitude": -81.833472222,
+      "latitude": 33.40575,
+      "wikidata": "Q7947082"
+    },
+    {
+      "name": "WALB",
+      "url": "https://www.walb.com/",
+      "longitude": -83.861944444,
+      "latitude": 31.331111111,
+      "wikidata": "Q3564600"
+    },
+    {
+      "name": "WANE-TV",
+      "url": "https://www.wane.com/",
+      "longitude": -85.18022222,
+      "latitude": 41.09397222,
+      "wikidata": "Q7946611"
+    },
+    {
+      "name": "WANF",
+      "url": "https://www.atlantanewsfirst.com/",
+      "longitude": -84.339444444,
+      "latitude": 33.807222222,
+      "wikidata": "Q7949690"
+    },
+    {
+      "name": "WBBJ-DT3",
+      "url": "https://www.wbbjtv.com/",
+      "longitude": -88.6925,
+      "latitude": 35.63777778,
+      "wikidata": "Q7946996"
+    },
+    {
+      "name": "WBGU-TV",
+      "url": "https://www.wbgu.org/",
+      "longitude": -83.90666667,
+      "latitude": 41.13666667,
+      "wikidata": "Q7947153"
+    },
+    {
+      "name": "WBNX-TV",
+      "url": "https://fox8.com/cw55/",
+      "longitude": -81.695277777,
+      "latitude": 41.383888888,
+      "wikidata": "Q7947330"
+    },
+    {
+      "name": "WBPX-TV",
+      "url": "https://iontelevision.com/",
+      "longitude": -71.493138888,
+      "latitude": 42.384083333,
+      "wikidata": "Q7947371"
+    },
+    {
+      "name": "WCAU",
+      "url": "https://www.nbcphiladelphia.com/",
+      "longitude": -75.17416667,
+      "latitude": 39.95527778,
+      "wikidata": "Q3564630"
+    },
+    {
+      "name": "WCCT-TV",
+      "url": "https://yourcwtv.com/partners/hartford",
+      "longitude": -72.831944444,
+      "latitude": 41.703611111,
+      "wikidata": "Q7947677"
+    },
+    {
+      "name": "WCIX",
+      "url": "https://www.wcia.com/",
+      "longitude": -89.51472222,
+      "latitude": 39.79083333,
+      "wikidata": "Q7947825"
+    },
+    {
+      "name": "WCTE",
+      "url": "https://www.wcte.org/",
+      "longitude": -85.34361111,
+      "latitude": 36.17388889,
+      "wikidata": "Q7948118"
+    },
+    {
+      "name": "WCTV",
+      "url": "https://www.wctv.tv/",
+      "longitude": -83.940344,
+      "latitude": 30.670608,
+      "wikidata": "Q2536991"
+    },
+    {
+      "name": "WDAZ-TV",
+      "url": "https://www.wdaz.com/",
+      "longitude": -97.99305556,
+      "latitude": 48.13833333,
+      "wikidata": "Q7948280"
+    },
+    {
+      "name": "WDCN-LP",
+      "url": "https://latinoalaire.com/",
+      "longitude": -77.134886,
+      "latitude": 38.895623,
+      "wikidata": "Q7948315"
+    },
+    {
+      "name": "WEEK-TV",
+      "url": "https://www.25newsnow.com/",
+      "longitude": -89.54791667,
+      "latitude": 40.62952778,
+      "wikidata": "Q7948819"
+    },
+    {
+      "name": "WESH",
+      "url": "https://www.wesh.com/",
+      "longitude": -81.05972222,
+      "latitude": 28.60972222,
+      "wikidata": "Q7949047"
+    },
+    {
+      "name": "WETA-TV",
+      "url": "https://weta.org/",
+      "longitude": -77.0794,
+      "latitude": 38.9504,
+      "wikidata": "Q7949064"
+    },
+    {
+      "name": "WEWS-TV",
+      "url": "https://news5cleveland.com/",
+      "longitude": -81.667161111,
+      "latitude": 41.502697222,
+      "wikidata": "Q2311186"
+    },
+    {
+      "name": "WFDC-DT",
+      "url": "https://www.noticiasya.com/washington-dc/",
+      "longitude": -77.08166667,
+      "latitude": 38.94,
+      "wikidata": "Q7949233"
+    },
+    {
+      "name": "WFLA-TV",
+      "url": "https://www.wfla.com/",
+      "longitude": -82.2625,
+      "latitude": 27.842222222,
+      "wikidata": "Q7949348"
+    },
+    {
+      "name": "WFMJ-TV",
+      "url": "https://www.wfmj.com/",
+      "longitude": -80.640277777,
+      "latitude": 41.08,
+      "wikidata": "Q3564673"
+    },
+    {
+      "name": "WFOR-TV",
+      "url": "https://www.cbsnews.com/miami/",
+      "longitude": -80.221944444,
+      "latitude": 25.968888888,
+      "wikidata": "Q7949446"
+    },
+    {
+      "name": "WFSB",
+      "url": "https://www.wfsb.com/",
+      "longitude": -72.805188888,
+      "latitude": 41.775030555,
+      "wikidata": "Q7949496"
+    },
+    {
+      "name": "WFTT-TV",
+      "url": "https://www.scientology.tv/tampa-bay/",
+      "longitude": -82.26388889,
+      "latitude": 27.84722222,
+      "wikidata": "Q7949545"
+    },
+    {
+      "name": "WFXU",
+      "url": "https://www.wctv.tv/station/wctv2",
+      "longitude": -83.013055555,
+      "latitude": 30.550222222,
+      "wikidata": "Q7949609"
+    },
+    {
+      "name": "WGBH-TV",
+      "url": "https://www.wgbh.org/",
+      "longitude": -71.147,
+      "latitude": 42.357,
+      "wikidata": "Q3564675"
+    },
+    {
+      "name": "WGTE-TV",
+      "url": "https://www.wgte.org/",
+      "longitude": -83.43194444,
+      "latitude": 41.65722222,
+      "wikidata": "Q7949958"
+    },
+    {
+      "name": "WGTV",
+      "url": "https://www.gpb.org/",
+      "longitude": -84.144277777,
+      "latitude": 33.805194444,
+      "wikidata": "Q7949976"
+    },
+    {
+      "name": "WHIO-TV",
+      "url": "https://www.whio.com/",
+      "longitude": -84.24805556,
+      "latitude": 39.73388889,
+      "wikidata": "Q7950204"
+    },
+    {
+      "name": "WHIZ-TV",
+      "url": "https://www.whiznews.com/",
+      "longitude": -81.98527778,
+      "latitude": 39.92833333,
+      "wikidata": "Q7950216"
+    },
+    {
+      "name": "WHUT-TV",
+      "url": "https://www.whut.org/",
+      "longitude": -77.07972222,
+      "latitude": 38.95027778,
+      "wikidata": "Q15995586"
+    },
+    {
+      "name": "WIFR-LD",
+      "url": "https://www.rockfordnewsfirst.com/",
+      "longitude": -89.170830555,
+      "latitude": 42.296669444,
+      "wikidata": "Q7950652"
+    },
+    {
+      "name": "WIS News 10",
+      "url": "https://www.wistv.com/",
+      "longitude": -81.028871,
+      "latitude": 34.002272,
+      "wikidata": "Q3564696"
+    },
+    {
+      "name": "WISH-TV",
+      "url": "https://wishtv.com/",
+      "longitude": -86.157755312,
+      "latitude": 39.793032984,
+      "wikidata": "Q7950923"
+    },
+    {
+      "name": "WJAR",
+      "url": "https://coastalabc.com/",
+      "longitude": -71.286861111,
+      "latitude": 41.865388888,
+      "wikidata": "Q14715947"
+    },
+    {
+      "name": "WJAX-TV",
+      "url": "https://www.actionnewsjax.com/",
+      "longitude": -81.570055555,
+      "latitude": 30.281083333,
+      "wikidata": "Q7956143"
+    },
+    {
+      "name": "WJRT-TV",
+      "url": "https://www.abc12.com",
+      "longitude": -83.665466666,
+      "latitude": 43.009244444,
+      "wikidata": "Q3564703"
+    },
+    {
+      "name": "WJTV",
+      "url": "https://www.wjtv.com/",
+      "longitude": -90.40416667,
+      "latitude": 32.24055556,
+      "wikidata": "Q7951416"
+    },
+    {
+      "name": "WKMG-TV",
+      "url": "https://www.clickorlando.com",
+      "longitude": -81.059611111,
+      "latitude": 28.610138888,
+      "wikidata": "Q7951776"
+    },
+    {
+      "name": "WKPT-TV",
+      "url": "https://www.wkpttv.com/",
+      "longitude": -82.1375,
+      "latitude": 36.43166667,
+      "wikidata": "Q7951852"
+    },
+    {
+      "name": "WKYC",
+      "url": "https://www.wkyc.com/",
+      "longitude": -81.689030555,
+      "latitude": 41.386030555,
+      "wikidata": "Q408095"
+    },
+    {
+      "name": "WLEX-TV",
+      "url": "https://www.lex18.com/",
+      "longitude": -84.39416667,
+      "latitude": 38.03416667,
+      "wikidata": "Q7952194"
+    },
+    {
+      "name": "WLS-TV",
+      "url": "https://abc7chicago.com/",
+      "longitude": -87.635555555,
+      "latitude": 41.878888888,
+      "wikidata": "Q3050972"
+    },
+    {
+      "name": "WLWT",
+      "url": "https://www.wlwt.com/",
+      "longitude": -84.52163889,
+      "latitude": 39.12425,
+      "wikidata": "Q7952573"
+    },
+    {
+      "name": "WMAQ-TV",
+      "url": "https://www.nbcchicago.com/",
+      "longitude": -87.636111111,
+      "latitude": 41.878888888,
+      "wikidata": "Q3564723"
+    },
+    {
+      "name": "WMAR-TV",
+      "url": "https://www.wmar2news.com/",
+      "longitude": -76.650555555,
+      "latitude": 39.334722222,
+      "wikidata": "Q7952640"
+    },
+    {
+      "name": "WMBD-TV",
+      "url": "https://www.centralillinoisproud.com/",
+      "longitude": -89.5387,
+      "latitude": 40.635,
+      "wikidata": "Q7952659"
+    },
+    {
+      "name": "WMDT",
+      "url": "https://www.wmdt.com/",
+      "longitude": -75.735472222,
+      "latitude": 38.501833333,
+      "wikidata": "Q7952728"
+    },
+    {
+      "name": "WMGT-TV",
+      "url": "https://www.41nbc.com/",
+      "longitude": -83.563138888,
+      "latitude": 32.753111111,
+      "wikidata": "Q7952817"
+    },
+    {
+      "name": "WMPV-TV",
+      "url": "https://www.tbn.org/",
+      "longitude": -87.60733333,
+      "latitude": 30.61138889,
+      "wikidata": "Q7953014"
+    },
+    {
+      "name": "WMTV",
+      "url": "https://www.wmtv15news.com/",
+      "longitude": -89.48694444,
+      "latitude": 43.05069444,
+      "wikidata": "Q7953106"
+    },
+    {
+      "name": "WNBC",
+      "url": "https://www.nbcnewyork.com",
+      "longitude": -73.986111111,
+      "latitude": 40.748333333,
+      "wikidata": "Q2731065"
+    },
+    {
+      "name": "WNCN",
+      "url": "https://www.cbs17.com/",
+      "longitude": -78.527544,
+      "latitude": 35.674744,
+      "wikidata": "Q2537497"
+    },
+    {
+      "name": "WNED-TV",
+      "url": "https://www.btpm.org/",
+      "longitude": -78.920583333,
+      "latitude": 43.030055555,
+      "wikidata": "Q3564750"
+    },
+    {
+      "name": "WNEM-TV",
+      "url": "https://www.wnem.com",
+      "longitude": -83.84322222,
+      "latitude": 43.47072222,
+      "wikidata": "Q7953342"
+    },
+    {
+      "name": "WNEU",
+      "url": "https://www.telemundonuevainglaterra.com/",
+      "longitude": -71.5885,
+      "latitude": 42.984,
+      "wikidata": "Q7953346"
+    },
+    {
+      "name": "WOAI-TV",
+      "url": "https://news4sanantonio.com/",
+      "longitude": -98.26527778,
+      "latitude": 29.26972222,
+      "wikidata": "Q7953728"
+    },
+    {
+      "name": "WOFL",
+      "url": "https://www.fox35orlando.com/",
+      "longitude": -81.08638889,
+      "latitude": 28.60361111,
+      "wikidata": "Q7953804"
+    },
+    {
+      "name": "WOIO",
+      "url": "https://www.cleveland19.com/",
+      "longitude": -81.719722222,
+      "latitude": 41.379166666,
+      "wikidata": "Q7953839"
+    },
+    {
+      "name": "WOTF-TV",
+      "url": "https://www.wapa.tv/",
+      "longitude": -81.08277778,
+      "latitude": 28.58666667,
+      "wikidata": "Q7953995"
+    },
+    {
+      "name": "WPEC",
+      "url": "https://cbs12.com/",
+      "longitude": -80.208027777,
+      "latitude": 26.588833333,
+      "wikidata": "Q7954227"
+    },
+    {
+      "name": "WPIX",
+      "url": "https://pix11.com/",
+      "longitude": -73.985833333,
+      "latitude": 40.748333333,
+      "wikidata": "Q3068955"
+    },
+    {
+      "name": "WPLG",
+      "url": "https://www.local10.com",
+      "longitude": -80.211938888,
+      "latitude": 25.966669444,
+      "wikidata": "Q7954357"
+    },
+    {
+      "name": "WPTO",
+      "url": "https://thinktv.org/",
+      "longitude": -84.521666666,
+      "latitude": 39.124166666,
+      "wikidata": "Q107272985"
+    },
+    {
+      "name": "WPTV-TV",
+      "url": "https://www.wptv.com/",
+      "longitude": -80.21222222,
+      "latitude": 26.58888889,
+      "wikidata": "Q7954513"
+    },
+    {
+      "name": "WPVI-TV",
+      "url": "https://6abc.com",
+      "longitude": -75.213888888,
+      "latitude": 40.006111111,
+      "wikidata": "Q3564777"
+    },
+    {
+      "name": "WPXH-TV",
+      "url": "https://www.iontelevision.com/",
+      "longitude": -86.47036111,
+      "latitude": 33.89077778,
+      "wikidata": "Q7954556"
+    },
+    {
+      "name": "WPXW-TV",
+      "url": "https://www.iontelevision.com/",
+      "longitude": -77.32972222,
+      "latitude": 38.78777778,
+      "wikidata": "Q7954575"
+    },
+    {
+      "name": "WRBW",
+      "url": "https://fox35orlando.com/fox35plus",
+      "longitude": -81.05972222,
+      "latitude": 28.60972222,
+      "wikidata": "Q7954906"
+    },
+    {
+      "name": "WREX",
+      "url": "https://www.rockfordnewsfirst.com/",
+      "longitude": -89.239444444,
+      "latitude": 42.296666666,
+      "wikidata": "Q7954984"
+    },
+    {
+      "name": "WRTV",
+      "url": "https://www.wrtv.com/",
+      "longitude": -86.157755311,
+      "latitude": 39.79303298,
+      "wikidata": "Q7955332"
+    },
+    {
+      "name": "WSB-TV",
+      "url": "https://www.wsbtv.com/",
+      "longitude": -84.361666666,
+      "latitude": 33.764166666,
+      "wikidata": "Q7955494"
+    },
+    {
+      "name": "WSET-TV",
+      "url": "https://wset.com/",
+      "longitude": -79.63475,
+      "latitude": 37.31516667,
+      "wikidata": "Q7955583"
+    },
+    {
+      "name": "WSIL-TV",
+      "url": "https://www.kfvs12.com/",
+      "longitude": -88.872222222,
+      "latitude": 37.613888888,
+      "wikidata": "Q7955673"
+    },
+    {
+      "name": "WSJV",
+      "url": "https://www.wsjvelkhart.com/",
+      "longitude": -86.19388889,
+      "latitude": 41.61611111,
+      "wikidata": "Q7955704"
+    },
+    {
+      "name": "WSST-TV",
+      "url": "https://www.southgatv.com/",
+      "longitude": -83.805,
+      "latitude": 31.89305556,
+      "wikidata": "Q7955921"
+    },
+    {
+      "name": "WSTM-TV",
+      "url": "https://cnycentral.com",
+      "longitude": -76.11830556,
+      "latitude": 42.94525,
+      "wikidata": "Q7955942"
+    },
+    {
+      "name": "WSVN",
+      "url": "https://wsvn.com/",
+      "longitude": -80.212111111,
+      "latitude": 25.963861111,
+      "wikidata": "Q7956000"
+    },
+    {
+      "name": "WTAP-TV",
+      "url": "https://wtap.com/",
+      "longitude": -81.56555556,
+      "latitude": 39.34972222,
+      "wikidata": "Q7956060"
+    },
+    {
+      "name": "WTBS-LD",
+      "url": "https://www.wtbs26.com/",
+      "longitude": -84.388611111,
+      "latitude": 33.759444444,
+      "wikidata": "Q7956096"
+    },
+    {
+      "name": "WTIU",
+      "url": "https://indianapublicmedia.org/tv/",
+      "longitude": -86.49525,
+      "latitude": 39.141944444,
+      "wikidata": "Q7956202"
+    },
+    {
+      "name": "WTOC-TV",
+      "url": "https://www.wtoc.com/",
+      "longitude": -81.35027778,
+      "latitude": 32.05388889,
+      "wikidata": "Q7956325"
+    },
+    {
+      "name": "WTSP",
+      "url": "https://www.wtsp.com",
+      "longitude": -82.260555555,
+      "latitude": 27.819666666,
+      "wikidata": "Q7956417"
+    },
+    {
+      "name": "WTTO",
+      "url": "https://www.wtto21.com/",
+      "longitude": -87.400833,
+      "latitude": 33.480908,
+      "wikidata": "Q2538008"
+    },
+    {
+      "name": "WTVJ",
+      "url": "https://www.nbcmiami.com/",
+      "longitude": -80.221944444,
+      "latitude": 25.968888888,
+      "wikidata": "Q4260070"
+    },
+    {
+      "name": "WUAB",
+      "url": "https://www.clevelands43.com/",
+      "longitude": -81.72,
+      "latitude": 41.379166666,
+      "wikidata": "Q3564814"
+    },
+    {
+      "name": "WVEN-TV",
+      "url": "https://noticiasya.com/orlando",
+      "longitude": -81.082638888,
+      "latitude": 28.586833333,
+      "wikidata": "Q7956801"
+    },
+    {
+      "name": "WVNY",
+      "url": "https://www.mychamplainvalley.com/",
+      "longitude": -72.815333333,
+      "latitude": 44.52575,
+      "wikidata": "Q782450"
+    },
+    {
+      "name": "WWAX-LD",
+      "url": "https://www.wfsb.com/wwax/",
+      "longitude": -72.805083333,
+      "latitude": 41.775,
+      "wikidata": "Q141601231"
+    },
+    {
+      "name": "WWOR-TV",
+      "url": "https://www.fox5ny.com/shows/fox-5-plus",
+      "longitude": -74.013138888,
+      "latitude": 40.713,
+      "wikidata": "Q3044253"
+    },
+    {
+      "name": "WXYZ-TV",
+      "url": "https://www.wxyz.com/",
+      "longitude": -83.246925,
+      "latitude": 42.471522222,
+      "wikidata": "Q3564870"
+    },
+    {
+      "name": "WYCN-LD",
+      "url": "https://www.telemundonuevainglaterra.com/noticias/local/rhode-island/",
+      "longitude": -71.153972222,
+      "latitude": 41.997055555,
+      "wikidata": "Q7956292"
+    },
+    {
+      "name": "WYES-TV",
+      "url": "https://www.wyes.org/",
+      "longitude": -89.949444444,
+      "latitude": 29.953888888,
+      "wikidata": "Q7958003"
+    },
+    {
+      "name": "WYTV",
+      "url": "https://www.wytv.com/",
+      "longitude": -80.645277777,
+      "latitude": 41.0565,
+      "wikidata": "Q7958184"
+    },
+    {
+      "name": "WZRA-CA",
+      "url": "https://www.wzratv.com/",
+      "longitude": -82.729277777,
+      "latitude": 28.259166666,
+      "wikidata": "Q7958378"
+    }
+  ]
+}
