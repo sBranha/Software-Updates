@@ -90,7 +90,13 @@ public final class NewsWireDrivingMapActivity extends Activity {
         });
         shell.addView(view,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(shell);
-        view.loadUrl("https://appassets.androidplatform.net/assets/drive_map.html");
+        android.content.SharedPreferences prefs=getSharedPreferences("newswire-location",MODE_PRIVATE);
+        double lat=Double.longBitsToDouble(prefs.getLong("lat",Double.doubleToLongBits(Double.NaN)));
+        double lon=Double.longBitsToDouble(prefs.getLong("lon",Double.doubleToLongBits(Double.NaN)));
+        String initial="https://appassets.androidplatform.net/assets/drive_map.html";
+        if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)
+            initial+="?lat="+lat+"&lon="+lon;
+        view.loadUrl(initial);
     }
 
     @Override protected void onResume(){
