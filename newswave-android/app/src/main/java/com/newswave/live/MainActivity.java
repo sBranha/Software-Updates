@@ -1093,13 +1093,13 @@ public class MainActivity extends Activity {
     if(nationalLoading)list.addView(text("Loading national headlines…",13,MUTED,false));
     else if(!nationalFeedError.isEmpty())
       list.addView(text(nationalFeedError,13,MUTED,false));
-    else if(nationalHeadlines.isEmpty())
-      list.addView(text("No headlines returned. National source links are below.",13,MUTED,false));
+    else if(LocalNewspapers.fresh(nationalHeadlines).isEmpty())
+      list.addView(text("No national news published in the last 24 hours. Source links are below.",13,MUTED,false));
     int count=0;
-    for(LocalNewspapers.Headline item:nationalHeadlines){
+    for(LocalNewspapers.Headline item:LocalNewspapers.fresh(nationalHeadlines)){
       if(!newsMatch(item.title,item.source))continue;
       card(localLink("national"+item.url.hashCode(),item.title,"National headline",
-          item.source+" • Opens attributed source",item.url));
+          item.source+" • "+LocalNewspapers.age(item),item.url));
       count++;
     }
     section(list,"NATIONAL NEWS CHANNELS");
@@ -1168,14 +1168,14 @@ public class MainActivity extends Activity {
     }else if(!newsFeedError.isEmpty()){
       TextView unavailable=text(newsFeedError,13,MUTED,false);
       pad(unavailable,8,10);list.addView(unavailable);
-    }else if(newsHeadlines.isEmpty()){
-      TextView empty=text("No recent headlines returned for this area. Try the full news search.",13,MUTED,false);
+    }else if(LocalNewspapers.fresh(newsHeadlines).isEmpty()){
+      TextView empty=text("No local news published in the last 24 hours.",13,MUTED,false);
       pad(empty,8,10);list.addView(empty);
     }else{
-      for(LocalNewspapers.Headline h:newsHeadlines){
+      for(LocalNewspapers.Headline h:LocalNewspapers.fresh(newsHeadlines)){
         if(!newsMatch(h.title,h.source))continue;
         card(localLink("story"+h.url.hashCode(),h.title,"Headline",
-            h.source+" • Opens source coverage",h.url));
+            h.source+" • "+LocalNewspapers.age(h),h.url));
         count++;
       }
     }
