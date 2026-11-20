@@ -140,7 +140,7 @@ public final class NewsWaveCarService extends CarAppService {
         private LocationListener locationListener;
         private final RadarRenderer renderer;
         private boolean warningsEnabled=true;
-        private String mapStyle="road";
+        private String mapStyle="satellite";
         private boolean perspective3d=true;
         private final android.os.Handler radarRefreshHandler=
             new android.os.Handler(Looper.getMainLooper());
@@ -157,7 +157,7 @@ public final class NewsWaveCarService extends CarAppService {
             String old=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE).getString("station","KHTX");
             chosen=find(old);
             mapStyle=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
-                .getString("map_style","road");
+                .getString("map_style","satellite");
             perspective3d=context.getSharedPreferences("newswave-car",Context.MODE_PRIVATE)
                 .getBoolean("perspective_3d",true);
             renderer.setMapStyle(mapStyle);
@@ -632,7 +632,7 @@ public final class NewsWaveCarService extends CarAppService {
         private int zoom=DRIVE_ZOOM; // Close, heading-up 3D driving follow view by default.
         private int lastDisplayedZoom=DRIVE_ZOOM;
         private double lastDisplayedLat=Double.NaN, lastDisplayedLon=Double.NaN;
-        private String mapStyle="road";
+        private String mapStyle="satellite";
         private boolean perspective3d=true;
         static String styleName(String style){
             if("road".equals(style))return "Street Map";
