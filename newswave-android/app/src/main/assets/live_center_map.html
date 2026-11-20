@@ -41,6 +41,7 @@
 const $=id=>document.getElementById(id);
 let map=null,base=null,alertLayer=null,positionMarker=null,warningCount=0;
 let lastPosition=null,followEnabled=true;
+let referenceLayers=[];
 let mapStyle='satellite';
 try{const remembered=localStorage.getItem('newswireLiveMapStyle');
     if(['satellite','terrain','road'].includes(remembered))mapStyle=remembered;}catch(e){}
@@ -55,6 +56,12 @@ function setMapStyle(style){
      (style==='terrain'?'World_Topo_Map':'World_Imagery')+'/MapServer/tile/{z}/{y}/{x}';
    base=L.tileLayer(url,{maxZoom:17,attribution:style==='road'?'© OpenStreetMap contributors':'© Esri & partners'}).addTo(map);
    base.bringToBack();
+   referenceLayers.forEach(layer=>map.removeLayer(layer));referenceLayers=[];
+   if(style==='satellite'){
+     if(!map.getPane('referenceLabels')){map.createPane('referenceLabels');map.getPane('referenceLabels').style.zIndex=350;map.getPane('referenceLabels').style.pointerEvents='none';}
+     for(const name of ['World_Transportation','World_Boundaries_and_Places'])
+       referenceLayers.push(L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/'+name+'/MapServer/tile/{z}/{y}/{x}',{pane:'referenceLabels',maxZoom:17,attribution:'Reference © Esri'}).addTo(map));
+   }
  }
  for(const [name,id] of [['satellite','satelliteType'],['terrain','terrainType'],['road','roadType']]){
    const b=$(id);if(b){b.classList.toggle('active',name===style);b.setAttribute('aria-pressed',String(name===style));}
