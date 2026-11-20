@@ -108,7 +108,15 @@ const mapLayers={
  terrain:{url:'https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',attribution:'Terrain © Esri & partners'},
  road:{url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attribution:'© OpenStreetMap contributors'}
 };
-function createBaseLayer(){const source=mapLayers[mapStyle];return L.tileLayer(source.url,{maxZoom:18,attribution:source.attribution})}
+function createBaseLayer(){
+ const source=mapLayers[mapStyle],base=L.tileLayer(source.url,{maxZoom:18,attribution:source.attribution});
+ if(mapStyle!=='satellite')return base;
+ const layers=[base];
+ for(const name of ['World_Transportation','World_Boundaries_and_Places'])layers.push(L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/'+name+'/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Reference © Esri'}));
+ const group=L.layerGroup(layers);
+ group.bringToBack=()=>{for(let i=layers.length-1;i>=0;i--)layers[i].bringToBack();return group;};
+ return group;
+}
 function applyMapStyle(style){
  if(!mapLayers[style])return;
  mapStyle=style;
