@@ -45,10 +45,16 @@ button:active{transform:scale(.97)}
 const $=id=>document.getElementById(id),Maths=window.NewsWireDriveMath;
 const MAP_DARK='https://tiles.openfreemap.org/styles/dark';
 const MAP_SAT={version:8,sources:{imagery:{type:'raster',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Tiles © Esri and contributors'}},layers:[{id:'satellite',type:'raster',source:'imagery'}]};
-const MAP_STYLE={dark:'Roads',satellite:'Satellite'};
+// Separate transparent reference tiles preserve roads and place names over imagery.
+MAP_SAT.sources.roads={type:'raster',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Reference © Esri'};
+MAP_SAT.sources.labels={type:'raster',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Reference © Esri'};
+MAP_SAT.layers.push({id:'roads',type:'raster',source:'roads'},{id:'labels',type:'raster',source:'labels'});
+const MAP_TERRAIN={version:8,sources:{terrain:{type:'raster',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:17,attribution:'Tiles © Esri and contributors'}},layers:[{id:'terrain',type:'raster',source:'terrain'}]};
+const MAP_STYLE={dark:'Roads',satellite:'Satellite',terrain:'Terrain'};
+function mapSource(){return style==='dark'?MAP_DARK:style==='terrain'?MAP_TERRAIN:MAP_SAT;}
 function saved(key,otherwise){try{return localStorage.getItem('nw-drive-'+key)||otherwise}catch(_){return otherwise}}
 function save(key,value){try{localStorage.setItem('nw-drive-'+key,String(value))}catch(_){}}
-let style=saved('style','dark');if(!MAP_STYLE[style])style='dark';
+let style=saved('style','satellite');if(!MAP_STYLE[style])style='satellite';
 let pitched=saved('perspective','true')!=='false',follow=saved('follow','true')!=='false';
 let gps=null,course=null,speed=0,initialized=false,marker=null,map=null,lastCenter=0;
 // Keep the map unobstructed while idle. A tap reveals controls for 15 seconds;
@@ -74,7 +80,7 @@ $('styleBtn').textContent=MAP_STYLE[style];$('followBtn').setAttribute('aria-pre
 function ready(){
  if(typeof maplibregl!=='object'){ $('fallback').style.display='block';return }
  try{
-  map=new maplibregl.Map({container:'map',style:style==='dark'?MAP_DARK:MAP_SAT,
+  map=new maplibregl.Map({container:'map',style:mapSource(),
    center:[-98.2,39.1],zoom:3.6,pitch:pitched?58:0,bearing:0,
    maxPitch:65,attributionControl:true,antialias:true});
   map.on('load',()=>{initialized=true;camera(true);});
@@ -116,15 +122,20 @@ $('pitchBtn').addEventListener('click',()=>{
  map?.easeTo({pitch:pitched?58:0,duration:450});
 });
 $('styleBtn').addEventListener('click',()=>{
- style=style==='dark'?'satellite':'dark';save('style',style);
+ style=style==='satellite'?'terrain':style==='terrain'?'dark':'satellite';save('style',style);
  $('styleBtn').textContent=MAP_STYLE[style];
- if(map){map.setStyle(style==='dark'?MAP_DARK:MAP_SAT);map.once('styledata',()=>camera(true))}
+ if(map){map.setStyle(mapSource());map.once('styledata',()=>camera(true))}
 });
 $('followBtn').addEventListener('click',()=>{
  follow=!follow;save('follow',follow);$('followBtn').setAttribute('aria-pressed',String(follow));
  if(follow)camera(true);
 });
 ready();
+const initial=new URLSearchParams(window.location.search);
+if(initial.has('lat')&&initial.has('lon')){
+ const lat=Number(initial.get('lat')),lon=Number(initial.get('lon'));
+ if(Maths.validFix(lat,lon)){gps={lat,lng:lon};$('status').textContent='Saved ZIP area · waiting for GPS';}
+}
 revealControls();
 })();
 </script></body></html>
