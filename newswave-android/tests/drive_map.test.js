@@ -22,7 +22,7 @@ const manifest=fs.readFileSync(root+'AndroidManifest.xml','utf8');
 const build=fs.readFileSync('newswave-android/app/build.gradle','utf8');
 for(const required of ["MAP_DARK","tiles.openfreemap.org/styles/dark","pitch:pitched?58:0","map.easeTo","updateNewsWireDrivePosition","pitchBtn","styleBtn","followBtn"])assert.ok(html.includes(required),required);
 for(const required of ["class NewsWireDrivingMapActivity","requestLocationUpdates(provider,1600L,3f","lastGoodCourse","https://appassets.androidplatform.net/assets/drive_map.html"])assert.ok(java.includes(required),required);
-for(const required of ['https://tile.openstreetmap.org/','newswire-road-tiles-v2','ROAD_CACHE_MS=7L*24*60*60*1000','© OpenStreetMap contributors','Matrix tilt=null','tilt.setPolyToPoly','canvas.concat(tilt)','perspective_3d','3D map perspective:','mapStyle="road"'])assert.ok(car.includes(required),required);
+for(const required of ['https://tile.openstreetmap.org/','newswire-road-tiles-v2','ROAD_CACHE_MS=7L*24*60*60*1000','© OpenStreetMap contributors','Matrix tilt=null','tilt.setPolyToPoly','canvas.concat(tilt)','perspective_3d','3D map perspective:','mapStyle="satellite"'])assert.ok(car.includes(required),required);
 assert.ok(!car.includes('basemaps.cartocdn.com'), 'No API-key-required CARTO road tiles');
 assert.ok(car.includes('World_Imagery')&&car.includes('World_Topo_Map'),'Keep working satellite and terrain maps');
 assert.ok(car.includes('setIcon(settingsIcon())'),'Options should be an icon-only gear');
@@ -79,6 +79,6 @@ assert.ok(radio.includes('SOFT_INPUT_STATE_ALWAYS_HIDDEN'),
   'Keyboard must not obscure station results when entering radio page');
 assert.ok(radio.includes('station.stream.equals(playing.stream)'),
   'Saved station stop button must match by stream address');
-assert.ok(build.includes("versionCode 49"));
-assert.ok(build.includes("versionName '0.7.14'"));
+assert.ok(build.includes("versionCode 50"));
+assert.ok(build.includes("versionName '0.7.15'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
