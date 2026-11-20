@@ -225,7 +225,7 @@ public final class PersonalizedNewsActivity extends Activity {
         },"newswire-personal").start();
     }
     private void open(String url){
-        try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
+        try{ArticleReaderActivity.open(this,url);}
         catch(Exception error){android.widget.Toast.makeText(this,"No browser available",0).show();}
     }
     @Override protected void onResume(){super.onResume();if(root!=null)draw();}
