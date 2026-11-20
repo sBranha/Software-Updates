@@ -165,25 +165,19 @@ public final class PersonalizedNewsActivity extends Activity {
         if(feed==null)return;
         feed.removeAllViews();
         if(loading){feed.addView(text("Finding stories from your chosen area…",13,MUTED,false));return;}
-        if(headlines.isEmpty()){
-            feed.addView(text("No stories loaded. Check your area and tap Refresh. " +
-                "Feeds may be unavailable temporarily.",13,MUTED,false));
+        if(LocalNewspapers.fresh(headlines).isEmpty()){
+            feed.addView(text("No local news published in the last 24 hours. " +
+                "Tap Refresh to check again.",13,MUTED,false));
             return;
         }
-        String pref=NewsPreferences.favoritePublisher(this).toLowerCase(Locale.US);
-        List<LocalNewspapers.Headline> sorted=new ArrayList<>(headlines);
-        if(!pref.isEmpty())Collections.sort(sorted,(a,b)->{
-            int aa=a.source.toLowerCase(Locale.US).contains(pref)?0:1;
-            int bb=b.source.toLowerCase(Locale.US).contains(pref)?0:1;
-            return aa-bb;
-        });
+        List<LocalNewspapers.Headline> sorted=LocalNewspapers.fresh(headlines);
         int shown=0;
         for(LocalNewspapers.Headline article:sorted){
             if(!NewsPreferences.allow(this,article.title))continue;
             LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
             tile.setPadding(dp(15),dp(15),dp(15),dp(15));
             tile.setBackground(card(0xff173149,0xff101e31,0xff315e7d));
-            tile.addView(text(article.source.toUpperCase(Locale.US),10,CYAN,true));
+            tile.addView(text(article.source.toUpperCase(Locale.US)+" • "+LocalNewspapers.age(article),10,CYAN,true));
             TextView headline=text(article.title+"  ›",15,WHITE,true);
             headline.setPadding(0,dp(8),0,dp(10));
             tile.addView(headline);
@@ -212,7 +206,7 @@ public final class PersonalizedNewsActivity extends Activity {
         }
         if(city.isEmpty()||state.isEmpty()){renderFeed();return;}
         String key=city+"|"+state;
-        if(!force && key.equals(lastKey) && !headlines.isEmpty()){renderFeed();return;}
+        if(!force && key.equals(lastKey) && !LocalNewspapers.fresh(headlines).isEmpty()){renderFeed();return;}
         if(loading)return;
         lastKey=key;loading=true;renderFeed();
         final int rev=++generation;
