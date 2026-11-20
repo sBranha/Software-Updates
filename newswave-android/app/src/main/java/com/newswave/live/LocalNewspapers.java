@@ -54,7 +54,7 @@ final class LocalNewspapers {
     return list;
   }
   static String localNewsSearch(String city,String region){
-    return "https://news.google.com/search?q="+encode("\""+city+"\" \""+region+"\" news")+"&hl=en-US&gl=US&ceid=US%3Aen";
+    return "https://news.google.com/search?q="+encode("\""+city+"\" \""+region+"\" news when:1d")+"&hl=en-US&gl=US&ceid=US%3Aen";
   }
   static String paperDiscovery(String city,String region){
     return "https://www.google.com/search?q="+encode("local newspapers "+city+" "+region+" official websites");
@@ -98,7 +98,7 @@ final class LocalNewspapers {
     return rssSearch(query,15);
   }
   private static List<Headline> rssSearch(String phrase,int maxItems) throws Exception {
-    String address="https://news.google.com/rss/search?q="+encode(phrase)
+    String address="https://news.google.com/rss/search?q="+encode(phrase+" when:1d")
         +"&hl=en-US&gl=US&ceid=US%3Aen";
     return rssFeed(address,maxItems);
   }
@@ -123,7 +123,7 @@ final class LocalNewspapers {
         boolean inItem=false;
         String title="",link="",source="",published="";
         int event=xml.getEventType();
-        while(event!=XmlPullParser.END_DOCUMENT && data.size()<maxItems){
+        while(event!=XmlPullParser.END_DOCUMENT){
           if(event==XmlPullParser.START_TAG){
             String name=xml.getName();
             if("item".equals(name)){inItem=true;title="";link="";source="";published="";}
@@ -136,14 +136,7 @@ final class LocalNewspapers {
             }
           }else if(event==XmlPullParser.END_TAG&&"item".equals(xml.getName())){
             if(!title.isEmpty()&&link.startsWith("https://")){
-              long timestamp=0;
-              try{
-                java.text.SimpleDateFormat parser=new java.text.SimpleDateFormat(
-                  "EEE, dd MMM yyyy HH:mm:ss Z",Locale.US);
-                parser.setLenient(false);
-                java.util.Date date=parser.parse(published);
-                if(date!=null)timestamp=date.getTime();
-              }catch(Exception ignored){}
+              long timestamp=NewsFreshness.parse(published);
               data.add(new Headline(title,source.isEmpty()?"News provider":source,link,timestamp));
             }
             inItem=false;
@@ -152,46 +145,19 @@ final class LocalNewspapers {
         }
       }
     }finally{if(connection!=null)connection.disconnect();}
-    return data;
+    List<Headline> recent=fresh(data);
+    return new ArrayList<>(recent.subList(0,Math.min(maxItems,recent.size())));
   }
-  /** Fetch a short attributed live feed on a worker thread; no paywalled article scraping. */
+  /** Local headlines use the same dated, age-filtered parser as all other feeds. */
   static List<Headline> headlines(String city,String region) throws Exception {
-    String search="\""+city+"\" \""+region+"\" (news OR newspaper OR local)";
-    String address="https://news.google.com/rss/search?q="+encode(search)+"&hl=en-US&gl=US&ceid=US%3Aen";
-    HttpURLConnection connection=null;
-    ArrayList<Headline> data=new ArrayList<>();
-    try{
-      connection=(HttpURLConnection)new URL(address).openConnection();
-      connection.setConnectTimeout(10000);
-      connection.setReadTimeout(12000);
-      connection.setRequestProperty("Accept","application/rss+xml, application/xml");
-      connection.setRequestProperty("User-Agent","Newswire Android/0.4.4");
-      if(connection.getResponseCode()!=200)throw new IllegalStateException("News feed unavailable");
-      try(InputStream stream=connection.getInputStream()){
-        XmlPullParser xml=Xml.newPullParser();
-        xml.setInput(stream,"UTF-8");
-        boolean inItem=false;
-        String title="",link="",source="";
-        int event=xml.getEventType();
-        while(event!=XmlPullParser.END_DOCUMENT && data.size()<12){
-          if(event==XmlPullParser.START_TAG){
-            String name=xml.getName();
-            if("item".equals(name)){inItem=true;title="";link="";source="";}
-            else if(inItem && ("title".equals(name)||"link".equals(name)||"source".equals(name))){
-              String value=xml.nextText();
-              if("title".equals(name))title=value;
-              else if("link".equals(name))link=value;
-              else source=value;
-            }
-          } else if(event==XmlPullParser.END_TAG && "item".equals(xml.getName())){
-            if(!title.isEmpty()&&link.startsWith("https://"))
-              data.add(new Headline(title,source.isEmpty()?"Local news":source,link));
-            inItem=false;
-          }
-          event=xml.next();
-        }
-      }
-    }finally{if(connection!=null)connection.disconnect();}
-    return data;
+    return rssSearch("\""+city+"\" \""+region+"\" (news OR newspaper OR local)",12);
   }
+  static List<Headline> fresh(List<Headline> input) {
+    ArrayList<Headline> result=new ArrayList<>();
+    long now=System.currentTimeMillis();
+    for(Headline h:input)if(NewsFreshness.isRecent(h.publishedMillis,now))result.add(h);
+    result.sort((a,b)->Long.compare(b.publishedMillis,a.publishedMillis));
+    return result;
+  }
+  static String age(Headline h){return NewsFreshness.age(h.publishedMillis,System.currentTimeMillis());}
 }
