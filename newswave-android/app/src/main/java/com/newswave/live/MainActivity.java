@@ -685,7 +685,7 @@ public class MainActivity extends Activity {
         myAreaCard.addView(top,titleLp);
         TextView story=text(headline.title+"  ›",14,FG,true);
         pad(story,0,6);myAreaCard.addView(story);
-        story.setOnClickListener(v->openBrowser(headline.url));
+        story.setOnClickListener(v->ArticleReaderActivity.open(this,headline.url));
       }else{
         TextView missing=text("Open News for current regional headlines.",12,MUTED,false);
         LinearLayout.LayoutParams msg=lp(-1,-2);msg.topMargin=dp(10);myAreaCard.addView(missing,msg);
