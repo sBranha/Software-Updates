@@ -101,10 +101,10 @@ public final class LiveCenterActivity extends Activity {
     private void build(){
         ScrollView scroll=new ScrollView(this);
         scroll.setBackgroundColor(BG);scroll.setFillViewport(true);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(12),dp(15),dp(12),dp(26));scroll.addView(root);
         setContentView(scroll);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setPadding(dp(17),dp(17),dp(17),dp(17));
         hero.setBackground(surface(0xff17465d,0xff0a2133,0xff3b87a0));
         hero.addView(text("NEWSWIRE / LIVE AWARENESS",11,CYAN,true));
@@ -115,7 +115,7 @@ public final class LiveCenterActivity extends Activity {
         add(hero,status,8);add(root,hero,0);
 
         LinearLayout nav=new LinearLayout(this);
-        nav.setOrientation(0);
+        nav.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         mapTab=button("◈ LIVE SATELLITE MAP",()->switchMode(true));
         alertsTab=button("⚠ EMERGENCY CENTER",()->switchMode(false));
         LinearLayout.LayoutParams one=new LinearLayout.LayoutParams(0,-2,1);
@@ -149,9 +149,9 @@ public final class LiveCenterActivity extends Activity {
         else map.loadUrl(String.format(Locale.US,
             "https://appassets.androidplatform.net/assets/live_center_map.html?lat=%.5f&lon=%.5f",lat,lon));
 
-        alertsPanel=new LinearLayout(this);alertsPanel.setOrientation(1);
+        alertsPanel=new LinearLayout(this);alertsPanel.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(root,alertsPanel,12);
-        newsPanel=new LinearLayout(this);newsPanel.setOrientation(1);
+        newsPanel=new LinearLayout(this);newsPanel.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(root,newsPanel,12);
         TextView tip=text("Warning information may be delayed or unavailable. "+
             "Always use Wireless Emergency Alerts and official NWS guidance; this app cannot guarantee advance notice.",
@@ -193,7 +193,7 @@ public final class LiveCenterActivity extends Activity {
         int shown=0;
         for(ActiveAlertData.Item alert:warnings.items){
             if(shown++>=45)break;
-            LinearLayout pane=new LinearLayout(this);pane.setOrientation(1);
+            LinearLayout pane=new LinearLayout(this);pane.setOrientation(android.widget.LinearLayout.VERTICAL);
             pane.setPadding(dp(14),dp(14),dp(14),dp(14));
             pane.setBackground(surface(0xff26344a,0xff102133,
                 ActiveAlertData.rank(alert)<=2?0xffda6d76:0xff3c7b8d));
@@ -223,7 +223,7 @@ public final class LiveCenterActivity extends Activity {
             .show();
     }
     private void updateAlerts(){
-        if(loading){android.widget.Toast.makeText(this,"Still checking NWS…",0).show();return;}
+        if(loading){android.widget.Toast.makeText(this,"Still checking NWS…",android.widget.Toast.LENGTH_SHORT).show();return;}
         loading=true;status.setText("Checking current NWS warnings…");
         renderAlerts();
         final int revision=++generation;
@@ -376,7 +376,7 @@ public final class LiveCenterActivity extends Activity {
     }
     private void open(String url){
         try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
-        catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",0).show();}
+        catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",android.widget.Toast.LENGTH_SHORT).show();}
     }
     @Override protected void onDestroy(){
         closed=true;generation++;

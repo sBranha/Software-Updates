@@ -94,10 +94,10 @@ public final class NewsWireDriveActivity extends Activity {
     private void render(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        main=new LinearLayout(this);main.setOrientation(1);
+        main=new LinearLayout(this);main.setOrientation(android.widget.LinearLayout.VERTICAL);
         main.setPadding(dp(15),dp(18),dp(15),dp(32));
         scroll.addView(main);setContentView(scroll);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setPadding(dp(19),dp(20),dp(19),dp(20));
         hero.setBackground(surface(0xff173c55,0xff0a1b2b,0xff417d93));
         hero.addView(text("NEWSWIRE / DRIVE",12,CYAN,true));
@@ -115,11 +115,11 @@ public final class NewsWireDriveActivity extends Activity {
             "⌖  "+city+", "+region,13,CYAN,true);
         locationLabel.setPadding(dp(7),dp(10),dp(7),dp(10));
         main.addView(locationLabel);
-        LinearLayout weather=new LinearLayout(this);weather.setOrientation(1);
+        LinearLayout weather=new LinearLayout(this);weather.setOrientation(android.widget.LinearLayout.VERTICAL);
         weather.setBackground(surface(0xff133548,0xff0c2434,0xff32687e));
         weather.setPadding(dp(16),dp(14),dp(16),dp(14));
         weather.addView(text("WEATHER ALONG YOUR DRIVE",11,CYAN,true));
-        details=new LinearLayout(this);details.setOrientation(1);
+        details=new LinearLayout(this);details.setOrientation(android.widget.LinearLayout.VERTICAL);
         weather.addView(details);
         LinearLayout.LayoutParams wc=new LinearLayout.LayoutParams(-1,-2);
         wc.bottomMargin=dp(12);main.addView(weather,wc);

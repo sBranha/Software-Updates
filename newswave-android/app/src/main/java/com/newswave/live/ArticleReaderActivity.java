@@ -24,7 +24,7 @@ public final class ArticleReaderActivity extends Activity {
         super.onCreate(state);SystemUi.install(this);SystemUi.onBack(this,this::handleBack);
         String url=getIntent().getStringExtra("url");
         if(!isWebUrl(url)){finish();return;}
-        LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(0xff091622);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);root.setBackgroundColor(0xff091622);
         LinearLayout controls=new LinearLayout(this);
         Button home=new Button(this);home.setText("‹ NewsWire");home.setOnClickListener(v->finish());controls.addView(home);
         Button back=new Button(this);back.setText("Back");back.setOnClickListener(v->{if(web.canGoBack())web.goBack();else finish();});controls.addView(back);

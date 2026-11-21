@@ -75,10 +75,10 @@ public final class TrafficActivity extends Activity {
         toolbar.addView(v,lp);
     }
     private void renderLayout(){
-        main=new LinearLayout(this);main.setOrientation(1);
+        main=new LinearLayout(this);main.setOrientation(android.widget.LinearLayout.VERTICAL);
         main.setPadding(dp(13),dp(16),dp(13),dp(10));
         main.setBackgroundColor(BG);setContentView(main);
-        LinearLayout banner=new LinearLayout(this);banner.setOrientation(1);
+        LinearLayout banner=new LinearLayout(this);banner.setOrientation(android.widget.LinearLayout.VERTICAL);
         banner.setPadding(dp(15),dp(15),dp(15),dp(15));
         banner.setBackground(background(0xff183c55,0xff102336,0xff398ca0));
         TextView kicker=text("NEWSWIRE / ROAD WATCH",11,CYAN,true);banner.addView(kicker);
@@ -94,7 +94,7 @@ public final class TrafficActivity extends Activity {
         bl.bottomMargin=dp(11);main.addView(banner,bl);
 
         toolbar=new LinearLayout(this);
-        toolbar.setOrientation(0);
+        toolbar.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         rowButton("← BACK",this::finish);
         rowButton("⌖ STATE",this::showStates);
         rowButton("↻ REFRESH",()->{if(browser!=null)browser.reload();});
@@ -220,7 +220,7 @@ public final class TrafficActivity extends Activity {
         if(url==null||!url.startsWith("https://"))return;
         try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
         catch(Exception ex){android.widget.Toast.makeText(this,
-            "No browser available",1).show();}
+            "No browser available",android.widget.Toast.LENGTH_LONG).show();}
     }
     @Override public void onBackPressed(){handleBack();}
     private void handleBack(){

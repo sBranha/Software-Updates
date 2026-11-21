@@ -77,7 +77,7 @@ public final class DayPlannerActivity extends Activity {
         lp.topMargin=dp(marginTop);parent.addView(child,lp);
     }
     private LinearLayout card(LinearLayout parent,String caption,int highlight){
-        LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(android.widget.LinearLayout.VERTICAL);
         card.setPadding(dp(15),dp(15),dp(15),dp(16));
         card.setBackground(background(0xff153951,0xff0b2133,0xff336a80));
         card.addView(text(caption,12,highlight,true));
@@ -108,7 +108,7 @@ public final class DayPlannerActivity extends Activity {
     }
     private void build(){
         scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setFillViewport(true);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(14),dp(17),dp(14),dp(35));
         scroll.addView(root);setContentView(scroll);
 
@@ -125,15 +125,15 @@ public final class DayPlannerActivity extends Activity {
         second.leftMargin=dp(5);controls.addView(refresh,second);add(root,controls,12);
 
         LinearLayout daily=card(root,"01  /  AT A GLANCE",CYAN);
-        dayAnchor=daily;overview=new LinearLayout(this);overview.setOrientation(1);add(daily,overview,7);
+        dayAnchor=daily;overview=new LinearLayout(this);overview.setOrientation(android.widget.LinearLayout.VERTICAL);add(daily,overview,7);
         LinearLayout forecast=card(root,"02  /  YOUR NEXT 12 HOURS",CYAN);
         hoursAnchor=forecast;hoursContainer=new LinearLayout(this);
-        hoursContainer.setOrientation(1);add(forecast,hoursContainer,8);
+        hoursContainer.setOrientation(android.widget.LinearLayout.VERTICAL);add(forecast,hoursContainer,8);
         add(forecast,button("◎ SATELLITE RADAR",()->
             startActivity(new Intent(this,RadarActivity.class))),12);
 
         LinearLayout schools=card(root,"03  /  SCHOOL CLOSINGS & DELAYS",AMBER);
-        schoolAnchor=schools;schoolContainer=new LinearLayout(this);schoolContainer.setOrientation(1);
+        schoolAnchor=schools;schoolContainer=new LinearLayout(this);schoolContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(schools,text("Official notices are separate from publisher reporting. Never assume school is open from an empty news feed.",12,MUTED,false),8);
         add(schools,schoolContainer,8);
         add(schools,button("↗ CHECK OFFICIAL SCHOOL CLOSURES",this::openOfficialSchoolBoard),12);
@@ -141,7 +141,7 @@ public final class DayPlannerActivity extends Activity {
 
         LinearLayout eventCard=card(root,"04  /  WHAT'S HAPPENING AROUND ME",CYAN);
         eventAnchor=eventCard;eventContainer=new LinearLayout(this);
-        eventContainer.setOrientation(1);
+        eventContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(eventCard,text("Local event coverage is news reporting, not a confirmed event calendar. Always verify event times and cancellations.",12,MUTED,false),8);
         add(eventCard,eventContainer,8);
         add(eventCard,button("↗ VERIFIED TOURISM & EVENT CALENDAR",this::openOfficialEvents),12);
@@ -192,11 +192,11 @@ public final class DayPlannerActivity extends Activity {
             addLine(hoursContainer,"Official NWS hourly forecast is loading or unavailable.",MUTED);
         }else{
             for(DayPlannerData.Hour h:hours.hours){
-                LinearLayout row=new LinearLayout(this);row.setOrientation(0);
+                LinearLayout row=new LinearLayout(this);row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 TextView time=text(h.time,12,CYAN,true);
                 time.setWidth(dp(65));row.addView(time);
-                LinearLayout details=new LinearLayout(this);details.setOrientation(1);
+                LinearLayout details=new LinearLayout(this);details.setOrientation(android.widget.LinearLayout.VERTICAL);
                 row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
                 details.addView(text(h.temperature+"  ·  "+h.condition,13,FG,true));
                 details.addView(text("Rain "+h.rain+"   ·   Wind "+h.wind,12,MUTED,false));
@@ -241,7 +241,7 @@ public final class DayPlannerActivity extends Activity {
             long seconds=(System.currentTimeMillis()-refreshStartedAt)/1000;
             if(seconds<35){
                 android.widget.Toast.makeText(this,
-                    "Still checking live sources ("+seconds+" seconds).",0).show();
+                    "Still checking live sources ("+seconds+" seconds).",android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
             // An old network task may be stuck. Allow retry and reject its late result.
@@ -357,7 +357,8 @@ public final class DayPlannerActivity extends Activity {
                         refresh();
                     }
                 });
-            }catch(Exception error){android.util.Log.w("NewsWireDay","GPS check unavailable",error);}
+            }catch(SecurityException error){android.util.Log.w("NewsWireDay","GPS permission unavailable; saved location retained",error);}
+            catch(Exception error){android.util.Log.w("NewsWireDay","GPS check unavailable",error);}
         });
     }
     private void followSchool(){
@@ -377,7 +378,7 @@ public final class DayPlannerActivity extends Activity {
     }
     private void followCity(){
         android.widget.Toast.makeText(this,
-            "NewsWire follows your GPS when allowed. Change the saved ZIP on the main screen.",1).show();
+            "NewsWire follows your GPS when allowed. Change the saved ZIP on the main screen.",android.widget.Toast.LENGTH_LONG).show();
     }
     private void openOfficialSchoolBoard(){
         if("AL".equalsIgnoreCase(region)||"Alabama".equalsIgnoreCase(region)){
@@ -385,7 +386,7 @@ public final class DayPlannerActivity extends Activity {
         }else{
             // No unsupported state link is claimed to be an official closure feed.
             android.widget.Toast.makeText(this,
-                "Select your local school district website to verify closures. Alabama's official state feed is supported.",1).show();
+                "Select your local school district website to verify closures. Alabama's official state feed is supported.",android.widget.Toast.LENGTH_LONG).show();
         }
     }
     private void openOfficialEvents(){
@@ -397,7 +398,7 @@ public final class DayPlannerActivity extends Activity {
     }
     private void open(String uri){
         try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(uri)));}
-        catch(Exception ignored){android.widget.Toast.makeText(this,"Browser unavailable",0).show();}
+        catch(Exception ignored){android.widget.Toast.makeText(this,"Browser unavailable",android.widget.Toast.LENGTH_SHORT).show();}
     }
     @Override protected void onDestroy(){
         closed=true;generation++;workers.shutdownNow();super.onDestroy();

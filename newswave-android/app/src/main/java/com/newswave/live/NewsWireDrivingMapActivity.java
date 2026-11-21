@@ -53,7 +53,7 @@ public final class NewsWireDrivingMapActivity extends Activity {
         title.setText("‹   NEWSWIRE     /     3D DRIVE MAP");
         title.setTextColor(Color.WHITE);
         title.setTextSize(15);
-        title.setTypeface(null,1);
+        title.setTypeface(null,android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER_VERTICAL);
         title.setPadding(dp(16),0,dp(12),0);
         title.setBackgroundColor(0xff0c263c);

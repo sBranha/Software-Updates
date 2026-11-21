@@ -146,7 +146,7 @@ public final class NewsRadioActivity extends Activity {
     }
     private void draw(){
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(BG);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(15),dp(19),dp(15),dp(28));
         root.setFocusableInTouchMode(true);
         sc.addView(root);setContentView(sc);
@@ -155,7 +155,7 @@ public final class NewsRadioActivity extends Activity {
         getWindow().setSoftInputMode(
             android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN |
             android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setPadding(dp(20),dp(22),dp(20),dp(20));hero.setBackground(card());
         hero.addView(text("NEWSWIRE / AUDIO",11,CYAN,true));
         add(hero,text("YOUR CITY. YOUR NEWS.",26,INK,true),8);
@@ -177,7 +177,7 @@ public final class NewsRadioActivity extends Activity {
         add(root,button("↻  FIND NOAA WEATHER RADIO STREAMS",this::loadNoaaStations),9);
         add(root,button("⌖  OFFICIAL NOAA RADIO STATION DIRECTORY",()->
             startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.weather.gov/nwr/stations")))),9);
-        noaaList=new LinearLayout(this);noaaList.setOrientation(1);
+        noaaList=new LinearLayout(this);noaaList.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(root,noaaList,10);
         add(root,text("LOCAL AM/FM STATIONS · LIVE STREAMS",13,CYAN,true),21);
         add(root,text("Nearby stations are discovered automatically from your current area. "+
@@ -221,12 +221,12 @@ public final class NewsRadioActivity extends Activity {
         add(root,stationStatus,9);
         // Keep playable stations immediately below the results count, where
         // they are visible without scrolling past two large utility buttons.
-        stationList=new LinearLayout(this);stationList.setOrientation(1);
+        stationList=new LinearLayout(this);stationList.setOrientation(android.widget.LinearLayout.VERTICAL);
         add(root,stationList,5);
         add(root,button("↻  REFRESH LOCAL STATIONS",this::loadLocalStations),14);
         add(root,button("■  STOP LIVE RADIO",()->stopStream("Live station stopped.")),9);
         add(root,button("←  BACK TO NEWSWIRE",this::finish),13);
-        details=new LinearLayout(this);details.setOrientation(1);add(root,details,16);
+        details=new LinearLayout(this);details.setOrientation(android.widget.LinearLayout.VERTICAL);add(root,details,16);
         renderStations();renderNoaaStations();
         add(root,text("Spoken briefing requires an explicit Play tap on your phone. "+
             "News headlines are attributed to publishers; sports stories are not live score feeds. "+
@@ -427,9 +427,9 @@ public final class NewsRadioActivity extends Activity {
                 &&!station.genre.toLowerCase(Locale.US).contains(term)
                 &&!station.region.toLowerCase(Locale.US).contains(term))continue;
             LinearLayout block=new LinearLayout(this);
-            block.setOrientation(1);block.setPadding(dp(12),dp(10),dp(12),dp(10));
+            block.setOrientation(android.widget.LinearLayout.VERTICAL);block.setPadding(dp(12),dp(10),dp(12),dp(10));
             block.setBackground(card());
-            LinearLayout heading=new LinearLayout(this);heading.setOrientation(0);
+            LinearLayout heading=new LinearLayout(this);heading.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             heading.setGravity(Gravity.CENTER_VERTICAL);
             TextView title=text((playing!=null&&playing.stream.equals(station.stream)?
                 "▶  ":"◉  ")+station.name,16,INK,true);
@@ -451,7 +451,7 @@ public final class NewsRadioActivity extends Activity {
             star.setOnClickListener(v->{
                 boolean added=RadioStationFavorites.toggle(this,station);
                 android.widget.Toast.makeText(this,
-                    added?"Station saved":"Station removed from favorites",0).show();
+                    added?"Station saved":"Station removed from favorites",android.widget.Toast.LENGTH_SHORT).show();
                 renderStations();
             });
             heading.addView(star);block.addView(heading);
@@ -482,7 +482,7 @@ public final class NewsRadioActivity extends Activity {
         }
         for(LocalRadioDirectory.Station station:noaaStations){
             LinearLayout block=new LinearLayout(this);
-            block.setOrientation(1);block.setPadding(dp(13),dp(12),dp(13),dp(12));
+            block.setOrientation(android.widget.LinearLayout.VERTICAL);block.setPadding(dp(13),dp(12),dp(13),dp(12));
             block.setBackground(card());
             String marker=playing!=null&&playing.stream.equals(station.stream)?"▶  ":"◉  ";
             add(block,text(marker+station.name,15,INK,true),0);

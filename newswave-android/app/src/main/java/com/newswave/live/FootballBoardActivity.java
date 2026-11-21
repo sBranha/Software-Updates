@@ -68,7 +68,7 @@ public final class FootballBoardActivity extends Activity {
     }
     private void launch(String url){
         try{ArticleReaderActivity.open(this,url);}
-        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",1).show();}
+        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",android.widget.Toast.LENGTH_LONG).show();}
     }
     @Override public void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);SystemUi.install(this);
@@ -89,11 +89,11 @@ public final class FootballBoardActivity extends Activity {
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        outer=new LinearLayout(this);outer.setOrientation(1);
+        outer=new LinearLayout(this);outer.setOrientation(android.widget.LinearLayout.VERTICAL);
         outer.setPadding(dp(16),dp(20),dp(16),dp(30));scroll.addView(outer);
         setContentView(scroll);
 
-        LinearLayout header=new LinearLayout(this);header.setOrientation(1);
+        LinearLayout header=new LinearLayout(this);header.setOrientation(android.widget.LinearLayout.VERTICAL);
         header.setPadding(dp(17),dp(17),dp(17),dp(17));
         header.setBackground(card(0xff143f58,0xff44819a));
         TextView over=text("NEWSWIRE / FRIDAY NIGHT LIGHTS",11,CYAN,true);
@@ -134,7 +134,7 @@ public final class FootballBoardActivity extends Activity {
         TextView note=text("Publisher-reported football results near your saved area. " +
             "Titles link to the original sources; score articles are not verified live game feeds.",
             12,MUTED,false);outer.addView(note);
-        stories=new LinearLayout(this);stories.setOrientation(1);
+        stories=new LinearLayout(this);stories.setOrientation(android.widget.LinearLayout.VERTICAL);
         LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);
         sl.topMargin=dp(8);outer.addView(stories,sl);
 
@@ -155,7 +155,7 @@ public final class FootballBoardActivity extends Activity {
                 .putString("favorite_team",favorite).apply();
             renderStoriesAgain();
             android.widget.Toast.makeText(this,
-                favorite.isEmpty()?"Team preference cleared":"Following "+favorite,0).show();
+                favorite.isEmpty()?"Team preference cleared":"Following "+favorite,android.widget.Toast.LENGTH_SHORT).show();
         });
         LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2);
         sp.leftMargin=dp(8);favoriteRow.addView(save,sp);
@@ -228,7 +228,7 @@ public final class FootballBoardActivity extends Activity {
         if(shown==0)renderStories(null);
     }
     private void showArticle(LocalNewspapers.Headline article,boolean pinned){
-        LinearLayout row=new LinearLayout(this);row.setOrientation(1);
+        LinearLayout row=new LinearLayout(this);row.setOrientation(android.widget.LinearLayout.VERTICAL);
         row.setBackground(card(pinned?0xff1b4359:PANEL,
             pinned?0xff3ac1e0:0xff284f69));
         row.setPadding(dp(14),dp(12),dp(14),dp(12));

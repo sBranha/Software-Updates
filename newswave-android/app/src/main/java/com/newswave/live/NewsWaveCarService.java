@@ -214,17 +214,18 @@ public final class NewsWaveCarService extends CarAppService {
           }
           lastFix=new Location(loc);
           if(!follow)return;
-          float course=Float.NaN;
+          float course=0f;boolean hasCourse=false;
           float traveled=previous==null?0f:previous.distanceTo(loc);
           float elapsed=previous==null?0f:(loc.getTime()-previous.getTime())/1000f;
           float displacementSpeed=elapsed>0f && elapsed<30f ? traveled/elapsed:0f;
           boolean moving=(loc.hasSpeed() && loc.getSpeed()>=1.5f)
               ||(traveled>=12f && displacementSpeed>=1.8f && loc.getAccuracy()<35f);
-          if(moving && loc.hasBearing() && loc.hasSpeed() && loc.getSpeed()>=1.5f)
-              course=loc.getBearing();
-          else if(moving && previous!=null && traveled>=8f)
-              course=previous.bearingTo(loc);
-          renderer.setPosition(loc.getLatitude(),loc.getLongitude(),course,
+          if(moving && loc.hasBearing() && loc.hasSpeed() && loc.getSpeed()>=1.5f){
+              course=loc.getBearing();hasCourse=true;
+          }else if(moving && previous!=null && traveled>=8f){
+              course=previous.bearingTo(loc);hasCourse=true;
+          }
+          renderer.setPosition(loc.getLatitude(),loc.getLongitude(),hasCourse?course:Float.NaN,
               loc.hasAccuracy()?loc.getAccuracy():20f,!moving);
           Station nearest=chosen;double best=Double.MAX_VALUE;
           for(Station station:stations){

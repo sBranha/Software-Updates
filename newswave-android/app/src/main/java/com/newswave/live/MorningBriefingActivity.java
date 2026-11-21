@@ -61,7 +61,7 @@ public final class MorningBriefingActivity extends Activity {
         b.setPadding(dp(14),dp(13),dp(14),dp(13));b.setOnClickListener(v->click.run());return b;
     }
     private void addLabel(String tag,String value,int accent){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(1);
+        LinearLayout box=new LinearLayout(this);box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setBackground(card(0xff152d44,0xff0d2134,0xff315a70));
         box.setPadding(dp(17),dp(16),dp(17),dp(16));
         box.addView(text(tag,11,accent,true));
@@ -73,9 +73,9 @@ public final class MorningBriefingActivity extends Activity {
     }
     private void render(){
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(BG);
-        content=new LinearLayout(this);content.setOrientation(1);
+        content=new LinearLayout(this);content.setOrientation(android.widget.LinearLayout.VERTICAL);
         content.setPadding(dp(16),dp(22),dp(16),dp(35));sc.addView(content);setContentView(sc);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setPadding(dp(19),dp(23),dp(19),dp(23));
         hero.setBackground(card(0xff194963,0xff0b2538,0xff3689a3));
         hero.addView(text("NEWSWIRE / TODAY",11,CYAN,true));
@@ -123,7 +123,7 @@ public final class MorningBriefingActivity extends Activity {
                 for(LocalNewspapers.Headline headline:d.headlines){
                     if(!NewsPreferences.allow(this,headline.title))continue;
                     final LocalNewspapers.Headline link=headline;
-                    LinearLayout row=new LinearLayout(this);row.setOrientation(1);
+                    LinearLayout row=new LinearLayout(this);row.setOrientation(android.widget.LinearLayout.VERTICAL);
                     row.setBackground(card(0xff152c46,0xff101e33,0xff2d617d));
                     row.setPadding(dp(14),dp(14),dp(14),dp(14));
                     row.addView(text(headline.source.toUpperCase(Locale.US),11,CYAN,true));
@@ -135,7 +135,7 @@ public final class MorningBriefingActivity extends Activity {
                         boolean added=NewsPreferences.toggleBookmark(
                             this,link.title,link.source,link.url);
                         android.widget.Toast.makeText(this,
-                            added?"Story saved":"Bookmark removed",0).show();
+                            added?"Story saved":"Bookmark removed",android.widget.Toast.LENGTH_SHORT).show();
                         render();
                     });
                     row.addView(save);
@@ -171,14 +171,14 @@ public final class MorningBriefingActivity extends Activity {
     }
     private void open(String url){
         try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
-        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",0).show();}
+        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",android.widget.Toast.LENGTH_SHORT).show();}
     }
     private void refreshFromGps(){
         if(loading){
             long seconds=(System.currentTimeMillis()-refreshStartedAt)/1000;
             if(seconds<40){
                 android.widget.Toast.makeText(this,
-                    "Refresh is still checking the live services ("+seconds+" seconds).",0).show();
+                    "Refresh is still checking the live services ("+seconds+" seconds).",android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
             // Permit an explicit retry if an earlier network request stalled.

@@ -161,10 +161,10 @@ public final class LiveTVActivity extends Activity {
     }
     private void build(){
         scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(15),dp(20),dp(15),dp(28));
         scroll.addView(root);setContentView(scroll);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setBackground(surface(0xff185272,0xff0b2339));
         hero.setPadding(dp(16),dp(18),dp(16),dp(19));
         hero.addView(text("NEWSWIRE  /  LIVE TV",11,CYAN,true));
@@ -209,7 +209,7 @@ public final class LiveTVActivity extends Activity {
             else status.setText("Use an HTTPS YouTube, Facebook or Twitch URL.");
         }),8);
 
-        LinearLayout filters=new LinearLayout(this);filters.setOrientation(0);
+        LinearLayout filters=new LinearLayout(this);filters.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         for(String type:new String[]{"all","local","national","saved"}){
             TextView action=button(type.toUpperCase(Locale.US),()->{
                 filter=type;render();
@@ -230,7 +230,7 @@ public final class LiveTVActivity extends Activity {
         });
         add(root,search,10);
         filterAction=text("",12,CYAN,true);add(root,filterAction,12);
-        list=new LinearLayout(this);list.setOrientation(1);add(root,list,4);
+        list=new LinearLayout(this);list.setOrientation(android.widget.LinearLayout.VERTICAL);add(root,list,4);
         add(root,button("⌕  FIND OTHER TV STATIONS NEAR ME",()->
             startActivity(getIntentForFinder())),13);
         add(root,button("←  BACK TO NEWSWIRE",this::finish),10);
@@ -266,10 +266,10 @@ public final class LiveTVActivity extends Activity {
             if(filter.equals("all")&&item.local&&!nearby(item)&&!favorite)continue;
             if(!term.isEmpty()&&!(item.name+" "+item.network+" "+item.market)
                 .toLowerCase(Locale.US).contains(term))continue;
-            LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+            LinearLayout card=new LinearLayout(this);card.setOrientation(android.widget.LinearLayout.VERTICAL);
             card.setPadding(dp(13),dp(13),dp(13),dp(13));
             card.setBackground(surface(0xff163c55,0xff0d2439));
-            LinearLayout top=new LinearLayout(this);top.setOrientation(0);
+            LinearLayout top=new LinearLayout(this);top.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             top.setGravity(Gravity.CENTER_VERTICAL);
             TextView title=text((item==selected?"▶  ":"▣  ")+item.name,17,WHITE,true);
             top.addView(title,new LinearLayout.LayoutParams(0,-2,1));

@@ -45,6 +45,10 @@ public final class NewsMonitorWorker extends Worker {
         manager.createNotificationChannel(new NotificationChannel(DIGEST,"NewsWire headline digest",NotificationManager.IMPORTANCE_DEFAULT));
         WidgetAreaResolver.Area area=WidgetAreaResolver.resolve(ctx);
         String city=area==null?"":area.city,region=area==null?"":area.region;
+        if(city.isEmpty()||region.isEmpty()){
+            SharedPreferences saved=ctx.getSharedPreferences("newswire-location",Context.MODE_PRIVATE);
+            city=saved.getString("city","");region=saved.getString("state","");
+        }
         boolean succeeded=false,attempted=false;
         for(int i=0;i<TOPICS.length;i++){
             String topic=TOPICS[i];boolean national="national".equals(topic);

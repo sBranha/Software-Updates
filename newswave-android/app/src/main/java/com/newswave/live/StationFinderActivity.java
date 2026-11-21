@@ -69,10 +69,10 @@ public final class StationFinderActivity extends Activity {
     }
     private void render(){
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(15),dp(18),dp(15),dp(28));
         scroll.addView(root);setContentView(scroll);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setPadding(dp(17),dp(18),dp(17),dp(18));hero.setBackground(panel());
         hero.addView(text("NEWSWIRE / YOUR AIRWAVES",11,CYAN,true));
         add(hero,text("LOCAL TV FINDER",27,WHITE,true),6);
@@ -80,11 +80,11 @@ public final class StationFinderActivity extends Activity {
         add(hero,area,8);add(root,hero,0);
         add(root,button("← BACK TO NEWSWIRE",this::finish),12);
         add(root,text("NEARBY TV STATIONS",12,CYAN,true),17);
-        stations=new LinearLayout(this);stations.setOrientation(1);add(root,stations,10);
+        stations=new LinearLayout(this);stations.setOrientation(android.widget.LinearLayout.VERTICAL);add(root,stations,10);
         add(root,text("Local broadcasters stream only when their own schedules or rights allow it. "+
             "Some links lead to a station website instead of continuous live video.",12,MUTED,false),10);
         add(root,text("OTHER LOCAL PUBLISHERS",12,CYAN,true),22);
-        localSources=new LinearLayout(this);localSources.setOrientation(1);add(root,localSources,9);
+        localSources=new LinearLayout(this);localSources.setOrientation(android.widget.LinearLayout.VERTICAL);add(root,localSources,9);
         add(root,button("⌕ SEARCH TV STATIONS FOR MY CITY",()->open(
             "https://www.google.com/search?q="+Uri.encode(city+" "+region+" local TV news stations live"))),13);
         add(root,button("↗ FCC BROADCAST STATION DIRECTORY",()->open("https://publicfiles.fcc.gov/")),9);
@@ -93,7 +93,7 @@ public final class StationFinderActivity extends Activity {
         refreshKnown();
     }
     private void station(String label,String affiliation,String source,String url){
-        LinearLayout line=new LinearLayout(this);line.setOrientation(1);
+        LinearLayout line=new LinearLayout(this);line.setOrientation(android.widget.LinearLayout.VERTICAL);
         line.setPadding(dp(14),dp(14),dp(14),dp(14));line.setBackground(panel());
         line.addView(text(label+" · "+affiliation,15,WHITE,true));
         add(line,text(source,12,MUTED,false),5);
@@ -202,7 +202,7 @@ public final class StationFinderActivity extends Activity {
     private void open(String url){
         if(!url.startsWith("https://"))return;
         try{ArticleReaderActivity.open(this,url);}
-        catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",0).show();}
+        catch(Exception e){android.widget.Toast.makeText(this,"Browser unavailable",android.widget.Toast.LENGTH_SHORT).show();}
     }
     @Override protected void onDestroy(){closed=true;generation++;super.onDestroy();}
 }

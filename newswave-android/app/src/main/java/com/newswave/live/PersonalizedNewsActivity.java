@@ -49,10 +49,10 @@ public final class PersonalizedNewsActivity extends Activity {
     }
     private void draw(){
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(BG);
-        root=new LinearLayout(this);root.setOrientation(1);
+        root=new LinearLayout(this);root.setOrientation(android.widget.LinearLayout.VERTICAL);
         root.setPadding(dp(16),dp(20),dp(16),dp(30));
         sc.addView(root);setContentView(sc);
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(android.widget.LinearLayout.VERTICAL);
         hero.setBackground(card(0xff183f5b,0xff102235,0xff397e96));
         hero.setPadding(dp(18),dp(19),dp(18),dp(19));
         hero.addView(text("NEWSWIRE / JUST FOR YOU",11,CYAN,true));
@@ -95,7 +95,7 @@ public final class PersonalizedNewsActivity extends Activity {
 
         TextView feedTitle=text("LATEST STORIES FOR YOU",12,CYAN,true);
         feedTitle.setPadding(dp(5),dp(22),0,dp(10));root.addView(feedTitle);
-        feed=new LinearLayout(this);feed.setOrientation(1);root.addView(feed);
+        feed=new LinearLayout(this);feed.setOrientation(android.widget.LinearLayout.VERTICAL);root.addView(feed);
         renderFeed();
         TextView note=text("Headlines are attributed to original news publishers. " +
             "Publisher preferences affect ordering, not coverage guarantees. " +
@@ -104,7 +104,7 @@ public final class PersonalizedNewsActivity extends Activity {
         note.setPadding(dp(5),dp(15),dp(5),0);root.addView(note);
     }
     private void editFavoriteArea(){
-        LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+        LinearLayout fields=new LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
         fields.setPadding(dp(20),dp(8),dp(20),dp(4));
         EditText town=new EditText(this),region=new EditText(this);
         town.setText(NewsPreferences.favoriteCity(this));town.setHint("Town, e.g. Albertville");
@@ -117,7 +117,7 @@ public final class PersonalizedNewsActivity extends Activity {
                 String c=town.getText().toString().trim();
                 String s=region.getText().toString().trim();
                 if((c.isEmpty())!=(s.isEmpty())){
-                    android.widget.Toast.makeText(this,"Enter both town and state, or clear both.",0).show();
+                    android.widget.Toast.makeText(this,"Enter both town and state, or clear both.",android.widget.Toast.LENGTH_SHORT).show();
                     return;
                 }
                 NewsPreferences.setFavoritePlace(this,c,s);
@@ -156,7 +156,7 @@ public final class PersonalizedNewsActivity extends Activity {
         for(int i=0;i<bookmarks.size();i++)
             titles[i]=bookmarks.get(i).title+" · "+bookmarks.get(i).source;
         if(titles.length==0){android.widget.Toast.makeText(this,
-            "No saved stories yet. Tap ☆ on an article to save it.",1).show();return;}
+            "No saved stories yet. Tap ☆ on an article to save it.",android.widget.Toast.LENGTH_LONG).show();return;}
         new AlertDialog.Builder(this).setTitle("Your saved stories")
             .setItems(titles,(dialog,index)->open(bookmarks.get(index).url))
             .setPositiveButton("Close",null).show();
@@ -174,7 +174,7 @@ public final class PersonalizedNewsActivity extends Activity {
         int shown=0;
         for(LocalNewspapers.Headline article:sorted){
             if(!NewsPreferences.allow(this,article.title))continue;
-            LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
+            LinearLayout tile=new LinearLayout(this);tile.setOrientation(android.widget.LinearLayout.VERTICAL);
             tile.setPadding(dp(15),dp(15),dp(15),dp(15));
             tile.setBackground(card(0xff173149,0xff101e31,0xff315e7d));
             tile.addView(text(article.source.toUpperCase(Locale.US)+" • "+LocalNewspapers.age(article),10,CYAN,true));
@@ -186,7 +186,7 @@ public final class PersonalizedNewsActivity extends Activity {
                 "★ SAVED · TAP TO REMOVE":"☆ SAVE FOR LATER",()->{
                 boolean added=NewsPreferences.toggleBookmark(this,
                     article.title,article.source,article.url);
-                android.widget.Toast.makeText(this,added?"Saved for later":"Removed bookmark",0).show();
+                android.widget.Toast.makeText(this,added?"Saved for later":"Removed bookmark",android.widget.Toast.LENGTH_SHORT).show();
                 draw();
             });
             tile.addView(save);
@@ -226,7 +226,7 @@ public final class PersonalizedNewsActivity extends Activity {
     }
     private void open(String url){
         try{ArticleReaderActivity.open(this,url);}
-        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",0).show();}
+        catch(Exception error){android.widget.Toast.makeText(this,"No browser available",android.widget.Toast.LENGTH_SHORT).show();}
     }
     @Override protected void onResume(){super.onResume();if(root!=null)draw();}
     @Override protected void onDestroy(){closed=true;generation++;super.onDestroy();}

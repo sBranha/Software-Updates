@@ -1,4 +1,4 @@
-name: NewsWire v0.7.16 satellite maps and local news
+name: NewsWire v0.7.16 review fixes and Android reliability
 on:
   push:
     branches: [newswire-review-fixes-v0.7.16]
@@ -156,7 +156,7 @@ jobs:
           javac -d /tmp/news-tests newswave-android/app/src/main/java/com/newswave/live/NewsFreshness.java newswave-android/tests/NewsFreshnessTest.java
           java -cp /tmp/news-tests com.newswave.live.NewsFreshnessTest
       - name: Build app for phone testing and unsigned Google Play preparation
-        run: ./newswave-android/gradlew -p newswave-android :app:assembleDebug :app:bundleRelease --write-locks --no-daemon
+        run: ./newswave-android/gradlew -p newswave-android :app:assembleDebug :app:bundleRelease --no-daemon
       - name: Verify archive integrity and package files
         run: |
           set -euo pipefail
@@ -179,7 +179,7 @@ jobs:
             newswave-android/app/gradle.lockfile
           retention-days: 15
       - name: Android release lint
-        run: ./newswave-android/gradlew -p newswave-android :app:lintRelease --write-locks --no-daemon
+        run: ./newswave-android/gradlew -p newswave-android :app:lintRelease --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:

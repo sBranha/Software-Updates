@@ -178,7 +178,7 @@ public class MainActivity extends Activity {
     dashboard();
     android.widget.Toast.makeText(this,enabled?
       "Good Morning notifications on. Android chooses an approximate morning delivery time.":
-      "Good Morning notifications turned off.",1).show();
+      "Good Morning notifications turned off.",android.widget.Toast.LENGTH_LONG).show();
   }
   // The live My Area dashboard is driven by a foreground GPS fix when allowed.
   // Saved ZIP coordinates are the reliable fallback.
@@ -229,7 +229,7 @@ public class MainActivity extends Activity {
       getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
         .edit().putBoolean("enabled",false).apply();
       android.widget.Toast.makeText(this,
-        "Couldn't start Drive Alerts. Check GPS and notification permissions.",1).show();
+        "Couldn't start Drive Alerts. Check GPS and notification permissions.",android.widget.Toast.LENGTH_LONG).show();
       dashboard();
     }
   }
@@ -254,7 +254,7 @@ public class MainActivity extends Activity {
       runOnUiThread(()->{
         checkingUpdate=false;
         android.widget.Toast.makeText(this,
-          "Google Play download failed; you can retry in Play Store.",1).show();
+          "Google Play download failed; you can retry in Play Store.",android.widget.Toast.LENGTH_LONG).show();
       });
     }
   };
@@ -341,7 +341,7 @@ public class MainActivity extends Activity {
         updatePromptVisible=false;
         playUpdates.completeUpdate().addOnFailureListener(error->{
           android.widget.Toast.makeText(this,
-            "Could not finish the update. Try again or open Google Play.",1).show();
+            "Could not finish the update. Try again or open Google Play.",android.widget.Toast.LENGTH_LONG).show();
         });
       })
       .setNegativeButton("Later",(dialog,which)->updatePromptVisible=false)
@@ -374,32 +374,32 @@ public class MainActivity extends Activity {
       if(!interactive)return; // Never interrupt Google's automatic background update policy.
       if(available && type>=0){
         playUpdates.startUpdateFlow(info,this,
-          AppUpdateOptions.newBuilder(type).build())
+          AppUpdateOptions.newBuilder(type==AppUpdateType.IMMEDIATE?AppUpdateType.IMMEDIATE:AppUpdateType.FLEXIBLE).build())
           .addOnFailureListener(error->{
             android.widget.Toast.makeText(this,
-              "Could not start in-app update. Open the NewsWire Play Store page.",1).show();
+              "Could not start in-app update. Open the NewsWire Play Store page.",android.widget.Toast.LENGTH_LONG).show();
             openNewsWirePlayListing();
           });
       }else if(available){
         android.widget.Toast.makeText(this,
-          "New version available; open Google Play to install it.",1).show();
+          "New version available; open Google Play to install it.",android.widget.Toast.LENGTH_LONG).show();
         openNewsWirePlayListing();
       }else if(availability==UpdateAvailability.UPDATE_NOT_AVAILABLE){
         android.widget.Toast.makeText(this,
-          "Google Play has not offered a newer NewsWire version to this device yet.",1).show();
+          "Google Play has not offered a newer NewsWire version to this device yet.",android.widget.Toast.LENGTH_LONG).show();
       }else if(availability==UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS){
         android.widget.Toast.makeText(this,
-          "An in-app update is already in progress.",1).show();
+          "An in-app update is already in progress.",android.widget.Toast.LENGTH_LONG).show();
       }else{
         android.widget.Toast.makeText(this,
-          "Google Play could not confirm your update status. Open Play Store.",1).show();
+          "Google Play could not confirm your update status. Open Play Store.",android.widget.Toast.LENGTH_LONG).show();
         openNewsWirePlayListing();
       }
     }).addOnFailureListener(error->{
       checkingUpdate=false;
       if(interactive){
         android.widget.Toast.makeText(this,
-          "Cannot check updates through Google Play. Opening the store.",1).show();
+          "Cannot check updates through Google Play. Opening the store.",android.widget.Toast.LENGTH_LONG).show();
         openNewsWirePlayListing();
       }
     });
@@ -425,7 +425,7 @@ public class MainActivity extends Activity {
         editor.apply();
         NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
         android.widget.Toast.makeText(this,
-          "News alert preferences saved. Checks are periodic, not immediate.",1).show();
+          "News alert preferences saved. Checks are periodic, not immediate.",android.widget.Toast.LENGTH_LONG).show();
       })
       .setNegativeButton("Cancel",null).show();
   }
@@ -442,7 +442,7 @@ public class MainActivity extends Activity {
     dashboard();
     android.widget.Toast.makeText(this,enabled?
       "Local headline alerts are on. Updates are checked hourly.":
-      "Local headline notifications are off.",1).show();
+      "Local headline notifications are off.",android.widget.Toast.LENGTH_LONG).show();
   }
   // Always show the version of the package actually installed on the device.
   // Never hardcode a release string in this UI again.
@@ -472,8 +472,8 @@ public class MainActivity extends Activity {
     if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
     return t;
   }
-  private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
-  private LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
+  private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(android.widget.LinearLayout.VERTICAL);return l;}
+  private LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(android.widget.LinearLayout.HORIZONTAL);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
   private void pad(View v,int x,int y){v.setPadding(dp(x),dp(y),dp(x),dp(y));}
   private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
   private TextView button(String label,Runnable onTap){
@@ -525,7 +525,9 @@ public class MainActivity extends Activity {
           .putBoolean("follow_phone",!followPhone()).apply();
         stopDashboardGps();stopNewsGps();
         dashboardLatitude=Double.NaN;dashboardLongitude=Double.NaN;
-        newsGpsActive=false;loadedAreaKey="";dashboard();
+        newsGpsActive=false;loadedAreaKey="";myAreaSnapshot=null;
+        areaLoading=false;areaRequestGeneration++;areaRefreshHandler.removeCallbacksAndMessages(null);
+        dashboard();
       });
     LinearLayout.LayoutParams modeParams=lp(-1,-2);modeParams.bottomMargin=dp(12);
     content.addView(locationMode,modeParams);
@@ -660,6 +662,9 @@ public class MainActivity extends Activity {
           &&(!latest.hasAccuracy()||latest.getAccuracy()<1500f)){
         dashboardLatitude=latest.getLatitude();dashboardLongitude=latest.getLongitude();
       }
+    }catch(SecurityException error){
+      stopDashboardGps();dashboardLatitude=Double.NaN;dashboardLongitude=Double.NaN;
+      android.util.Log.w("NewsWireArea","GPS permission changed; using saved ZIP",error);
     }catch(Exception error){android.util.Log.w("NewsWireArea","Dashboard GPS unavailable",error);}
   }
   private void renderMyArea(){
@@ -901,7 +906,7 @@ public class MainActivity extends Activity {
   }
   private void resolveZip(String postal){resolveZip(postal,false);}
   private void resolveZip(String postal,boolean showSportsAfterSave){
-    if(!postal.matches("[0-9]{5}")){android.widget.Toast.makeText(this,"Enter a 5-digit ZIP code",0).show();return;}
+    if(!postal.matches("[0-9]{5}")){android.widget.Toast.makeText(this,"Enter a 5-digit ZIP code",android.widget.Toast.LENGTH_SHORT).show();return;}
     new Thread(()->{
       HttpURLConnection con=null;
       try{
@@ -929,7 +934,7 @@ public class MainActivity extends Activity {
           if(showSportsAfterSave){tab="Sports";query="";home();}
           else dashboard();
         });
-      }catch(Exception ex){runOnUiThread(()->android.widget.Toast.makeText(this,"Could not look up ZIP. Check connection.",1).show());}
+      }catch(Exception ex){runOnUiThread(()->android.widget.Toast.makeText(this,"Could not look up ZIP. Check connection.",android.widget.Toast.LENGTH_LONG).show());}
       finally{if(con!=null)con.disconnect();}
     }).start();
   }
@@ -1300,7 +1305,7 @@ public class MainActivity extends Activity {
       runOnUiThread(()->{
         if(generation!=newsGeoGeneration)return;
         newsGeocoding=false;
-        if(!newCity.isEmpty()){
+        if(!newCity.isEmpty()&&!newRegion.isEmpty()){
           boolean changed=!newCity.equalsIgnoreCase(newsGpsCity)||!newRegion.equalsIgnoreCase(newsGpsRegion);
           newsGpsCity=newCity;newsGpsRegion=newRegion;newsGpsLatitude=lat;newsGpsLongitude=lon;
           newsGpsActive=true;
@@ -1309,6 +1314,9 @@ public class MainActivity extends Activity {
             NewsWireWidget.refresh(this);
           }
           if(changed&&tab.equals("News")&&current==null)render();
+        }else{
+          newsGpsActive=false;
+          if(tab.equals("News")&&current==null)render(); // Explicit saved-ZIP fallback.
         }
       });
     }).start();
@@ -1350,26 +1358,26 @@ public class MainActivity extends Activity {
       if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
         requestDriveAlerts();
       else android.widget.Toast.makeText(this,
-        "Drive Alerts require precise location to detect warning areas.",1).show();
+        "Drive Alerts require precise location to detect warning areas.",android.widget.Toast.LENGTH_LONG).show();
     }
     if(requestCode==DRIVE_NOTIFICATION_REQUEST){
       if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)
         requestDriveAlerts();
       else android.widget.Toast.makeText(this,
-        "Drive Alerts require permission to show tornado-warning notifications.",1).show();
+        "Drive Alerts require permission to show tornado-warning notifications.",android.widget.Toast.LENGTH_LONG).show();
     }
     if(requestCode==MORNING_NOTIFICATION_PERMISSION){
       if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){
         MorningBriefingWorker.configure(this,true);
         dashboard();
       }else android.widget.Toast.makeText(this,
-        "Good Morning notifications remain disabled.",1).show();
+        "Good Morning notifications remain disabled.",android.widget.Toast.LENGTH_LONG).show();
     }
     if(requestCode==DASHBOARD_LOCATION_REQUEST){
       boolean ok=false;
       for(int result:results)if(result==PackageManager.PERMISSION_GRANTED)ok=true;
       if(ok){startDashboardGps();refreshMyArea(true);}
-      else android.widget.Toast.makeText(this,"Location is off. Saved ZIP is still available.",1).show();
+      else android.widget.Toast.makeText(this,"Location is off. Saved ZIP is still available.",android.widget.Toast.LENGTH_LONG).show();
     }
     if(requestCode==NEWS_NOTIFICATION_REQUEST){
       if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){
@@ -1377,7 +1385,7 @@ public class MainActivity extends Activity {
           .edit().putBoolean("enabled",true).apply();
         NewsMonitorWorker.schedule(this,true);
         dashboard();
-      }else android.widget.Toast.makeText(this,"Notifications are off until permitted.",1).show();
+      }else android.widget.Toast.makeText(this,"Notifications are off until permitted.",android.widget.Toast.LENGTH_LONG).show();
     }
     if(requestCode==NEWS_LOCATION_REQUEST){
       boolean granted=false;
@@ -1469,7 +1477,7 @@ public class MainActivity extends Activity {
   }
   private void openBrowser(String url){
     try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
-    catch(Exception e){android.widget.Toast.makeText(this,"No browser available",0).show();}
+    catch(Exception e){android.widget.Toast.makeText(this,"No browser available",android.widget.Toast.LENGTH_SHORT).show();}
   }
   @Override public void onBackPressed(){handleBack();}
   // Android 16 (targetSdk 36) no longer calls onBackPressed(); SystemUi.onBack
