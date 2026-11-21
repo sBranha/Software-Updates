@@ -54,7 +54,7 @@ public final class StationFinderActivity extends Activity {
         p.topMargin=dp(top);box.addView(view,p);
     }
     @Override public void onCreate(Bundle b){
-        super.onCreate(b);
+        super.onCreate(b);SystemUi.install(this);
         android.content.SharedPreferences prefs=getSharedPreferences("newswire-location",MODE_PRIVATE);
         city=getIntent().getStringExtra("city");region=getIntent().getStringExtra("state");
         if(city==null||city.isEmpty())city=prefs.getString("city","");

@@ -37,7 +37,7 @@ public final class MorningBriefingActivity extends Activity {
     private int generation=0;
 
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);
+        super.onCreate(saved);SystemUi.install(this);
         android.content.SharedPreferences area=
             getSharedPreferences("newswire-location",MODE_PRIVATE);
         city=area.getString("city","");region=area.getString("state","");

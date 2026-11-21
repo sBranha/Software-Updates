@@ -29,7 +29,9 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
     private AudioFocusRequest focus;
     private boolean ready=false,closed=false;
     private String pending=null,currentId=null;
-    private int sequence=0;
+    private String currentMessage=null;
+    private int sequence=0,focusEpoch=0,replays=0;
+    private long validUntil=0;
 
     DrivingAlertSpeaker(Context app){
         audio=(AudioManager)app.getApplicationContext()
@@ -56,51 +58,73 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
                 @Override public void onDone(String id){main.post(()->finish(id));}
                 @Override public void onError(String id){main.post(()->finish(id));}
             });
-            if(pending!=null){String message=pending;pending=null;begin(message);}
+            if(pending!=null&&android.os.SystemClock.elapsedRealtime()<validUntil){
+                String message=pending;pending=null;begin(message);
+            }
         });
     }
 
     void announce(String message){
         main.post(()->{
             if(closed||message==null||message.isEmpty())return;
+            validUntil=android.os.SystemClock.elapsedRealtime()+90_000L;
+            replays=0;
             if(!ready){pending=message;return;}
             begin(message);
         });
     }
 
     private void begin(String message){
-        if(closed||tts==null)return;
+        if(closed||tts==null||android.os.SystemClock.elapsedRealtime()>=validUntil)return;
         if(currentId!=null){
-            tts.stop();
             currentId=null;
-            abandonFocus();
+            tts.stop();
         }
+        pending=null;abandonFocus();
         if(audio==null)return;
+        final int epoch=++focusEpoch;
         focus=new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(attributes)
             .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(change->{
-                // Do not talk over phone calls, navigation, or media that has
-                // taken focus. The notification remains visible if speech stops.
-                if(change==AudioManager.AUDIOFOCUS_LOSS
-                    ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-                    ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
-                    main.post(()->{
-                        String interrupted=currentId;
-                        if(interrupted!=null){
-                            if(tts!=null)tts.stop();
-                            finish(interrupted);
-                        }
-                    });
-                }
+                main.post(()->{
+                    if(closed||epoch!=focusEpoch)return;
+                    if(change==AudioManager.AUDIOFOCUS_GAIN&&pending!=null){
+                        String resume=pending;pending=null;
+                        if(android.os.SystemClock.elapsedRealtime()<validUntil){replays++;speak(resume);}
+                        else abandonFocus();
+                    }else if(change==AudioManager.AUDIOFOCUS_LOSS
+                        ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                        ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+                        String interrupted=currentMessage;
+                        currentId=null;
+                        if(tts!=null)tts.stop();
+                        if(change!=AudioManager.AUDIOFOCUS_LOSS&&replays==0
+                            &&interrupted!=null&&android.os.SystemClock.elapsedRealtime()<validUntil){
+                            pending=interrupted;
+                            main.postDelayed(()->{
+                                if(epoch==focusEpoch&&pending!=null
+                                    &&android.os.SystemClock.elapsedRealtime()>=validUntil){
+                                    pending=null;abandonFocus();
+                                }
+                            },Math.max(1,validUntil-android.os.SystemClock.elapsedRealtime()));
+                        }else{pending=null;abandonFocus();}
+                    }
+                });
             }).build();
         if(audio.requestAudioFocus(focus)!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED){
             focus=null;
             Log.w(TAG,"Audio focus denied; notification delivered without speech");
             return;
         }
+        speak(message);
+    }
+
+    private void speak(String message){
+        if(closed||tts==null)return;
         String id="newswire-drive-alert-"+(++sequence);
         currentId=id;
+        currentMessage=message;
         if(tts.speak(message,TextToSpeech.QUEUE_FLUSH,null,id)!=TextToSpeech.SUCCESS){
             finish(id);return;
         }
@@ -113,10 +137,12 @@ final class DrivingAlertSpeaker implements TextToSpeech.OnInitListener {
     private void finish(String id){
         if(id==null||!id.equals(currentId))return;
         currentId=null;
+        currentMessage=null;
         abandonFocus();
     }
 
     private void abandonFocus(){
+        focusEpoch++;
         if(focus!=null&&audio!=null){
             audio.abandonAudioFocusRequest(focus);
             focus=null;

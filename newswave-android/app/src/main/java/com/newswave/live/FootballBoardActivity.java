@@ -71,7 +71,7 @@ public final class FootballBoardActivity extends Activity {
         catch(Exception error){android.widget.Toast.makeText(this,"No browser available",1).show();}
     }
     @Override public void onCreate(Bundle savedInstanceState){
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState);SystemUi.install(this);
         city=getIntent().getStringExtra("city");
         state=getIntent().getStringExtra("state");
         zip=getIntent().getStringExtra("zip");
@@ -178,7 +178,7 @@ public final class FootballBoardActivity extends Activity {
             scoreboard.getSettings().setDomStorageEnabled(true);
             scoreboard.getSettings().setMediaPlaybackRequiresUserGesture(true);
             scoreboard.setWebChromeClient(new WebChromeClient());
-            scoreboard.setWebViewClient(new WebViewClient(){
+            scoreboard.setWebViewClient(new NewsWireWebClient(){
                 @Override public boolean shouldOverrideUrlLoading(WebView view,String url){
                     if(!url.startsWith("https://scorestream.com/") &&
                         !url.startsWith("https://api.scorestream.com/")){

@@ -42,7 +42,7 @@ public final class TrafficActivity extends Activity {
     private boolean reportsMode=false,locationLookup=false,manualSelection=false;
 
     @Override public void onCreate(Bundle savedInstanceState){
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState);SystemUi.install(this);SystemUi.onBack(this,this::handleBack);
         state=getIntent().getStringExtra("state");
         if(state==null||state.isEmpty())
             state=getSharedPreferences("newswire-location",MODE_PRIVATE)
@@ -121,7 +121,7 @@ public final class TrafficActivity extends Activity {
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         browser.setWebChromeClient(new WebChromeClient());
-        browser.setWebViewClient(new WebViewClient(){
+        browser.setWebViewClient(new NewsWireWebClient(){
             @Override public void onPageFinished(WebView view,String url){
                 loading.setText("Official "+source.agency+" information · updated by the provider");
             }
@@ -222,9 +222,10 @@ public final class TrafficActivity extends Activity {
         catch(Exception ex){android.widget.Toast.makeText(this,
             "No browser available",1).show();}
     }
-    @Override public void onBackPressed(){
+    @Override public void onBackPressed(){handleBack();}
+    private void handleBack(){
         if(browser!=null&&browser.canGoBack())browser.goBack();
-        else super.onBackPressed();
+        else finish();
     }
     @Override protected void onDestroy(){
         if(browser!=null){browser.stopLoading();browser.destroy();browser=null;}

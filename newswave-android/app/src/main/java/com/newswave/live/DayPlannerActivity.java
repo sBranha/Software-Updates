@@ -84,7 +84,7 @@ public final class DayPlannerActivity extends Activity {
         add(parent,card,12);return card;
     }
     @Override public void onCreate(Bundle savedInstanceState){
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState);SystemUi.install(this);
         Intent from=getIntent();
         city=from.getStringExtra("city");region=from.getStringExtra("state");
         requestedSection=from.getStringExtra("section");

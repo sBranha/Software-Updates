@@ -21,7 +21,7 @@ public final class ArticleReaderActivity extends Activity {
         return WebLinkPolicy.allowed(url);
     }
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);
+        super.onCreate(state);SystemUi.install(this);SystemUi.onBack(this,this::handleBack);
         String url=getIntent().getStringExtra("url");
         if(!isWebUrl(url)){finish();return;}
         LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(0xff091622);
@@ -36,7 +36,7 @@ public final class ArticleReaderActivity extends Activity {
         s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setGeolocationEnabled(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setMediaPlaybackRequiresUserGesture(true);s.setSupportMultipleWindows(false);
-        web.setWebViewClient(new WebViewClient(){
+        web.setWebViewClient(new NewsWireWebClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest req){
                 if(isWebUrl(req.getUrl().toString()))return false;
                 status.setText("This publisher link cannot open here. Use Back to return.");return true;
@@ -56,7 +56,8 @@ public final class ArticleReaderActivity extends Activity {
         });
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);web.loadUrl(url);
     }
-    @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
+    @Override public void onBackPressed(){handleBack();}
+    private void handleBack(){if(web!=null&&web.canGoBack())web.goBack();else finish();}
     @Override protected void onPause(){if(web!=null)web.onPause();super.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
     @Override protected void onDestroy(){if(web!=null){web.stopLoading();web.destroy();web=null;}super.onDestroy();}

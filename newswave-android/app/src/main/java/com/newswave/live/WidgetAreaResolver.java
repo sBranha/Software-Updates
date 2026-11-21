@@ -37,7 +37,8 @@ final class WidgetAreaResolver {
         double lat=Double.longBitsToDouble(bits(gps,"latitude"));
         double lon=Double.longBitsToDouble(bits(gps,"longitude"));
         long seen=gps.getLong("seen_at",0);
-        if(valid(lat,lon)&&seen>0&&seen<=now&&now-seen<=GPS_MAX_AGE_MS) {
+        if(context.getSharedPreferences("newswire-location",Context.MODE_PRIVATE).getBoolean("follow_phone",true)
+            &&valid(lat,lon)&&seen>0&&seen<=now&&now-seen<=GPS_MAX_AGE_MS) {
             return new Area(lat,lon,gps.getString("city",""),
                 gps.getString("region",""),true);
         }

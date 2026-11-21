@@ -31,7 +31,7 @@ public final class PersonalizedNewsActivity extends Activity {
     private int generation=0;
     private List<LocalNewspapers.Headline> headlines=new ArrayList<>();
     private String lastKey="";
-    @Override public void onCreate(Bundle b){super.onCreate(b);draw();loadNews(false);}
+    @Override public void onCreate(Bundle b){super.onCreate(b);SystemUi.install(this);draw();loadNews(false);}
     private int dp(int value){return (int)(value*getResources().getDisplayMetrics().density+.5);}
     private GradientDrawable card(int a,int b,int edge){
         GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{a,b});

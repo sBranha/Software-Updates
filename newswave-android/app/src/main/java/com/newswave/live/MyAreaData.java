@@ -41,15 +41,17 @@ final class MyAreaData {
         HttpURLConnection conn=null;
         try {
             conn=(HttpURLConnection)new URL(url).openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(7000);
+            conn.setConnectTimeout(RefreshBudget.timeout(5000)/2+1);
+            conn.setReadTimeout(RefreshBudget.timeout(7000)/2+1);
             conn.setRequestProperty("Accept","application/geo+json, application/json");
             conn.setRequestProperty("User-Agent","NewsWire (newswire weather / local information app)");
             if(conn.getResponseCode()!=200)throw new java.io.IOException("HTTP "+conn.getResponseCode());
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();
             try(InputStream stream=conn.getInputStream()){
                 byte[] b=new byte[8192];int count;
-                while((count=stream.read(b))!=-1){
+                while(true){
+                    conn.setReadTimeout(RefreshBudget.timeout(7000));
+                    count=stream.read(b);if(count==-1)break;
                     if(bytes.size()+count>1024*1024)throw new java.io.IOException("Response too large");
                     bytes.write(b,0,count);
                 }
@@ -61,6 +63,11 @@ final class MyAreaData {
         return String.format(Locale.US,"%.0f",value);
     }
     static Snapshot load(double lat,double lon,String city,String region){
+        RefreshBudget.begin(42_000L);
+        try{return loadWithinBudget(lat,lon,city,region);}
+        finally{RefreshBudget.clear();}
+    }
+    private static Snapshot loadWithinBudget(double lat,double lon,String city,String region){
         String place=city.isEmpty()?"Current location":city+(region.isEmpty()?"":", "+region);
         String temp="—",feel="—",description="Conditions unavailable",wind="—";
         boolean ok=false,alertsOk=false;

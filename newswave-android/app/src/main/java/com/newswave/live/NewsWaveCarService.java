@@ -176,8 +176,10 @@ public final class NewsWaveCarService extends CarAppService {
               if(event==Lifecycle.Event.ON_STOP || event==Lifecycle.Event.ON_DESTROY){
                 radarRefreshHandler.removeCallbacks(radarRefreshTask);
               }
-              if(event==Lifecycle.Event.ON_DESTROY&&locationManager!=null&&locationListener!=null){
-                locationManager.removeUpdates(locationListener);
+              if(event==Lifecycle.Event.ON_DESTROY){
+                if(locationManager!=null&&locationListener!=null)
+                  try{locationManager.removeUpdates(locationListener);}catch(Exception ignored){}
+                renderer.close();
               }
             });
         }
@@ -619,6 +621,7 @@ public final class NewsWaveCarService extends CarAppService {
             if(!roadCacheDir.isDirectory() && !roadCacheDir.mkdirs())
                 Log.w(LOG,"Road tile cache unavailable");
         }
+        private volatile boolean disposed=false;
         private final ExecutorService executor=Executors.newSingleThreadExecutor();
         private final ExecutorService tileWorkers=Executors.newFixedThreadPool(6);
         private final ExecutorService warningExecutor=Executors.newSingleThreadExecutor();
@@ -802,14 +805,16 @@ public final class NewsWaveCarService extends CarAppService {
         }
         private void fetchWarningsIfDue(){
             synchronized(lock){
-                if(!warningsOn||System.currentTimeMillis()-lastWarningRequest<WeatherWarningOverlay.REFRESH_MS)
+                if(disposed||!warningsOn||System.currentTimeMillis()-lastWarningRequest<WeatherWarningOverlay.REFRESH_MS)
                     return;
                 lastWarningRequest=System.currentTimeMillis();
             }
-            warningExecutor.execute(()->{
+            try{warningExecutor.execute(()->{
+                if(disposed)return;
                 warnings=WeatherWarningOverlay.fetch(warnings);
                 refresh();
-            });
+            });}catch(java.util.concurrent.RejectedExecutionException ignored){}
+
         }
         private final Object lock=new Object();
         void change(Station s,String p,boolean national){
@@ -822,7 +827,12 @@ public final class NewsWaveCarService extends CarAppService {
             }
             refresh();
         }
+        void close(){
+            synchronized(lock){disposed=true;revision++;surface=null;}
+            executor.shutdownNow();tileWorkers.shutdownNow();warningExecutor.shutdownNow();
+        }
         void refresh(){
+            if(disposed)return;
             fetchWarningsIfDue();
             final Station s;final String p;final boolean national;final int rev,w,h,z;
             final boolean auto,drawWarnings,tiltRoads;
@@ -835,14 +845,15 @@ public final class NewsWaveCarService extends CarAppService {
                 mLat=manualLat;mLon=manualLon;
                 selectedStyle=mapStyle;
             }
-            executor.execute(()->{
-                synchronized(lock){if(rev!=revision)return;}
+            try{executor.execute(()->{
+                synchronized(lock){if(disposed||rev!=revision)return;}
                 render(s,p,national,rev,Math.max(480,w),Math.max(320,h),
                        z,auto,mLat,mLon,drawWarnings,selectedStyle,tiltRoads);
-            });
+            });}catch(java.util.concurrent.RejectedExecutionException ignored){}
+
         }
         @Override public void onSurfaceAvailable(@NonNull SurfaceContainer c){
-            synchronized(lock){surface=c.getSurface();width=c.getWidth();height=c.getHeight();}
+            synchronized(lock){if(disposed)return;surface=c.getSurface();width=c.getWidth();height=c.getHeight();}
             display();refresh();
         }
         @Override public void onSurfaceDestroyed(@NonNull SurfaceContainer c){

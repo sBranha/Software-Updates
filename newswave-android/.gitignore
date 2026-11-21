@@ -1,0 +1,7 @@
+/.gradle/
+/build/
+/app/build/
+/local.properties
+/signing/*.p12
+/signing/*.jks
+/signing/*private*.pem

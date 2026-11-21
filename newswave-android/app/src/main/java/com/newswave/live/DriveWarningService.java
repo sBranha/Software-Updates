@@ -51,6 +51,16 @@ public final class DriveWarningService extends Service implements LocationListen
     private static final long REPEAT_MS=20L*60*1000;
     private final ExecutorService network=Executors.newSingleThreadExecutor();
     private final Handler main=new Handler(Looper.getMainLooper());
+    private static volatile boolean running=false;
+    public static boolean isRunning(){return running;}
+    private volatile Location latestFix;
+    private final Runnable pollTick=new Runnable(){
+        @Override public void run(){
+            if(!active)return;
+            checkLatestFix();
+            main.postDelayed(this,POLL_MS);
+        }
+    };
     private LocationManager locationManager;
     private volatile boolean active=false,requesting=false;
     private long lastPoll=0,lastNotice=0;
@@ -105,15 +115,17 @@ public final class DriveWarningService extends Service implements LocationListen
             getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("enabled",false).apply();
             end();return START_NOT_STICKY;
         }
+        if(active)return START_STICKY;
         try{
             if(Build.VERSION.SDK_INT>=29)
-                startForeground(ONGOING_ID,monitoringNotice("Watching for official NWS warnings"),
+                startForeground(ONGOING_ID,monitoringNotice("Waiting for a fresh GPS fix · no NWS check yet"),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-            else startForeground(ONGOING_ID,monitoringNotice("Watching for official NWS warnings"));
-            active=true;
+            else startForeground(ONGOING_ID,monitoringNotice("Waiting for a fresh GPS fix · no NWS check yet"));
+            active=true;running=true;
+            main.removeCallbacks(pollTick);main.post(pollTick);
             locationManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
             for(String provider:locationManager.getProviders(true)){
-                try{locationManager.requestLocationUpdates(provider,5000,25f,this,Looper.getMainLooper());}
+                try{locationManager.requestLocationUpdates(provider,5000,0f,this,Looper.getMainLooper());}
                 catch(Exception e){Log.w(TAG,"Location provider unavailable",e);}
             }
             Location best=null;
@@ -129,28 +141,50 @@ public final class DriveWarningService extends Service implements LocationListen
             getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("enabled",false).apply();
             end();return START_NOT_STICKY;
         }
-        return START_NOT_STICKY; // never restart monitoring without explicit user action
+        return START_STICKY; // Restore only this previously opted-in foreground session.
     }
     private void end(){
-        active=false;
+        active=false;running=false;main.removeCallbacksAndMessages(null);
         if(locationManager!=null)try{locationManager.removeUpdates(this);}catch(Exception ignored){}
         if(voice!=null){voice.shutdown();voice=null;}
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
     @Override public void onLocationChanged(Location location){
-        if(!active||location==null||!location.hasAccuracy()
-            ||location.getAccuracy()>150f || System.currentTimeMillis()-location.getTime()>90000L)return;
-        long now=System.currentTimeMillis();
-        if(now-lastPoll<POLL_MS||requesting)return;
+        if(!active||location==null||!location.hasAccuracy()||location.getAccuracy()>150f
+            ||System.currentTimeMillis()-location.getTime()>DrivePollPolicy.MAX_FIX_AGE_MS)return;
+        latestFix=new Location(location);
+        checkLatestFix();
+    }
+    private String lastCheck(){
+        long checked=getSharedPreferences(PREF,MODE_PRIVATE).getLong("last_success",0);
+        return checked==0?"no successful check yet":"last success "+
+            new java.text.SimpleDateFormat("h:mm:ss a",Locale.US).format(new java.util.Date(checked));
+    }
+    private void checkLatestFix(){
+        if(!active)return;
+        Location current=latestFix;
+        long age=current==null?Long.MAX_VALUE:System.currentTimeMillis()-current.getTime();
+        if(current==null||age<0||age>DrivePollPolicy.MAX_FIX_AGE_MS){
+            setMonitoringStatus("Waiting for fresh GPS · "+lastCheck());return;
+        }
+        long now=android.os.SystemClock.elapsedRealtime();
+        if(!DrivePollPolicy.due(active,requesting,now,lastPoll,age,current.getAccuracy()))return;
         lastPoll=now;requesting=true;
-        final Location fix=new Location(location);
+        final Location fix=new Location(current);
         network.execute(()->{
-            try{inspect(fix);}
-            catch(Exception error){
+            RefreshBudget.begin(55_000L);
+            try{
+                inspect(fix);
+                if(active){
+                    getSharedPreferences(PREF,MODE_PRIVATE).edit()
+                        .putLong("last_success",System.currentTimeMillis()).apply();
+                    main.post(()->{if(active)setMonitoringStatus("NWS checked · "+lastCheck()+" · alerts can change");});
+                }
+            }catch(Exception error){
                 Log.w(TAG,"NWS driving alert check unavailable",error);
-                if(active)main.post(()->setMonitoringStatus("NWS check unavailable; use official alerts"));
-            }finally{requesting=false;}
+                if(active)main.post(()->{if(active)setMonitoringStatus("NWS check unavailable · "+lastCheck());});
+            }finally{RefreshBudget.clear();requesting=false;}
         });
     }
     private static Location projected(Location origin,double meters){
@@ -181,7 +215,7 @@ public final class DriveWarningService extends Service implements LocationListen
         try{
             connection=(HttpURLConnection)new URL("https://api.weather.gov/alerts/active?point="+coord)
                 .openConnection();
-            connection.setConnectTimeout(6500);connection.setReadTimeout(9000);
+            connection.setConnectTimeout(RefreshBudget.timeout(6500)/2+1);connection.setReadTimeout(RefreshBudget.timeout(9000)/2+1);
             connection.setRequestProperty("Accept","application/geo+json");
             connection.setRequestProperty("User-Agent",
                 "NewsWire Drive Alerts/0.5.1 (https://github.com/sBranha/Software-Updates)");
@@ -190,7 +224,9 @@ public final class DriveWarningService extends Service implements LocationListen
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();
             try(InputStream input=connection.getInputStream()){
                 byte[] block=new byte[8192];int n;
-                while((n=input.read(block))!=-1){
+                while(true){
+                    connection.setReadTimeout(RefreshBudget.timeout(9000));
+                    n=input.read(block);if(n==-1)break;
                     if(bytes.size()+n>512*1024)throw new IllegalStateException("NWS alert response too large");
                     bytes.write(block,0,n);
                 }
@@ -331,7 +367,7 @@ public final class DriveWarningService extends Service implements LocationListen
     }
     @Nullable @Override public IBinder onBind(Intent intent){return null;}
     @Override public void onDestroy(){
-        active=false;
+        active=false;running=false;main.removeCallbacksAndMessages(null);
         if(locationManager!=null)try{locationManager.removeUpdates(this);}catch(Exception ignored){}
         network.shutdownNow();
         if(voice!=null){voice.shutdown();voice=null;}

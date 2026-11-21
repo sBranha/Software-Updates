@@ -45,7 +45,7 @@ public final class NewsWireDriveActivity extends Activity {
     private int generation=0;
 
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);
+        super.onCreate(state);SystemUi.install(this);
         city=getIntent().getStringExtra("city");
         region=getIntent().getStringExtra("state");
         if(city==null)city="";if(region==null)region="";

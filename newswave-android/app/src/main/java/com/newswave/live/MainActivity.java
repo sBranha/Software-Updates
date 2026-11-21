@@ -111,6 +111,18 @@ public class MainActivity extends Activity {
   private void openRadio(){
     startActivity(localIntent(NewsRadioActivity.class));
   }
+  // One tap from the home or news screens: opens the audio screen and starts the
+  // spoken briefing as soon as the weather and headlines have loaded.
+  private void openSpokenNews(){
+    Intent play=localIntent(NewsRadioActivity.class);
+    play.putExtra("autoplay",true);
+    play.putExtra("national",!dashboardActive&&"National".equals(tab));
+    if(!dashboardActive&&newsGpsActive){
+      play.putExtra("city",newsGpsCity);play.putExtra("state",newsGpsRegion);
+      play.putExtra("latitude",newsGpsLatitude);play.putExtra("longitude",newsGpsLongitude);
+    }
+    startActivity(play);
+  }
   private void addHomeWidget(){
     android.appwidget.AppWidgetManager manager=
       android.appwidget.AppWidgetManager.getInstance(this);
@@ -185,8 +197,7 @@ public class MainActivity extends Activity {
   private static final int DRIVE_FINE_LOCATION_REQUEST=147;
   private static final int DRIVE_NOTIFICATION_REQUEST=148;
   private boolean driveAlertsEnabled(){
-    return getSharedPreferences(DriveWarningService.PREF,MODE_PRIVATE)
-      .getBoolean("enabled",false);
+    return DriveWarningService.isRunning();
   }
   private void requestDriveAlerts(){
     if(driveAlertsEnabled()){
@@ -286,7 +297,7 @@ public class MainActivity extends Activity {
   private String nationalFeedError="";
 
   @Override public void onCreate(Bundle b){
-    super.onCreate(b);
+    super.onCreate(b);SystemUi.install(this);SystemUi.onBack(this,this::handleBack);
     getWindow().setStatusBarColor(BG);
     getWindow().setNavigationBarColor(BG);
     prefs=getSharedPreferences("newswave-favorites",MODE_PRIVATE);
@@ -397,18 +408,20 @@ public class MainActivity extends Activity {
     final String[] labels={
       "Important headlines (only when the publisher headline indicates urgency)",
       "School closures and delays",
-      "General local headlines"
+      "General local headlines",
+      "Important national news",
+      "Official FAA ground stops"
     };
-    final String[] topic={"breaking","schools","local"};
+    final String[] topic={"breaking","schools","local","national","faa"};
     SharedPreferences prefs=getSharedPreferences("newswire-news-alerts",MODE_PRIVATE);
-    boolean[] values=new boolean[3];
-    for(int i=0;i<3;i++)values[i]=prefs.getBoolean("topic_"+topic[i],true);
+    boolean[] values=new boolean[topic.length];
+    for(int i=0;i<topic.length;i++)values[i]=prefs.getBoolean("topic_"+topic[i],true);
     new AlertDialog.Builder(this)
       .setTitle("Smart News Alerts")
       .setMultiChoiceItems(labels,values,(dialog,index,checked)->values[index]=checked)
       .setPositiveButton("Save preferences",(dialog,which)->{
         SharedPreferences.Editor editor=prefs.edit();
-        for(int i=0;i<3;i++)editor.putBoolean("topic_"+topic[i],values[i]);
+        for(int i=0;i<topic.length;i++)editor.putBoolean("topic_"+topic[i],values[i]);
         editor.apply();
         NewsMonitorWorker.schedule(this,localNewsNotificationEnabled());
         android.widget.Toast.makeText(this,
@@ -506,7 +519,19 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams bp=lp(-2,-2);bp.leftMargin=dp(9);ziprow.addView(save,bp);
     LinearLayout.LayoutParams zr=lp(-1,-2);zr.topMargin=dp(12);locale.addView(ziprow,zr);
     LinearLayout.LayoutParams cp=lp(-1,-2);cp.bottomMargin=dp(20);content.addView(locale,cp);
+    TextView locationMode=button(followPhone()?"LOCATION: FOLLOW PHONE · TAP FOR SAVED ZIP":
+      "LOCATION: SAVED ZIP · TAP TO FOLLOW PHONE",()->{
+        getSharedPreferences("newswire-location",MODE_PRIVATE).edit()
+          .putBoolean("follow_phone",!followPhone()).apply();
+        stopDashboardGps();stopNewsGps();
+        dashboardLatitude=Double.NaN;dashboardLongitude=Double.NaN;
+        newsGpsActive=false;loadedAreaKey="";dashboard();
+      });
+    LinearLayout.LayoutParams modeParams=lp(-1,-2);modeParams.bottomMargin=dp(12);
+    content.addView(locationMode,modeParams);
     // Local first, National second; leave the rest accessible without crowding the home screen.
+    categoryTile(content,"▶  PLAY MY NEWS","Hear local weather, alerts and headlines read aloud","▶",
+      0xff7b3fb5,this::openSpokenNews);
     categoryTile(content,"LOCAL NEWS","Headlines following your location","⌖",
       0xff2b65c3,()->openSection("News"));
     categoryTile(content,"NATIONAL NEWS","Today's U.S. headlines & broadcasters","▣",
@@ -529,7 +554,7 @@ public class MainActivity extends Activity {
       "Live TV • local radio • NOAA Weather Radio","▶",0xff624277);
     categoryTile(listenTools,"LIVE TV","Local and national TV news","▣",
       0xff2a5281,this::openTV);
-    categoryTile(listenTools,"NEWSWIRE RADIO","Local radio and NOAA weather broadcasts","▶",
+    categoryTile(listenTools,"NEWSWIRE RADIO","Spoken briefing • local radio • NOAA weather radio","▶",
       0xff624277,this::openRadio);
     LinearLayout dayTools=dashboardGroup(content,"MY DAY & COMMUNITY",
       "School news • sports • events • personal briefing","★",0xff146577);
@@ -587,7 +612,7 @@ public class MainActivity extends Activity {
       "↑  CHECK FOR APP UPDATES",()->checkForUpdates(true));
     updateAction=updates;
     content.addView(updates);
-    TextView alertInfo=text("Optional local headline notifications appear on your phone, not over the car radar. Updates are handled by Google Play.",11,MUTED,false);
+    TextView alertInfo=text("News and FAA checks are periodic (about 15 minutes; Android may delay them), not instant. Local alerts use recent phone location or saved ZIP.",11,MUTED,false);
     pad(alertInfo,5,12);content.addView(alertInfo);
     TextView foot=text("NewsWire v"+installedVersion()+"  •  More sections arrive through official app updates.",12,MUTED,false);
     pad(foot,5,20);content.addView(foot);
@@ -609,7 +634,9 @@ public class MainActivity extends Activity {
     startDashboardGps();
     refreshMyArea(true);
   }
+  private boolean followPhone(){return getSharedPreferences("newswire-location",MODE_PRIVATE).getBoolean("follow_phone",true);}
   private void startDashboardGps(){
+    if(!followPhone())return;
     if(!dashboardActive||!hasLocationAccess()||dashboardLocationListener!=null)return;
     try{
       dashboardLocationManager=(LocationManager)getSystemService(Context.LOCATION_SERVICE);
@@ -927,6 +954,12 @@ public class MainActivity extends Activity {
     TextView notice=text(tab.equals("News")?"LOCAL HEADLINES  •  NEWSPAPERS":
       tab.equals("National")?"NATIONAL HEADLINES  •  BROADCASTERS":"OFFICIAL CHANNEL LINKS  •  Live coverage depends on the broadcaster",11,ACCENT,true);
     pad(notice,20,8);root.addView(notice);
+    if(tab.equals("News")||tab.equals("National")){
+      TextView listen=button("▶  PLAY MY NEWS ALOUD",this::openSpokenNews);
+      LinearLayout.LayoutParams listenLp=lp(-1,-2);
+      listenLp.leftMargin=dp(16);listenLp.rightMargin=dp(16);listenLp.bottomMargin=dp(8);
+      root.addView(listen,listenLp);
+    }
     if(tab.equals("Sports")){
       LinearLayout sportZip=column();pad(sportZip,16,12);
       TextView instruction=text("FIND HIGH-SCHOOL FOOTBALL SCORES BY ZIP CODE",12,ACCENT,true);
@@ -1195,6 +1228,8 @@ public class MainActivity extends Activity {
   }
   private void startNewsGps(boolean userRequested){
     if(!newsScreenVisible||!"News".equals(tab)||current!=null)return;
+    if(userRequested)getSharedPreferences("newswire-location",MODE_PRIVATE).edit().putBoolean("follow_phone",true).apply();
+    if(!followPhone())return;
     if(!hasLocationAccess()){
       if(Build.VERSION.SDK_INT>=23&&(!newsPermissionRequested||userRequested)){
         newsPermissionRequested=true;
@@ -1379,7 +1414,7 @@ public class MainActivity extends Activity {
     web.getSettings().setGeolocationEnabled(true);
     web.getSettings().setMediaPlaybackRequiresUserGesture(false);
     web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-    web.setWebViewClient(new WebViewClient(){
+    web.setWebViewClient(new NewsWireWebClient(){
       @Override public boolean shouldOverrideUrlLoading(WebView view,android.webkit.WebResourceRequest req){
         String scheme=req.getUrl().getScheme();
         if(!"https".equalsIgnoreCase(scheme)&&!"http".equalsIgnoreCase(scheme)){
@@ -1436,11 +1471,15 @@ public class MainActivity extends Activity {
     try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
     catch(Exception e){android.widget.Toast.makeText(this,"No browser available",0).show();}
   }
-  @Override public void onBackPressed(){
+  @Override public void onBackPressed(){handleBack();}
+  // Android 16 (targetSdk 36) no longer calls onBackPressed(); SystemUi.onBack
+  // routes the system Back gesture here instead.
+  private void handleBack(){
     if(custom!=null){exitFullscreen();return;}
+    if(dashboardActive){finish();return;}
     if(current!=null){if(web!=null&&web.canGoBack()){web.goBack();return;}home();return;}
     if(tab.equals("News")||tab.equals("National")||tab.equals("Weather")||tab.equals("Sports")){dashboard();return;}
-    super.onBackPressed();
+    finish();
   }
   @Override protected void onResume(){
     super.onResume();

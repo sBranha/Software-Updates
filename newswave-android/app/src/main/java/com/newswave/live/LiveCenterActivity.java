@@ -60,7 +60,7 @@ public final class LiveCenterActivity extends Activity {
         }
     };
     @Override public void onCreate(Bundle b){
-        super.onCreate(b);
+        super.onCreate(b);SystemUi.install(this);
         android.content.SharedPreferences prefs=
             getSharedPreferences("newswire-location",MODE_PRIVATE);
         city=getIntent().getStringExtra("city");state=getIntent().getStringExtra("state");
@@ -132,9 +132,9 @@ public final class LiveCenterActivity extends Activity {
         map=new WebView(this);map.setBackgroundColor(BG);
         map.getSettings().setJavaScriptEnabled(true);
         map.getSettings().setDomStorageEnabled(true);
-        map.getSettings().setAllowFileAccess(true);
+        map.getSettings().setAllowFileAccess(false);
         map.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        map.setWebViewClient(new WebViewClient(){
+        map.setWebViewClient(new NewsWireWebClient(){
             @Override public void onPageFinished(WebView view,String url){
                 mapReady=true;
                 if(!Double.isNaN(lat)&&!Double.isNaN(lon))
@@ -145,9 +145,9 @@ public final class LiveCenterActivity extends Activity {
         LinearLayout.LayoutParams web=new LinearLayout.LayoutParams(-1,dp(395));
         web.topMargin=dp(10);root.addView(map,web);
         if(Double.isNaN(lat)||Double.isNaN(lon))
-            map.loadUrl("file:///android_asset/live_center_map.html");
+            map.loadUrl("https://appassets.androidplatform.net/assets/live_center_map.html");
         else map.loadUrl(String.format(Locale.US,
-            "file:///android_asset/live_center_map.html?lat=%.5f&lon=%.5f",lat,lon));
+            "https://appassets.androidplatform.net/assets/live_center_map.html?lat=%.5f&lon=%.5f",lat,lon));
 
         alertsPanel=new LinearLayout(this);alertsPanel.setOrientation(1);
         add(root,alertsPanel,12);

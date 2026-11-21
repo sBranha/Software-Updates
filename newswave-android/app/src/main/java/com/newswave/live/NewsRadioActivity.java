@@ -12,6 +12,9 @@ import java.util.ArrayList;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -39,7 +42,16 @@ public final class NewsRadioActivity extends Activity {
     private double lat=Double.NaN,lon=Double.NaN;
     private MyAreaData.Snapshot snapshot;
     private List<LocalNewspapers.Headline> sports;
-    private boolean loading=false,ready=false,pendingSpeak=false,closed=false;
+    private boolean loading=false,ready=false,pendingSpeak=false,closed=false,autoplay=false;
+    private static final long STALE_BRIEFING_MS=30L*60*1000;
+    private boolean foreground=true,voiceFailed=false,national=false;
+    private String speechId;
+    private int speechSequence=0,speechFocusEpoch=0;
+    private List<LocalNewspapers.Headline> nationalStories;
+    private AudioFocusRequest speechFocus;
+    private final AudioAttributes speechAttributes=new AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
     private TextToSpeech voice;
     private long fetchedAt=0;
     private int generation=0;
@@ -69,7 +81,9 @@ public final class NewsRadioActivity extends Activity {
             runOnUiThread(()->stopStream("Playback stopped for another audio app."));
     };
     @Override public void onCreate(Bundle b){
-        super.onCreate(b);
+        super.onCreate(b);SystemUi.install(this);
+        autoplay=b==null&&getIntent().getBooleanExtra("autoplay",false);
+        national=getIntent().getBooleanExtra("national",false);
         android.content.SharedPreferences prefs=getSharedPreferences("newswire-location",MODE_PRIVATE);
         city=getIntent().getStringExtra("city");state=getIntent().getStringExtra("state");
         if(city==null||city.isEmpty())city=prefs.getString("city","");
@@ -82,7 +96,30 @@ public final class NewsRadioActivity extends Activity {
             if(closed||voice==null)return;
             ready=code==TextToSpeech.SUCCESS;
             if(ready){
-                voice.setLanguage(Locale.US);voice.setSpeechRate(.95f);
+                int language=voice.setLanguage(Locale.US);
+                ready=language!=TextToSpeech.LANG_MISSING_DATA&&language!=TextToSpeech.LANG_NOT_SUPPORTED;
+            }
+            voiceFailed=!ready;
+            if(ready){
+                voice.setSpeechRate(.95f);
+                voice.setAudioAttributes(speechAttributes);
+                voice.setOnUtteranceProgressListener(new UtteranceProgressListener(){
+                    @Override public void onStart(String id){}
+                    @Override public void onDone(String id){
+                        runOnUiThread(()->{
+                            if(closed||!id.equals(speechId))return;
+                            speechId=null;releaseSpeechFocus();
+                            status.setText("Briefing finished · tap PLAY to hear it again.");
+                        });
+                    }
+                    @Override public void onError(String id){
+                        runOnUiThread(()->{
+                            if(closed||!id.equals(speechId))return;
+                            speechId=null;releaseSpeechFocus();
+                            status.setText("Speech stopped unexpectedly. Tap PLAY to try again.");
+                        });
+                    }
+                });
                 if(pendingSpeak){pendingSpeak=false;play();}
             }else status.setText("Android Text-to-Speech isn't available.");
         }));
@@ -127,7 +164,7 @@ public final class NewsRadioActivity extends Activity {
         status=text("Preparing local briefing…",12,CYAN,false);add(root,status,14);
         add(root,button("▶  PLAY MY NEWSWIRE BRIEFING",this::play),10);
         add(root,button("■  STOP PLAYBACK",()->{
-            pendingSpeak=false;if(voice!=null)voice.stop();
+            pendingSpeak=false;autoplay=false;stopBriefing();
             status.setText("Audio stopped.");
         }),9);
         add(root,button("↻  REFRESH THE NEWS & WEATHER",this::refresh),9);
@@ -200,7 +237,13 @@ public final class NewsRadioActivity extends Activity {
     private void updateDetails(){
         if(details==null)return;details.removeAllViews();
         add(details,text("TODAY'S AUDIO LINEUP",12,CYAN,true),0);
-        if(snapshot==null){add(details,text("Waiting for conditions and news sources…",13,MUTED,false),12);return;}
+        if(national){
+            add(details,text("NATIONAL HEADLINES",14,INK,true),10);
+            if(nationalStories!=null)for(LocalNewspapers.Headline h:nationalStories)
+                add(details,text(h.title+" · "+h.source+" · "+LocalNewspapers.age(h),12,INK,false),10);
+            return;
+        }
+        if(snapshot==null){add(details,text("Set a location or refresh to load local news.",13,MUTED,false),12);return;}
         add(details,text("WEATHER: "+(snapshot.conditionsAvailable?
             snapshot.temperature+" · "+snapshot.condition:"NWS observations unavailable"),14,INK,true),10);
         add(details,text("WARNINGS: "+(!snapshot.warningsAvailable?"Feed unavailable":
@@ -219,41 +262,80 @@ public final class NewsRadioActivity extends Activity {
     }
     private void refresh(){
         if(loading){status.setText("Still checking local weather and news…");return;}
-        if(voice!=null)voice.stop();
+        stopBriefing();
         loading=true;status.setText("Checking official conditions and attributed news…");
         final int rev=++generation;
+        if(!national&&!NewsPreferences.muted(this,"sports"))new Thread(()->{
+            List<LocalNewspapers.Headline> found=null;
+            try{found=LocalNewspapers.topicHeadlines(city,state,"sports");}
+            catch(Exception ignored){}
+            final List<LocalNewspapers.Headline> result=found;
+            runOnUiThread(()->{if(!closed&&rev==generation){sports=result;updateDetails();}});
+        },"newswire-sports-briefing").start();
         new Thread(()->{
             MyAreaData.Snapshot weather=null;
-            List<LocalNewspapers.Headline> sport=null;
-            if(!Double.isNaN(lat)&&!Double.isNaN(lon))
+            List<LocalNewspapers.Headline> sport=null,headlines=null;
+            if(!national&&!Double.isNaN(lat)&&!Double.isNaN(lon))
                 weather=MyAreaData.load(lat,lon,city,state);
-            try{sport=LocalNewspapers.topicHeadlines(city,state,"football");}
-            catch(Exception e){android.util.Log.w("NewsWireRadio","Sports news unavailable",e);}
+            if(national){
+                try{headlines=LocalNewspapers.nationalHeadlines();}
+                catch(Exception e){android.util.Log.w("NewsWireRadio","National news unavailable",e);}
+            }
             final MyAreaData.Snapshot result=weather;
-            final List<LocalNewspapers.Headline> sportsNews=sport;
+            final List<LocalNewspapers.Headline> sportsNews=sport,nationalNews=headlines;
             runOnUiThread(()->{
                 if(closed||rev!=generation)return;
-                loading=false;snapshot=result;sports=sportsNews;fetchedAt=System.currentTimeMillis();
-                status.setText(result==null?
-                    "No location available: save your ZIP or enable GPS.":
+                loading=false;snapshot=result;nationalStories=nationalNews;
+                fetchedAt=System.currentTimeMillis();
+                final boolean startNow=foreground&&autoplay&&(national?nationalStories!=null:result!=null);
+                autoplay=false;
+                status.setText(national&&nationalStories==null?"National news unavailable. Tap Refresh to retry.":
+                    !national&&result==null?"No location available: save your ZIP or enable GPS.":
                     "Ready · checked "+new SimpleDateFormat("h:mm a",Locale.US)
                         .format(new Date(fetchedAt))+" · tap PLAY");
                 updateDetails();
+                if(startNow)play();
             });
         },"newswire-radio-data").start();
     }
     private void play(){
-        if(snapshot==null){
-            status.setText("Waiting for the news and weather to load.");return;
+        if(closed||!foreground)return;
+        if(voiceFailed){status.setText("Phone voice unavailable. Check Android Text-to-speech settings.");return;}
+        if(national?nationalStories==null:snapshot==null){
+            if(loading){autoplay=true;status.setText("Loading your briefing… it will play automatically.");}
+            else status.setText(national?"National news unavailable. Tap Refresh to retry.":"No location available: save a ZIP or allow GPS, then tap PLAY.");
+            return;
+        }
+        if(loading){autoplay=true;status.setText("Loading the latest briefing…");return;}
+        if(System.currentTimeMillis()-fetchedAt>STALE_BRIEFING_MS){
+            // Never read an old briefing as if it were current.
+            autoplay=true;status.setText("Updating the news and weather before playing…");
+            refresh();return;
         }
         stopStream(null);
         if(!ready){pendingSpeak=true;status.setText("Preparing phone voice…");return;}
-        StringBuilder script=new StringBuilder("NewsWire local briefing. ");
+        stopBriefing();
+        StringBuilder script=new StringBuilder(national?"NewsWire national news briefing. ":"NewsWire local briefing. ");
+        if(national){
+            int count=0;
+            for(LocalNewspapers.Headline h:nationalStories){
+                script.append("National headline from ").append(h.source).append(". ")
+                    .append(spokenTitle(h)).append(". Published ").append(LocalNewspapers.age(h)).append(". ");
+                if(++count==5)break;
+            }
+            if(count==0)script.append("No recent national headlines are available. ");
+        }else{
         if(!city.isEmpty())script.append("Around ").append(city).append(". ");
-        if(snapshot.conditionsAvailable)
-            script.append("Current weather: ").append(snapshot.temperature.replace("°F"," degrees Fahrenheit"))
-                .append(", ").append(snapshot.condition).append(". Wind ").append(snapshot.wind).append(". ");
-        else script.append("Current weather observations are unavailable. ");
+        if(snapshot.conditionsAvailable){
+            script.append(snapshot.observationAt>0?"Station weather observation: ":"Estimated conditions: ")
+                .append(snapshot.temperature.replace("°F"," degrees Fahrenheit"))
+                .append(", ").append(snapshot.condition.replace(" · ",", "));
+            if(snapshot.wind!=null&&!snapshot.wind.equals("—"))
+                script.append(". Wind ").append(snapshot.wind);
+            script.append(". ");
+            if(snapshot.observationAt>0)script.append("Observed at ")
+                .append(new SimpleDateFormat("h:mm a",Locale.US).format(new Date(snapshot.observationAt))).append(". ");
+        }else script.append("Current weather observations are unavailable. ");
         if(!snapshot.warningsAvailable)
             script.append("Official NWS warning lookup unavailable. Verify emergency alerts. ");
         else if(!snapshot.warnings.isEmpty())
@@ -264,14 +346,63 @@ public final class NewsRadioActivity extends Activity {
         for(LocalNewspapers.Headline h:snapshot.headlines){
             if(!NewsPreferences.allow(this,h.title))continue;
             script.append("Local headline from ").append(h.source).append(". ")
-                .append(h.title).append(". ");
+                .append(spokenTitle(h)).append(". Published ").append(LocalNewspapers.age(h)).append(". ");
             if(++count>=3)break;
         }
         if(sports!=null&&!sports.isEmpty())
             script.append("In school sports reporting: ").append(sports.get(0).title).append(". ");
-        script.append("NewsWire audio uses live provider data that can change.");
-        voice.speak(script.toString(),TextToSpeech.QUEUE_FLUSH,null,"newswire_radio_"+fetchedAt);
-        status.setText("Now speaking your NewsWire local briefing…");
+        }
+        script.append("NewsWire audio uses provider data that can change.");
+        script.append(" Checked at ").append(new SimpleDateFormat("h:mm a",Locale.US).format(new Date(fetchedAt))).append(". ");
+        if(!requestSpeechFocus()){
+            status.setText("Another app is using the audio. Close it and tap PLAY again.");return;
+        }
+        speechId="newswire_radio_"+(++speechSequence);
+        if(voice.speak(script.toString(),TextToSpeech.QUEUE_FLUSH,null,speechId)
+            !=TextToSpeech.SUCCESS){
+            releaseSpeechFocus();
+            status.setText("Phone voice could not start. Check Text-to-speech settings.");return;
+        }
+        status.setText(national?"Now speaking national news…":"Now speaking your NewsWire local briefing…");
+    }
+    /** Google News titles end with " - Publisher"; avoid reading the publisher twice. */
+    private static String spokenTitle(LocalNewspapers.Headline h){
+        String suffix=" - "+h.source;
+        return h.title.endsWith(suffix)?h.title.substring(0,h.title.length()-suffix.length()):h.title;
+    }
+    private boolean requestSpeechFocus(){
+        AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+        if(audio==null)return true;
+        releaseSpeechFocus();
+        final int epoch=++speechFocusEpoch;
+        speechFocus=new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(speechAttributes)
+            .setWillPauseWhenDucked(true)
+            .setOnAudioFocusChangeListener(change->{
+                if(change==AudioManager.AUDIOFOCUS_LOSS||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                    ||change==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+                    runOnUiThread(()->{
+                        if(closed||epoch!=speechFocusEpoch)return;
+                        stopBriefing();
+                        status.setText("Briefing stopped because another app started audio. Tap PLAY to restart.");
+                    });
+            }).build();
+        if(audio.requestAudioFocus(speechFocus)!=AudioManager.AUDIOFOCUS_REQUEST_GRANTED){
+            speechFocus=null;return false;
+        }
+        return true;
+    }
+    private void stopBriefing(){
+        speechId=null;
+        if(voice!=null)voice.stop();
+        releaseSpeechFocus();
+    }
+    private void releaseSpeechFocus(){
+        speechFocusEpoch++;
+        if(speechFocus==null)return;
+        AudioManager audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+        if(audio!=null)audio.abandonAudioFocusRequest(speechFocus);
+        speechFocus=null;
     }
     private void renderStations(){
         if(stationList==null)return;
@@ -498,7 +629,9 @@ public final class NewsRadioActivity extends Activity {
             stopStream("Station unavailable right now. Choose a different station.");
         }
     }
+    @Override protected void onStart(){super.onStart();foreground=true;}
     @Override protected void onStop(){
+        foreground=false;autoplay=false;pendingSpeak=false;stopBriefing();
         // Don't unexpectedly keep station audio running in the background.
         stopStream(null);
         super.onStop();
@@ -506,6 +639,7 @@ public final class NewsRadioActivity extends Activity {
     @Override protected void onDestroy(){
         closed=true;generation++;stationGeneration++;noaaGeneration++;
         stopStream(null);
+        releaseSpeechFocus();
         if(voice!=null){voice.stop();voice.shutdown();voice=null;}
         super.onDestroy();
     }

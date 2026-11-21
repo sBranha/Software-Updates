@@ -125,7 +125,7 @@ public final class LiveTVActivity extends Activity {
             "Mobile / Gulf Coast",true,false,30.6954,-88.0399);
     }
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);
+        super.onCreate(state);SystemUi.install(this);SystemUi.onBack(this,this::handleBack);
         SharedPreferences p=getSharedPreferences("newswire-location",MODE_PRIVATE);
         city=getIntent().getStringExtra("city");this.state=getIntent().getStringExtra("state");
         if(city==null||city.isEmpty())city=p.getString("city","");
@@ -343,7 +343,7 @@ public final class LiveTVActivity extends Activity {
         player.getSettings().setDomStorageEnabled(true);
         player.getSettings().setMediaPlaybackRequiresUserGesture(true);
         player.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        player.setWebViewClient(new WebViewClient(){
+        player.setWebViewClient(new NewsWireWebClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 String scheme=request.getUrl().getScheme();
                 if("https".equalsIgnoreCase(scheme))return false;
@@ -401,10 +401,11 @@ public final class LiveTVActivity extends Activity {
         if(status!=null)status.setText("TV player closed.");
         render();
     }
-    @Override public void onBackPressed(){
+    @Override public void onBackPressed(){handleBack();}
+    private void handleBack(){
         if(customView!=null){closeFullscreen();return;}
         if(player!=null){closePlayer();return;}
-        super.onBackPressed();
+        finish();
     }
     @Override protected void onStop(){
         if(player!=null)player.onPause();

@@ -43,7 +43,7 @@ public final class NewsWireDrivingMapActivity extends Activity {
 
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);
+        super.onCreate(saved);SystemUi.install(this);
         getWindow().setStatusBarColor(0xff05111e);
         getWindow().setNavigationBarColor(0xff061421);
         LinearLayout shell=new LinearLayout(this);
@@ -70,7 +70,7 @@ public final class NewsWireDrivingMapActivity extends Activity {
         view.setWebChromeClient(new WebChromeClient());
         final WebViewAssetLoader localAssets=new WebViewAssetLoader.Builder()
             .addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
-        view.setWebViewClient(new WebViewClient(){
+        view.setWebViewClient(new NewsWireWebClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView web,android.webkit.WebResourceRequest request){
                 return localAssets.shouldInterceptRequest(request.getUrl());
             }

@@ -89,6 +89,9 @@ final class LocalNewspapers {
       case "soccer":
         query="("+city+" "+region+") (high school soccer OR varsity soccer)";
         break;
+      case "sports":
+        query="("+city+" "+region+") (high school sports OR basketball OR football OR baseball OR softball OR soccer)";
+        break;
       case "football":
         query="("+city+" "+region+") (high school football score OR final OR Friday night football)";
         break;
@@ -111,8 +114,8 @@ final class LocalNewspapers {
     ArrayList<Headline> data=new ArrayList<>();
     try{
       connection=(HttpURLConnection)new URL(address).openConnection();
-      connection.setConnectTimeout(8000);
-      connection.setReadTimeout(10000);
+      connection.setConnectTimeout(RefreshBudget.timeout(8000)/2+1);
+      connection.setReadTimeout(RefreshBudget.timeout(10000)/2+1);
       connection.setRequestProperty("Accept","application/rss+xml, application/xml");
       connection.setRequestProperty("User-Agent","NewsWire Android/0.5.2");
       if(connection.getResponseCode()!=200)
@@ -124,6 +127,7 @@ final class LocalNewspapers {
         String title="",link="",source="",published="";
         int event=xml.getEventType();
         while(event!=XmlPullParser.END_DOCUMENT){
+          connection.setReadTimeout(RefreshBudget.timeout(10000));
           if(event==XmlPullParser.START_TAG){
             String name=xml.getName();
             if("item".equals(name)){inItem=true;title="";link="";source="";published="";}

@@ -32,22 +32,22 @@ public class RadarActivity extends Activity {
   private boolean loaded=false;
   private Location pendingPosition;
   @Override public void onCreate(Bundle state) {
-    super.onCreate(state);
+    super.onCreate(state);SystemUi.install(this);SystemUi.onBack(this,this::returnHome);
     getWindow().setStatusBarColor(Color.rgb(9,15,29));
     getWindow().setNavigationBarColor(Color.rgb(9,15,29));
     radar = new WebView(this);
     radar.setBackgroundColor(Color.rgb(9,15,29));
     radar.getSettings().setJavaScriptEnabled(true);
     radar.getSettings().setDomStorageEnabled(true);
-    radar.getSettings().setAllowFileAccess(true);
+    radar.getSettings().setAllowFileAccess(false);
     radar.getSettings().setLoadsImagesAutomatically(true);
     radar.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
     radar.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
     radar.setWebChromeClient(new WebChromeClient());
-    radar.setWebViewClient(new WebViewClient() {
+    radar.setWebViewClient(new NewsWireWebClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
         Uri uri=request.getUrl();
-        if ("file".equalsIgnoreCase(uri.getScheme())) return false;
+        if (("https".equalsIgnoreCase(uri.getScheme())&&"appassets.androidplatform.net".equalsIgnoreCase(uri.getHost()))) return false;
         if ("https".equalsIgnoreCase(uri.getScheme()) && uri.getHost()!=null) {
           try { startActivity(new Intent(Intent.ACTION_VIEW,uri)); }
           catch(Exception e){ Toast.makeText(RadarActivity.this,"Could not open browser",Toast.LENGTH_SHORT).show(); }
@@ -80,13 +80,13 @@ public class RadarActivity extends Activity {
     shell.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(64)));
     shell.addView(radar,new LinearLayout.LayoutParams(-1,0,1));
     setContentView(shell);
-    radar.setWebViewClient(new WebViewClient() {
+    radar.setWebViewClient(new NewsWireWebClient() {
       @Override public void onPageFinished(WebView view,String url){
         loaded=true;if(pendingPosition!=null)deliver(pendingPosition);
       }
       @Override public boolean shouldOverrideUrlLoading(WebView view,android.webkit.WebResourceRequest request){
         Uri uri=request.getUrl();
-        if("file".equalsIgnoreCase(uri.getScheme()))return false;
+        if(("https".equalsIgnoreCase(uri.getScheme())&&"appassets.androidplatform.net".equalsIgnoreCase(uri.getHost())))return false;
         if("https".equalsIgnoreCase(uri.getScheme())&&uri.getHost()!=null){
           try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}
           catch(Exception ex){Toast.makeText(RadarActivity.this,"Could not open browser",Toast.LENGTH_SHORT).show();}
@@ -94,7 +94,7 @@ public class RadarActivity extends Activity {
         return true;
       }
     });
-    radar.loadUrl("file:///android_asset/radar.html");
+    radar.loadUrl("https://appassets.androidplatform.net/assets/radar.html");
     startLocation();
   }
 
