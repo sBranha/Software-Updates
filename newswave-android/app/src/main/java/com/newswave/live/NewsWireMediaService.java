@@ -160,6 +160,7 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
         if(!enterForeground())return;
         session.setActive(true);publish(PlaybackStateCompat.STATE_BUFFERING,status);
         main.postDelayed(preparationTimeout,PREPARATION_TIMEOUT_MS);
+        if(ttsFailed&&tts!=null){tts.shutdown();tts=null;ttsReady=false;ttsFailed=false;}
         initializeVoice();
         loadBriefing(token,id);
     }
@@ -238,6 +239,7 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     }
     private void rendered(String id) {
         if(closed||!id.equals(utterance)||rendered==null)return;
+        utterance=null;
         long token=playback.token();
         try {
             player=new MediaPlayer();
