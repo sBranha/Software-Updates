@@ -24,6 +24,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ServiceController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
@@ -46,12 +47,16 @@ public class NewsWireMediaServiceTest {
     private TestService service;
     private MediaPlayer player;
     @Before public void setUp(){
+        // Android grants this AndroidX merged-manifest signature permission to
+        // its own app. Robolectric API 28 doesn't grant it automatically.
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(
+            RuntimeEnvironment.getApplication().getPackageName()+".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION");
         controller=Robolectric.buildService(TestService.class).create();service=controller.get();
         ShadowTextToSpeech.addLanguageAvailability(Locale.US);
         ShadowMediaPlayer.setCreateListener((created,shadow)->player=created);
         ShadowMediaPlayer.setMediaInfoProvider(source->new ShadowMediaPlayer.MediaInfo(120_000,0));
     }
-    @After public void tearDown(){controller.destroy();}
+    @After public void tearDown(){if(controller!=null)controller.destroy();}
     private void idle(){shadowOf(Looper.getMainLooper()).idle();}
     // Robolectric doesn't deliver framework media Binder transport calls. Exercise the
     // callback actually registered on MediaSessionCompat, not a separate fake callback.
