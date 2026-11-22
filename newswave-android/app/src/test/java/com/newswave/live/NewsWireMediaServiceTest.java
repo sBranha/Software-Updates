@@ -10,6 +10,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.speech.tts.TextToSpeech;
 import android.support.v4.media.MediaBrowserCompat;
+import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import androidx.media.MediaResultCapture;
@@ -29,9 +30,10 @@ import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowMediaPlayer;
 import org.robolectric.shadows.ShadowTextToSpeech;
 import org.robolectric.util.ReflectionHelpers;
+import org.robolectric.shadows.util.DataSource;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28)
+@Config(sdk={28,36})
 @LooperMode(LooperMode.Mode.PAUSED)
 public class NewsWireMediaServiceTest {
     public static class TestService extends NewsWireMediaService {
@@ -61,7 +63,12 @@ public class NewsWireMediaServiceTest {
         ShadowTextToSpeech speech=shadowOf(voice);
         speech.simulateSynthesizeToFileResult(TextToSpeech.SUCCESS);
         speech.getOnInitListener().onInit(TextToSpeech.SUCCESS);idle();
-        service.dataReady(service.requestToken,"NewsWire. Test briefing.");idle();
+        service.dataReady(service.requestToken,"NewsWire. Test briefing.");
+        // The TTS shadow registers a one-second clip; give this test a two-minute
+        // clip before the posted rendering callback opens it with MediaPlayer.
+        ShadowMediaPlayer.addMediaInfo(DataSource.toDataSource(speech.getLastSynthesizeToFile().getAbsolutePath()),
+            new ShadowMediaPlayer.MediaInfo(120_000,0));
+        idle();
         return speech.getLastSynthesizeToFile();
     }
 
@@ -100,7 +107,8 @@ public class NewsWireMediaServiceTest {
         play(CarBriefingText.NATIONAL);
         assertEquals(2,service.loads);assertEquals(CarBriefingText.NATIONAL,service.requested);
         assertFalse(service.playback.current(previous));
-        assertEquals("National News",service.session.getController().getMetadata().getDescription().getTitle());
+        MediaMetadataCompat metadata=ReflectionHelpers.getField(ReflectionHelpers.getField(service.session,"mImpl"),"mMetadata");
+        assertEquals("National News",metadata.getDescription().getTitle());
     }
     @Test public void voicePlaySelectsNationalAndDefaultPlaySelectsLocal(){
         controls().onPlay();idle();
