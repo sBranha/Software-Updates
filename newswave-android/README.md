@@ -1,5 +1,31 @@
-# NewsWire 0.4.5 — private Android Auto test
-Display name: NewsWire. Android applicationId: `com.newswire.live`.
-This is a new Android application ID distinct from the previous `com.newswave.live` phone APK. Existing Java namespace `com.newswave.live` remains as a code namespace.
-This branch creates **debug-signed** test APK and AAB. For the simpler Google Play **Internal app sharing** method, upload the APK. Google re-signs it with an internal test certificate. Do not upload the old NewsWave APK or this debug AAB into the standard Internal testing release form, which requires a production-upload-signed bundle.
-To distribute through the standard internal testing track later, first configure a persistent upload signing key, then generate a release AAB. Keep private keys out of GitHub. Android Auto weather availability requires real-vehicle verification; an installed phone APK alone is not proof that it will appear on the Explorer screen.
+# NewsWire 0.7.17 — Android Auto spoken news
+
+Application ID: `com.newswire.live`. Version code: **52**. Target SDK: 36.
+
+In the Ford Android Auto audio app list, choose **NewsWire Audio**, then **Play My News** or **National News**. Android Auto supplies Play/Pause, Stop and the playback timeline. The existing NewsWire Radar weather screen remains available. Connecting or browsing does not start audio.
+
+Play My News reads a short local briefing with NWS conditions/alerts and up to three attributed recent headlines. National News reads up to five attributed recent headlines without requiring a location. Local playback uses the recent location saved by the phone app, with the saved ZIP as fallback. Set your ZIP in the phone app before the first car test. The media service does not start background GPS tracking.
+
+Briefings are synthesized to a temporary private audio file using Android Text-to-speech. Playback continues when the phone screen is off. Pause preserves the position. Navigation/call interruptions pause speech; transient audio focus returning resumes it unless you paused or stopped. A permanent focus loss requires Play. Briefings older than 15 minutes refresh before resuming; a five-minute pause stops the session. Preparation has a 90-second timeout with a visible error. Stop, completion and destruction release playback, focus, pending work and private audio files.
+
+Only authenticated media browsers receive the catalog/session. Android Auto's production certificate allowlist is derived from Google's Apache-2.0 UAMP sample; privileged system media controllers and this app are also accepted. Debug Android Auto signing certificates are excluded. No private signing material is in this repository.
+
+## Build and verification
+
+Use Java 17 and Android SDK platform 36/build tools 36.0.0. The checked-in Gradle 8.11.1 wrapper and dependency lockfile are required.
+
+```
+./newswave-android/gradlew -p newswave-android :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease :app:lintRelease --no-daemon
+```
+
+The v0.7.17 GitHub workflow also runs the existing Java/JS/map browser regressions and the new car playback-state and bounded speech tests. Robolectric tests exercise the real media session/browser callback integration. Debug APKs use the separate `com.newswire.live.test` package. Release AABs from CI are unsigned; sign the Play bundle privately with the existing upload key.
+
+## Google Play and Ford test
+
+Upload the signed Google Play AAB to the existing internal-testing app. In Play Console, declare the new `mediaPlayback` foreground-service use as user-started spoken news playback, and include Android Auto media in the car distribution/review settings if prompted. Do not use the debug TEST.apk for your normal Play testing.
+
+After updating from Google Play, park the Explorer and reconnect Android Auto. Choose NewsWire Audio in the audio app selector; tap Play My News. Test Pause/Resume, National News, navigation interruption, phone-screen-off playback and Stop. Verify reconnecting does not start audio. A phone install/build/test alone cannot establish Ford screen availability or real audio routing. No phone/Ford hardware result is claimed by automated tests.
+
+## Data and attribution
+
+Weather and alerts use NWS; headlines use the existing publisher-attributed Google News RSS. Spoken stories must have a publication timestamp within 24 hours. Feed failures say unavailable; estimates and observation/check times are named. NewsWire is not an emergency alert receiver. Android's configured TTS engine and voice determine speech availability and whether speech rendering uses a network connection.

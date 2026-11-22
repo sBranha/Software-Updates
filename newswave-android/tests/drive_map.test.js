@@ -79,6 +79,6 @@ assert.ok(radio.includes('SOFT_INPUT_STATE_ALWAYS_HIDDEN'),
   'Keyboard must not obscure station results when entering radio page');
 assert.ok(radio.includes('station.stream.equals(playing.stream)'),
   'Saved station stop button must match by stream address');
-assert.ok(build.includes("versionCode 51"));
-assert.ok(build.includes("versionName '0.7.16'"));
+assert.ok(build.includes("versionCode 52"));
+assert.ok(build.includes("versionName '0.7.17'"));
 console.log("NewsWire Ford-inspired 3D drive map, GPS, privacy, heading and Android Auto contracts PASS");
