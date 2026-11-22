@@ -8,6 +8,7 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -34,7 +35,7 @@ jobs:
           javac -d /tmp/car-tests newswave-android/app/src/main/java/com/newswave/live/NewsFreshness.java newswave-android/app/src/main/java/com/newswave/live/CarBriefingText.java newswave-android/app/src/main/java/com/newswave/live/CarPlaybackState.java newswave-android/tests/CarAudioTest.java
           java -cp /tmp/car-tests com.newswave.live.CarAudioTest
       - name: Android media-service integration tests
-        run: ./newswave-android/gradlew -p newswave-android :app:testDebugUnitTest --write-locks --no-daemon
+        run: ./newswave-android/gradlew -p newswave-android :app:testDebugUnitTest --no-daemon
       - name: Version, GPS, radio, news, safety and map smoke checks
         run: |
           set -euo pipefail
@@ -162,7 +163,7 @@ jobs:
           javac -d /tmp/news-tests newswave-android/app/src/main/java/com/newswave/live/NewsFreshness.java newswave-android/tests/NewsFreshnessTest.java
           java -cp /tmp/news-tests com.newswave.live.NewsFreshnessTest
       - name: Build app for phone testing and unsigned Google Play preparation
-        run: ./newswave-android/gradlew -p newswave-android :app:assembleDebug :app:bundleRelease --write-locks --no-daemon
+        run: ./newswave-android/gradlew -p newswave-android :app:assembleDebug :app:bundleRelease --no-daemon
       - name: Verify archive integrity and package files
         run: |
           set -euo pipefail
@@ -185,7 +186,7 @@ jobs:
             newswave-android/app/gradle.lockfile
           retention-days: 15
       - name: Android release lint
-        run: ./newswave-android/gradlew -p newswave-android :app:lintRelease --write-locks --no-daemon
+        run: ./newswave-android/gradlew -p newswave-android :app:lintRelease --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:

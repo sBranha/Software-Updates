@@ -12,7 +12,7 @@ Only authenticated media browsers receive the catalog/session. Android Auto's pr
 
 ## Build and verification
 
-Use Java 17 and Android SDK platform 36/build tools 36.0.0. The checked-in Gradle 8.11.1 wrapper and dependency lockfile are required.
+Use Java 21 (the Android 16 unit-test runtime requires it) and Android SDK platform 36/build tools 36.0.0. The checked-in Gradle 8.11.1 wrapper and dependency lockfile are required.
 
 ```
 ./newswave-android/gradlew -p newswave-android :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease :app:lintRelease --no-daemon

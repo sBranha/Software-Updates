@@ -61,6 +61,7 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     private MediaPlayer player;
     private Future<?> loading;
     private File rendered;
+    private long durationMillis;
     private String speech,utterance,status="Choose Play My News or National News";
     private Bitmap artwork;
     private final Runnable preparationTimeout=()->fail("Briefing timed out. Check your connection and tap Play to retry.");
@@ -109,7 +110,8 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
         },main);
         setSessionToken(session.getSessionToken());
         setMetadata(0);
-        publish(PlaybackStateCompat.STATE_NONE,status);
+        // Keep the host's Play button available for the default local briefing.
+        publish(PlaybackStateCompat.STATE_STOPPED,status);
     }
 
     @Override public BrowserRoot onGetRoot(String name,int uid,Bundle hints) {
@@ -256,6 +258,9 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
             player.setOnCompletionListener(done->{
                 if(done==player)stopPlayback("Briefing finished. Tap Play for the latest news.");
             });
+            player.setOnSeekCompleteListener(seeked->{
+                if(!closed&&seeked==player&&playback.ready())publish(stateCode(),status);
+            });
             player.setOnErrorListener((failed,what,extra)->{
                 if(failed==player)fail("Audio playback failed. Tap Play to retry.");return true;
             });
@@ -347,9 +352,11 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
         abandonFocus();
     }
     private void setMetadata(long duration) {
+        durationMillis=duration;
         MediaMetadataCompat.Builder metadata=new MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID,playback.selection())
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE,CarBriefingText.title(playback.selection()))
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE,CarBriefingText.title(playback.selection()))
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST,"NewsWire spoken news")
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE,status)
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION,duration);
@@ -368,6 +375,7 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     }
     private void publish(int code,String message) {
         status=message;
+        setMetadata(durationMillis);
         long position=0;
         if(player!=null&&playback.ready())try {position=player.getCurrentPosition();}
         catch(IllegalStateException ignored){}
@@ -379,7 +387,13 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
             .setState(code,position,code==PlaybackStateCompat.STATE_PLAYING?1:0,SystemClock.elapsedRealtime());
         if(code==PlaybackStateCompat.STATE_ERROR)state.setErrorMessage(PlaybackStateCompat.ERROR_CODE_APP_ERROR,message);
         session.setPlaybackState(state.build());
-        if(foreground)getSystemService(NotificationManager.class).notify(NOTIFICATION_ID,notification());
+        if(foreground){
+            NotificationManager notifications=getSystemService(NotificationManager.class);
+            // Media-session notifications are exempt from Android's notification permission;
+            // still handle a device policy denying a notification update.
+            if(notifications!=null)try {notifications.notify(NOTIFICATION_ID,notification());}
+            catch(SecurityException denied){android.util.Log.w("NewsWireAudio","Playback notification update denied",denied);}
+        }
     }
     private PendingIntent openPhone() {
         return PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class)

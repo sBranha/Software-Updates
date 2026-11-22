@@ -82,7 +82,7 @@ public class NewsWireMediaServiceTest {
         assertTrue(result.value.get(0).isPlayable());
         assertEquals(CarBriefingText.NATIONAL,result.value.get(1).getMediaId());
         assertEquals(0,service.loads);
-        assertEquals(PlaybackStateCompat.STATE_NONE,service.session.getController().getPlaybackState().getState());
+        assertEquals(PlaybackStateCompat.STATE_STOPPED,service.session.getController().getPlaybackState().getState());
         assertFalse(service.session.isActive());
     }
     @Test public void unknownBrowserIsDenied(){
@@ -146,6 +146,8 @@ public class NewsWireMediaServiceTest {
         play(CarBriefingText.LOCAL);File wav=prepareSpeech();
         assertNotNull(wav);assertTrue(wav.isFile());assertNotNull(player);assertTrue(player.isPlaying());
         assertEquals(PlaybackStateCompat.STATE_PLAYING,service.session.getController().getPlaybackState().getState());
+        MediaMetadataCompat metadata=ReflectionHelpers.getField(ReflectionHelpers.getField(service.session,"mImpl"),"mMetadata");
+        assertEquals("Playing your news briefing",metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE));
         controls().onSeekTo(30_000);idle();controls().onPause();idle();
         assertFalse(player.isPlaying());assertEquals(30_000,player.getCurrentPosition());
         controls().onPlay();idle();assertTrue(player.isPlaying());assertEquals(30_000,player.getCurrentPosition());
