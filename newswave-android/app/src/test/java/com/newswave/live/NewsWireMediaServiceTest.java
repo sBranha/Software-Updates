@@ -186,4 +186,15 @@ public class NewsWireMediaServiceTest {
         assertEquals(CarPlaybackState.Phase.ERROR,service.playback.phase());assertNull(player);
         assertFalse(speech.getLastSynthesizeToFile().exists());
     }
+    @Test public void audioDisconnectPausesWithoutAutomaticResume(){
+        play(CarBriefingText.LOCAL);prepareSpeech();
+        service.sendBroadcast(new Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY));idle();
+        assertFalse(player.isPlaying());assertFalse(service.playback.wantsPlay());
+        assertEquals(PlaybackStateCompat.STATE_PAUSED,service.session.getController().getPlaybackState().getState());
+    }
+    @Test public void lastCarBrowserDisconnectPausesTheBriefing(){
+        play(CarBriefingText.LOCAL);prepareSpeech();
+        service.onUnbind(new Intent("android.media.browse.MediaBrowserService"));idle();
+        assertFalse(player.isPlaying());assertFalse(service.playback.wantsPlay());
+    }
 }

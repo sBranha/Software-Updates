@@ -5,6 +5,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.Context;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -27,6 +30,7 @@ import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 import androidx.media.MediaBrowserServiceCompat;
 import java.io.File;
 import java.util.ArrayList;
@@ -57,6 +61,13 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     private AudioFocusRequest focus;
     private int focusEpoch;
     private boolean hasFocus,foreground,closed,ttsReady,ttsFailed;
+    private boolean noisyRegistered;
+    private final BroadcastReceiver noisy=new BroadcastReceiver(){
+        @Override public void onReceive(Context context,Intent intent){
+            if(AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())&&foreground)
+                pauseForDisconnect();
+        }
+    };
     private TextToSpeech tts;
     private MediaPlayer player;
     private Future<?> loading;
@@ -70,6 +81,9 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     @Override public void onCreate() {
         super.onCreate();
         audio=(AudioManager)getSystemService(AUDIO_SERVICE);
+        ContextCompat.registerReceiver(this,noisy,new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+            ContextCompat.RECEIVER_NOT_EXPORTED);
+        noisyRegistered=true;
         NotificationManager notifications=getSystemService(NotificationManager.class);
         if(notifications!=null){
             NotificationChannel channel=new NotificationChannel(CHANNEL,"NewsWire spoken news",NotificationManager.IMPORTANCE_LOW);
@@ -150,6 +164,14 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
         }
         if(!foreground)stopSelf(startId);
         return START_NOT_STICKY;
+    }
+    @Override public boolean onUnbind(Intent intent) {
+        // With the last browser gone, don't move car speech onto the phone speaker.
+        if(foreground)pauseForDisconnect();
+        return super.onUnbind(intent);
+    }
+    private void pauseForDisconnect(){
+        pauseByUser();publish(PlaybackStateCompat.STATE_PAUSED,"Audio connection ended · tap Play to continue");
     }
 
     private void select(String id) {
@@ -431,6 +453,7 @@ public class NewsWireMediaService extends MediaBrowserServiceCompat {
     }
     @Override public void onDestroy() {
         closed=true;playback.stop();releaseWork();worker.shutdownNow();
+        if(noisyRegistered){unregisterReceiver(noisy);noisyRegistered=false;}
         if(tts!=null){tts.shutdown();tts=null;}
         main.removeCallbacksAndMessages(null);
         if(session!=null){session.setActive(false);session.release();}
