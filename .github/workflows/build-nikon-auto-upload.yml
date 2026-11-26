@@ -10,6 +10,9 @@ on:
       - '.github/workflows/build-nikon-auto-upload.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -73,3 +76,15 @@ jobs:
             CameraAutoUpload-${{ steps.ver.outputs.name }}-unsigned.apk
             signing-tools/
           if-no-files-found: error
+
+      - name: Commit unsigned APK to the branch (outside the build paths, so no rebuild loop)
+        if: startsWith(github.ref_name, 'claude/nikon-')
+        shell: bash
+        run: |
+          mkdir -p nikon-auto-upload-dist
+          cp "CameraAutoUpload-${{ steps.ver.outputs.name }}-unsigned.apk" nikon-auto-upload-dist/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f nikon-auto-upload-dist/
+          git commit -m "Add unsigned APK ${{ steps.ver.outputs.name }} [skip ci]" || exit 0
+          git push origin HEAD:${{ github.ref_name }}
