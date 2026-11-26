@@ -27,55 +27,57 @@ public final class MultiCameraSupport {
     }
 
     private static String commonServer(){
-        return "Use plain FTP (not FTPS/SFTP). Server = the phone IP shown by the app, port 2121, user nikon, password = Advanced FTP password. Use Passive/PASV mode when the camera offers it. Destination folder = root. For this app/Flickr workflow, transfer JPEG files.";
+        return "Use plain FTP (not FTPS/SFTP). Server = the phone IP shown by the app, port 2121, user/password = the values shown in Settings > FTP Login. Use Passive/PASV mode when the camera offers it. Destination folder = root. For this app/Flickr workflow, transfer JPEG files.";
     }
 
     private static Profile nikon(String model, boolean grip){
         return new Profile("Nikon",model,MODE_CAMERA_AP,grip,"Direct Wi-Fi FTP",
                 "Network menu → Connect to FTP server → Network settings → Create profile → Connection wizard → Direct connection / Wi-Fi access point mode.\n\n"+
-                "Join the camera's Wi-Fi network on this Android phone. On the camera choose FTP, enter port 2121, choose Enter user ID, use user nikon and the password shown in Advanced FTP. Choose the server home/root folder.\n\n"+
+                "Join the camera's Wi-Fi network on this Android phone. On the camera choose FTP, enter port 2121, choose Enter user ID, use the FTP username and password shown in Settings > FTP Login. Choose the server home/root folder.\n\n"+
                 "Then enable Connect to FTP server → Options → Auto upload. For RAW+JPEG, choose JPEG only if that option is available.\n\n"+commonServer(),"");
     }
     private static Profile nikonAccessory(String model, boolean grip, String accessory){
         return new Profile("Nikon",model,MODE_CAMERA_AP,grip,"Wireless transmitter + FTP",
                 "Attach and enable the "+accessory+". Create an FTP upload profile on the camera/transmitter. Use access-point mode if available so the transmitter/camera creates the Wi-Fi network; join that network on the Android phone.\n\n"+
-                "Enter the phone FTP server information shown by the app: port 2121, user nikon, Advanced FTP password, root folder. Enable automatic upload / upload as taken on the camera.\n\n"+commonServer(),accessory);
+                "Enter the phone FTP server information shown by the app: port 2121, the username/password shown in Settings > FTP Login, root folder. Enable automatic upload / upload as taken on the camera.\n\n"+commonServer(),accessory);
     }
     private static Profile canon(String model, boolean grip){
         return new Profile("Canon",model,MODE_PHONE_HOTSPOT,grip,"Phone hotspot + FTP",
-                "Turn on Android Mobile Hotspot and connect the camera to that hotspot.\n\n"+
-                "Camera: Communication functions / Wireless features → Transfer images to FTP server. Create or add a connection, choose FTP, and enter the phone hotspot IP shown by this app. Set the port to 02121/2121, Passive mode Enable, login user nikon, and the Advanced FTP password. Choose Root folder.\n\n"+
+                "In Nikon Auto Upload Settings, tap START CAMERA HOTSPOT. Connect the camera to the Wi-Fi name and password shown by the app.\n\n"+
+                "Camera: Communication functions / Wireless features → Transfer images to FTP server. Create or add a connection, choose FTP, and enter the phone hotspot IP shown by this app. Set the port to 02121/2121, Passive mode Enable, login with the username/password shown in Settings > FTP Login. Choose Root folder.\n\n"+
                 "Open FTP transfer settings and set Automatic transfer to Enable. Set Images to transfer to JPEG when shooting RAW+JPEG.\n\n"+commonServer(),"");
     }
     private static Profile canonAccessory(String model, boolean grip, String accessory){
         return new Profile("Canon",model,MODE_PHONE_HOTSPOT,grip,"Phone hotspot + wireless transmitter FTP",
-                "Attach and enable the "+accessory+". Turn on Android Mobile Hotspot and connect the transmitter/camera to it.\n\n"+
-                "Create an FTP transfer connection, use FTP, enter the phone hotspot IP shown by the app, port 2121, Passive mode Enable, user nikon, and the Advanced FTP password. Choose the root folder and enable automatic transfer after shooting.\n\n"+commonServer(),accessory);
+                "Attach and enable the "+accessory+". In Nikon Auto Upload Settings, tap START CAMERA HOTSPOT. Connect the transmitter/camera to the Wi-Fi name and password shown by the app.\n\n"+
+                "Create an FTP transfer connection, use FTP, enter the phone hotspot IP shown by the app, port 2121, Passive mode Enable, and the username/password shown in Settings > FTP Login. Choose the root folder and enable automatic transfer after shooting.\n\n"+commonServer(),accessory);
     }
     private static Profile sony(String model, boolean grip){
         return new Profile("Sony",model,MODE_PHONE_HOTSPOT,grip,"Phone hotspot + FTP",
-                "Turn on Android Mobile Hotspot and connect the camera to that hotspot using Network → Wi-Fi / Access Point Set.\n\n"+
-                "Camera: Network → FTP Transfer → FTP Transfer Func. → Server Setting. Set Host Name to the phone hotspot IP shown by this app, Port 2121, Secure Protocol Off, user nikon, and the Advanced FTP password. Use Passive mode if offered.\n\n"+
+                "In Nikon Auto Upload Settings, tap START CAMERA HOTSPOT. Connect the camera to that Wi-Fi using Network → Wi-Fi / Access Point Set.\n\n"+
+                "Camera: Network → FTP Transfer → FTP Transfer Func. → Server Setting. Set Host Name to the phone hotspot IP shown by this app, Port 2121, Secure Protocol Off, and the username/password shown in Settings > FTP Login. Use Passive mode if offered.\n\n"+
                 "Set FTP Function On, then Auto FTP Transfer / Auto Trans When Shot to On. For RAW+JPEG, choose JPEG as the transfer target.\n\n"+commonServer(),"");
     }
     private static Profile fuji(String model, boolean grip){
         return new Profile("Fujifilm",model,MODE_PHONE_HOTSPOT,grip,"Phone hotspot + FTP",
-                "Turn on Android Mobile Hotspot and connect the camera to it.\n\n"+
+                "In Nikon Auto Upload Settings, tap START CAMERA HOTSPOT and connect the camera to the Wi-Fi name/password shown by the app.\n\n"+
                 "Camera: Network/USB Setting → Create/Edit Connection Setting → Create Using Wizard → FTP Transfer → Wireless LAN. Create the wireless communication profile for the phone hotspot.\n\n"+
-                "Create the FTP server profile: FTP server type FTP, address = phone hotspot IP shown by the app, port 2121, proxy Disable, PASV Enable, User Name & Password = nikon plus the Advanced FTP password, destination Root Folder.\n\n"+
+                "Create the FTP server profile: FTP server type FTP, address = phone hotspot IP shown by the app, port 2121, proxy Disable, PASV Enable, User Name & Password = the values shown in Settings > FTP Login, destination Root Folder.\n\n"+
                 "Enable FTP Optional Setting → Auto Image Transfer Order so new photos are marked and sent automatically. Use JPEG for the Flickr workflow.\n\n"+commonServer(),"");
     }
     private static Profile fujiAccessory(String model, boolean grip, String accessory){
         return new Profile("Fujifilm",model,MODE_PHONE_HOTSPOT,grip,"FT-XH + phone hotspot + FTP",
-                "Attach the "+accessory+" and make sure it has power. Turn on Android Mobile Hotspot and connect the file transmitter to it.\n\n"+
-                "Camera: Network/USB Setting → Create/Edit Connection Setting → Create Using Wizard → FTP Transfer → Wireless LAN. Configure the hotspot, then create the FTP server profile using phone IP, port 2121, proxy Disable, PASV Enable, user nikon, and the Advanced FTP password.\n\n"+
+                "Attach the "+accessory+" and make sure it has power. In Nikon Auto Upload Settings, tap START CAMERA HOTSPOT and connect the file transmitter to the Wi-Fi name/password shown by the app.\n\n"+
+                "Camera: Network/USB Setting → Create/Edit Connection Setting → Create Using Wizard → FTP Transfer → Wireless LAN. Configure the hotspot, then create the FTP server profile using phone IP, port 2121, proxy Disable, PASV Enable, and the username/password shown in Settings > FTP Login.\n\n"+
                 "Set destination to Root Folder and enable FTP Optional Setting → Auto Image Transfer Order.\n\n"+commonServer(),accessory);
     }
 
     public static final Profile[] PROFILES={
         nikon("Z9",true), nikon("Z8",false), nikon("Z6III",false), nikon("Z5II",false), nikon("Zf",false), nikon("Z50II",false), nikon("ZR",false),
         nikonAccessory("Z7II",false,"WT-7"), nikonAccessory("Z6II",false,"WT-7"), nikonAccessory("Z7",false,"WT-7"), nikonAccessory("Z6",false,"WT-7"),
-        nikonAccessory("D850",false,"WT-7"), nikonAccessory("D6",true,"WT-6"),
+        nikonAccessory("D850",false,"WT-7"), nikonAccessory("D780",false,"WT-7"), nikonAccessory("D500",false,"WT-7"),
+        nikonAccessory("D810A",false,"WT-7"), nikonAccessory("D810",false,"WT-7"), nikonAccessory("D750",false,"WT-7"), nikonAccessory("D7200",false,"WT-7"),
+        nikonAccessory("D6",true,"WT-6"), nikonAccessory("D5",true,"WT-6 / WT-5"), nikonAccessory("D4S",true,"WT-5"), nikonAccessory("D4",true,"WT-5"),
 
         canon("EOS R1",true), canon("EOS R5 Mark II",false), canon("EOS R3",true), canon("EOS R5",false),
         canon("EOS R6 Mark III",false), canon("EOS R6 Mark II",false), canon("EOS R6 V",false), canon("EOS R6",false),
@@ -84,7 +86,7 @@ public final class MultiCameraSupport {
         sony("α7 V",false), sony("α1 II",false), sony("α1",false), sony("α9 III",false), sony("α9 II",false), sony("α9",false),
         sony("α7 IV",false), sony("α7 III",false), sony("α7S III",false), sony("α7R V",false), sony("α7R IV",false), sony("α7R IVA",false),
         sony("α7R III",false), sony("α7R IIIA",false), sony("α7C II",false), sony("α7CR",false), sony("α7C",false),
-        sony("FX3",false), sony("FX30",false),
+        sony("FX3",false), sony("FX30",false), sony("FX2",false), sony("ILX-LR1",false),
 
         fuji("GFX100 II",true), fuji("GFX100S II",false), fujiAccessory("X-H2",false,"FT-XH"), fujiAccessory("X-H2S",false,"FT-XH")
     };
@@ -109,7 +111,7 @@ public final class MultiCameraSupport {
     public static String waitingText(SharedPreferences p){
         Profile x=selected(p);
         String extra=x.accessory.isEmpty()?"":" "+x.accessory+" required.";
-        return usesPhoneHotspot(p)?"Turn on Android Mobile Hotspot and connect the "+x.model+" to it."+extra:"Turn on the "+x.model+" FTP Wi-Fi access-point profile."+extra+" No outside Wi-Fi is required.";
+        return usesPhoneHotspot(p)?"Start the Camera Hotspot inside this app, then connect the "+x.model+" to the Wi-Fi name/password shown here."+extra:"Turn on the "+x.model+" FTP Wi-Fi access-point profile."+extra+" No outside Wi-Fi is required.";
     }
 
     public static View artwork(Context c, SharedPreferences p){
@@ -137,7 +139,8 @@ public final class MultiCameraSupport {
     public static void showSetup(Activity a, SharedPreferences p){
         Profile x=selected(p);String ip=findBestLocalIp();
         String accessory=x.accessory.isEmpty()?"":"\n\nHardware note: "+x.accessory+" is required.";
-        String msg=x.setupSteps+accessory+"\n\nCurrent phone FTP address: "+ip+":2121";
+        String user=p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER),pass=p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD);
+        String msg=x.setupSteps+accessory+"\n\nCurrent phone FTP address: "+ip+":2121\nFTP username: "+user+"\nFTP password: "+pass;
         scrollDialog(a,x.displayName()+" — "+x.setupTitle,msg);
     }
 

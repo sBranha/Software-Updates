@@ -25,7 +25,19 @@ public static class SettingsStore
     public static void Save(AppSettings settings)
     {
         AppPaths.Ensure();
-        File.WriteAllText(AppPaths.SettingsFile, JsonSerializer.Serialize(settings, JsonOptions.Default));
+        AtomicFile.WriteAllText(AppPaths.SettingsFile, JsonSerializer.Serialize(settings, JsonOptions.Default));
+    }
+}
+
+/// <summary>Write to a temp file then swap it in, so a crash or power cut can never leave a half-written (and then silently reset) settings or queue file.</summary>
+public static class AtomicFile
+{
+    public static void WriteAllText(string path, string text)
+    {
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, text);
+        if (File.Exists(path)) File.Replace(tmp, path, null, true);
+        else File.Move(tmp, path);
     }
 }
 
@@ -40,37 +52,82 @@ public sealed class WatchFolderService : IDisposable
     {
         Stop();
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+        watchedFolder = folder;
+        startedUtc = DateTime.UtcNow;
         watcher = new FileSystemWatcher(folder)
         {
             IncludeSubdirectories = true,
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.Size | NotifyFilters.LastWrite,
             Filter = "*.*",
-            EnableRaisingEvents = true
+            // 64 KB (the maximum) so a fast burst doesn't overflow Windows' change buffer.
+            InternalBufferSize = 64 * 1024
         };
         watcher.Created += OnFile;
         watcher.Renamed += OnRename;
+        watcher.Error += OnWatcherError;
+        watcher.EnableRaisingEvents = true;
         Log?.Invoke($"Watching tether folder: {folder}");
     }
+
+    string watchedFolder = "";
+    DateTime startedUtc;
 
     void OnFile(object? s, FileSystemEventArgs e) => _ = HandleAsync(e.FullPath);
     void OnRename(object? s, RenamedEventArgs e) => _ = HandleAsync(e.FullPath);
 
-    async Task HandleAsync(string path)
+    // If Windows' change buffer overflowed during a burst, events were lost: rescan for new files.
+    void OnWatcherError(object? s, ErrorEventArgs e)
     {
-        if (!IsPhoto(path)) return;
-        if (recentlySeen.TryGetValue(path, out var when) && DateTime.UtcNow - when < TimeSpan.FromSeconds(5)) return;
-        recentlySeen[path] = DateTime.UtcNow;
-        for (var i = 0; i < 30; i++)
+        Log?.Invoke("Tether folder watcher overflowed — rescanning for new photos");
+        var folder = watchedFolder;
+        _ = Task.Run(async () =>
         {
             try
             {
-                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                if (fs.Length > 0) break;
+                foreach (var f in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
+                    if (IsPhoto(f) && File.GetLastWriteTimeUtc(f) >= startedUtc && !recentlySeen.ContainsKey(f)) await HandleAsync(f);
             }
-            catch { await Task.Delay(350); }
+            catch (Exception ex) { Log?.Invoke("Rescan: " + ex.Message); }
+        });
+    }
+
+    async Task HandleAsync(string path)
+    {
+        if (!IsPhoto(path)) return;
+        if (!recentlySeen.TryAdd(path, DateTime.UtcNow))
+        {
+            if (DateTime.UtcNow - recentlySeen[path] < TimeSpan.FromMinutes(10)) return;
+            recentlySeen[path] = DateTime.UtcNow;
         }
+        if (recentlySeen.Count > 20000)
+            foreach (var k in recentlySeen.Where(x => DateTime.UtcNow - x.Value > TimeSpan.FromHours(1)).Select(x => x.Key).ToList()) recentlySeen.TryRemove(k, out _);
+
+        // A file is complete only when the writer has closed it (we can open it exclusively)
+        // and its size has stopped changing. Previously a file still being written could be
+        // copied and uploaded half-finished.
+        long lastSize = -1;
+        var ready = false;
+        for (var i = 0; i < 240 && !ready; i++)
+        {
+            try
+            {
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+                if (fs.Length > 0 && fs.Length == lastSize) ready = true;
+                else lastSize = fs.Length;
+            }
+            catch (FileNotFoundException) { return; }
+            catch (DirectoryNotFoundException) { return; }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            if (!ready) await Task.Delay(500);
+        }
+        if (!ready) { Log?.Invoke($"Tether file never finished writing, skipped: {Path.GetFileName(path)}"); recentlySeen.TryRemove(path, out _); return; }
         Log?.Invoke($"Tether file received: {Path.GetFileName(path)}");
-        if (FileArrived != null) await FileArrived(path);
+        if (FileArrived != null)
+        {
+            try { await FileArrived(path); }
+            catch (Exception ex) { Log?.Invoke("Tether import: " + ex.Message); }
+        }
     }
 
     static bool IsPhoto(string p)
@@ -101,6 +158,20 @@ public sealed class FtpReceiverService : IDisposable
     public bool Running => listener != null;
     public event Func<string, Task>? FileReceived;
     public event Action<string>? Log;
+
+    // Processing (copy, editor, queue) runs off the camera's connection so the camera can send
+    // the next file immediately. Files are processed in arrival order.
+    readonly SemaphoreSlim processingOrder = new(1, 1);
+    void HandOff(string path)
+    {
+        _ = Task.Run(async () =>
+        {
+            await processingOrder.WaitAsync();
+            try { if (FileReceived != null) await FileReceived(path); }
+            catch (Exception ex) { Log?.Invoke("Processing " + Path.GetFileName(path) + ": " + ex.Message); }
+            finally { processingOrder.Release(); }
+        });
+    }
 
     public void Start(int port, string username, string password, string outputFolder)
     {
@@ -133,6 +204,8 @@ public sealed class FtpReceiverService : IDisposable
     async Task HandleClient(TcpClient client, CancellationToken token)
     {
         TcpListener? passive = null;
+        var storedSizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        try {
         using (client)
         using (var stream = client.GetStream())
         using (var reader = new StreamReader(stream, Encoding.ASCII, false, 4096, true))
@@ -158,7 +231,40 @@ public sealed class FtpReceiverService : IDisposable
                     case "PWD": await writer.WriteLineAsync("257 \"/\""); break;
                     case "CWD": await writer.WriteLineAsync("250 Directory changed"); break;
                     case "NOOP": await writer.WriteLineAsync("200 OK"); break;
-                    case "SIZE": await writer.WriteLineAsync("550 File not found"); break;
+                    case "SIZE":
+                    {
+                        var key = SanitizeFileName(Path.GetFileName(arg));
+                        await writer.WriteLineAsync(storedSizes.TryGetValue(key, out var size) ? $"213 {size}" : "550 File not found");
+                        break;
+                    }
+                    case "XPWD": await writer.WriteLineAsync("257 \"/\""); break;
+                    case "XCWD": case "CDUP": case "XCUP": await writer.WriteLineAsync("250 Directory changed"); break;
+                    case "MKD": case "XMKD": await writer.WriteLineAsync("257 Directory created"); break;
+                    case "MODE": await writer.WriteLineAsync("200 Mode S"); break;
+                    case "STRU": await writer.WriteLineAsync("200 Structure F"); break;
+                    case "ALLO": await writer.WriteLineAsync("202 No storage allocation necessary"); break;
+                    case "REST":
+                        // Resuming would produce a file missing its beginning; ask for the whole file.
+                        await writer.WriteLineAsync(arg == "0" ? "350 Restart position accepted" : "504 Resume not supported; send the whole file");
+                        break;
+                    case "APPE": await writer.WriteLineAsync("502 APPE not supported; use STOR"); break;
+                    case "LIST":
+                    case "NLST":
+                    {
+                        if (!authed) { await writer.WriteLineAsync("530 Not logged in"); break; }
+                        if (passive == null) { await writer.WriteLineAsync("425 Use PASV first"); break; }
+                        await writer.WriteLineAsync("150 Opening data connection");
+                        try
+                        {
+                            using var dataClient = await passive.AcceptTcpClientAsync(token).AsTask().WaitAsync(TimeSpan.FromMinutes(2), token);
+                            await using var data = dataClient.GetStream();
+                            if (cmd == "LIST") { var b = Encoding.ASCII.GetBytes("drwxr-xr-x 1 nikon nikon 0 Jan 01 00:00 .\r\n"); await data.WriteAsync(b, token); }
+                            await writer.WriteLineAsync("226 Transfer complete");
+                        }
+                        catch (Exception) { await writer.WriteLineAsync("425 Could not open data connection"); }
+                        finally { passive.Stop(); passive = null; }
+                        break;
+                    }
                     case "PASV":
                     {
                         passive?.Stop();
@@ -185,25 +291,36 @@ public sealed class FtpReceiverService : IDisposable
                         if (!authed) { await writer.WriteLineAsync("530 Not logged in"); break; }
                         if (passive == null) { await writer.WriteLineAsync("425 Use PASV first"); break; }
                         await writer.WriteLineAsync("150 Opening binary mode data connection");
+                        var clean = SanitizeFileName(Path.GetFileName(arg));
+                        if (string.IsNullOrWhiteSpace(clean)) clean = "camera_" + DateTime.Now.ToString("yyyyMMdd_HHmmssfff") + ".jpg";
+                        // Receive into a hidden .part file; only a fully received file gets its real name.
+                        var part = Path.Combine(root, "." + Guid.NewGuid().ToString("N") + ".part");
+                        string? target = null;
                         try
                         {
-                            using var dataClient = await passive.AcceptTcpClientAsync(token);
-                            await using var data = dataClient.GetStream();
-                            var clean = SanitizeFileName(Path.GetFileName(arg));
-                            if (string.IsNullOrWhiteSpace(clean)) clean = "camera_" + DateTime.Now.ToString("yyyyMMdd_HHmmssfff") + ".jpg";
-                            var target = UniquePath(root, clean);
-                            await using (var file = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
-                                await data.CopyToAsync(file, token);
+                            long bytes;
+                            using (var dataClient = await passive.AcceptTcpClientAsync(token).AsTask().WaitAsync(TimeSpan.FromMinutes(2), token))
+                            {
+                                dataClient.ReceiveBufferSize = 1024 * 1024;
+                                await using var data = dataClient.GetStream();
+                                await using var file = new FileStream(part, FileMode.CreateNew, FileAccess.Write, FileShare.None, 256 * 1024, true);
+                                await data.CopyToAsync(file, 256 * 1024, token);
+                                bytes = file.Length;
+                            }
+                            if (bytes == 0) { File.Delete(part); await writer.WriteLineAsync("226 Transfer complete"); break; }
+                            lock (renameLock) { target = UniquePath(root, clean); File.Move(part, target); }
+                            storedSizes[clean] = bytes;
                             await writer.WriteLineAsync("226 Transfer complete");
                             Log?.Invoke($"FTP received: {Path.GetFileName(target)}");
-                            if (FileReceived != null) await FileReceived(target);
+                            HandOff(target);
                         }
                         catch (Exception ex)
                         {
-                            await writer.WriteLineAsync("451 Transfer failed");
-                            Log?.Invoke("FTP transfer: " + ex.Message);
+                            try { if (File.Exists(part)) File.Delete(part); } catch { }
+                            await writer.WriteLineAsync("426 Transfer aborted; please resend");
+                            Log?.Invoke("FTP transfer incomplete (camera will resend): " + ex.Message);
                         }
-                        finally { passive.Stop(); passive = null; }
+                        finally { passive?.Stop(); passive = null; }
                         break;
                     }
                     case "QUIT": await writer.WriteLineAsync("221 Goodbye"); return;
@@ -211,8 +328,15 @@ public sealed class FtpReceiverService : IDisposable
                 }
             }
         }
-        passive?.Stop();
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or OperationCanceledException)
+        {
+            if (!token.IsCancellationRequested) Log?.Invoke("Camera FTP session ended: " + ex.Message);
+        }
+        finally { passive?.Stop(); }
     }
+
+    readonly object renameLock = new();
 
     static IPAddress FindLocalIPv4()
     {
@@ -338,7 +462,10 @@ public sealed class UploadQueueService
         }
         finally { gate.Release(); }
         CountChanged?.Invoke(queue.Count);
+        wake.Release();
     }
+
+    readonly SemaphoreSlim wake = new(0, int.MaxValue);
 
     public void Start(Func<AppSettings> settingsProvider)
     {
@@ -357,8 +484,17 @@ public sealed class UploadQueueService
                 {
                     UploadItem? item = null;
                     await gate.WaitAsync(ct);
-                    try { item = queue.FirstOrDefault(x => File.Exists(x.FilePath)); }
+                    try
+                    {
+                        // Drop entries whose file is gone, then take the oldest item that isn't
+                        // waiting out a retry delay. One bad photo can no longer block the queue.
+                        var missing = queue.RemoveAll(x => !File.Exists(x.FilePath));
+                        if (missing > 0) { Save(); Log?.Invoke($"Removed {missing} queue item(s) whose file no longer exists"); }
+                        var now = DateTime.UtcNow;
+                        item = queue.Where(x => x.NextAttemptUtc <= now).OrderBy(x => x.Attempts > 0 ? 1 : 0).ThenBy(x => x.AddedUtc).FirstOrDefault();
+                    }
                     finally { gate.Release(); }
+                    if (missingCountChanged()) CountChanged?.Invoke(queue.Count);
                     if (item != null)
                     {
                         try
@@ -372,24 +508,38 @@ public sealed class UploadQueueService
                             Log?.Invoke("Flickr upload complete: " + id);
                             continue;
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
                         {
-                            item.Attempts++; item.LastError = ex.Message; Save();
-                            Log?.Invoke("Flickr: " + ex.Message);
+                            await gate.WaitAsync(ct);
+                            try
+                            {
+                                item.Attempts++; item.LastError = ex.Message;
+                                var delay = TimeSpan.FromSeconds(Math.Min(900, 15 * Math.Pow(2, Math.Min(6, item.Attempts - 1))));
+                                item.NextAttemptUtc = DateTime.UtcNow + delay;
+                                Save();
+                            }
+                            finally { gate.Release(); }
+                            Log?.Invoke($"Flickr (attempt {item.Attempts}, retry in {(int)Math.Ceiling((item.NextAttemptUtc - DateTime.UtcNow).TotalSeconds)} s): " + ex.Message);
+                            continue;
                         }
                     }
                 }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { Log?.Invoke("Upload queue: " + ex.Message); }
-            try { await Task.Delay(TimeSpan.FromSeconds(12), ct); } catch { break; }
+            try { await wake.WaitAsync(TimeSpan.FromSeconds(12), ct); } catch { break; }
         }
     }
 
+    int lastReportedCount = -1;
+    bool missingCountChanged() { var changed = lastReportedCount != queue.Count; lastReportedCount = queue.Count; return changed; }
+
+    // Caller must hold the gate.
     void Save()
     {
         AppPaths.Ensure();
-        File.WriteAllText(AppPaths.QueueFile, JsonSerializer.Serialize(queue, JsonOptions.Default));
+        try { AtomicFile.WriteAllText(AppPaths.QueueFile, JsonSerializer.Serialize(queue, JsonOptions.Default)); }
+        catch (Exception ex) { Log?.Invoke("Could not save upload queue: " + ex.Message); }
     }
 }
 
@@ -397,6 +547,7 @@ public static class WindowsCameraHelpers
 {
     public static IEnumerable<string> FindCameraFolders()
     {
+        var found = new List<string>();
         foreach (var d in DriveInfo.GetDrives())
         {
             try
@@ -404,10 +555,11 @@ public static class WindowsCameraHelpers
                 if (!d.IsReady) continue;
                 if (d.DriveType is not (DriveType.Removable or DriveType.Fixed)) continue;
                 var dcim = Path.Combine(d.RootDirectory.FullName, "DCIM");
-                if (Directory.Exists(dcim)) yield return dcim;
+                if (Directory.Exists(dcim)) found.Add(dcim);
             }
             catch { }
         }
+        return found;
     }
 
     public static void OpenHotspotSettings()

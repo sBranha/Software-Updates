@@ -11,7 +11,7 @@ import javax.crypto.spec.SecretKeySpec;
 public final class OAuth1 {
     private OAuth1() {}
     public static String enc(String s) {
-        try { return URLEncoder.encode(s == null ? "" : s, "UTF-8").replace("+","%20").replace("%7E","~"); }
+        try { return URLEncoder.encode(s == null ? "" : s, "UTF-8").replace("+","%20").replace("*","%2A").replace("%7E","~"); }
         catch (Exception e) { return ""; }
     }
     public static String nonce() { return Long.toHexString(new SecureRandom().nextLong()) + Long.toHexString(System.nanoTime()); }

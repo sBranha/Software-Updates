@@ -33,8 +33,21 @@ public class MainActivity extends Activity {
     final Set<String> selectedPhotos=new HashSet<>();
     static final int REQ_DELETE_MEDIA=91;
 
-    final int bg=Color.rgb(7,11,15),panel=Color.rgb(16,23,31),panel2=Color.rgb(23,32,42),line=Color.rgb(42,54,66);
+    final int bg=Color.rgb(4,8,12),panel=Color.rgb(14,21,29),panel2=Color.rgb(22,31,41),line=Color.rgb(38,50,62);
     final int white=Color.rgb(245,247,250),muted=Color.rgb(155,166,178),blue=Color.rgb(33,150,243),green=Color.rgb(55,206,108),amber=Color.rgb(255,193,7),red=Color.rgb(239,83,80);
+
+    static final java.util.concurrent.ExecutorService thumbs=java.util.concurrent.Executors.newFixedThreadPool(2);
+    static final android.util.LruCache<String,Bitmap> thumbCache=new android.util.LruCache<String,Bitmap>((int)Math.min(48L*1024*1024,Runtime.getRuntime().maxMemory()/8)){@Override protected int sizeOf(String k,Bitmap v){return v.getByteCount();}};
+    void loadThumbAsync(ImageView view,Uri u,int size){
+        String key=u+"@"+size;view.setTag(key);Bitmap cached=thumbCache.get(key);
+        if(cached!=null){view.setImageBitmap(cached);return;}
+        view.setImageDrawable(null);
+        thumbs.execute(()->{
+            Bitmap bmp=null;try{bmp=getContentResolver().loadThumbnail(u,new Size(size,size),null);}catch(Exception ignored){}
+            final Bitmap result=bmp;if(result!=null&&size<=1000)thumbCache.put(key,result);
+            runOnUiThread(()->{if(!key.equals(view.getTag()))return;if(result!=null)view.setImageBitmap(result);else view.setImageResource(R.drawable.z8_camera);});
+        });
+    }
 
     static class PhotoItem { Uri uri; long added; long size; PhotoItem(Uri u,long a,long s){uri=u;added=a;size=s;} }
     static class Health { String title,detail; int color; Health(String t,String d,int c){title=t;detail=d;color=c;} }
@@ -52,7 +65,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         p=getSharedPreferences("settings",MODE_PRIVATE);
-        migrateStableSettings();applyKeepAwake();requestPerms();registerDirectReceiver();drawHome();handleCallback(getIntent());
+        migrateStableSettings();applyKeepAwake();requestPerms();registerDirectReceiver();drawHome();if(b==null)handleCallback(getIntent());
         if(p.getBoolean("auto_start_receiver",true))startDirect(false);
     }
 
@@ -81,23 +94,34 @@ public class MainActivity extends Activity {
     void registerDirectReceiver(){IntentFilter f=new IntentFilter(DirectTransferService.ACTION_STATUS);if(Build.VERSION.SDK_INT>=33)registerReceiver(directReceiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(directReceiver,f);receiverRegistered=true;}
 
     void handleCallback(Intent i){
-        Uri d=i.getData();
-        if(d!=null&&"nikonautoupload".equals(d.getScheme()))new Thread(()->{
-            try{new FlickrClient(this).finishAuth(d);runOnUiThread(()->{toast("Flickr connected");drawSettings();});}
+        Uri d=i==null?null:i.getData();
+        if(d==null||!"nikonautoupload".equals(d.getScheme()))return;
+        // Consume the callback so an Activity re-creation (rotation, theme change) can't replay it.
+        setIntent(new Intent(this,MainActivity.class));
+        new Thread(()->{
+            try{boolean saved=new FlickrClient(this).finishAuth(d);if(saved)runOnUiThread(()->{toast("Flickr connected");drawSettings();startDirect(false);});}
             catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}
         }).start();
+    }
+
+    /** Installed version, read from the package itself so it can never go stale. */
+    String appVersion(){
+        try{android.content.pm.PackageInfo pi=getPackageManager().getPackageInfo(getPackageName(),0);long code=Build.VERSION.SDK_INT>=28?pi.getLongVersionCode():pi.versionCode;return "Version "+pi.versionName+" (build "+code+")";}
+        catch(Exception e){return "Version unknown";}
     }
 
     void base(String title,String active){
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(bg);root.setPadding(dp(14),dp(6),dp(14),dp(10));
 
         LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(4),dp(6),dp(4),dp(8));
-        if("Home".equals(active)){
-            ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_camera);header.addView(logo,new LinearLayout.LayoutParams(dp(42),dp(42)));
+        if("Settings".equals(active)){
+            TextView back=iconText("‹",34,white);back.setOnClickListener(v->drawHome());header.addView(back,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        }else if("Home".equals(active)){
+            ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.launcher_z8);logo.setScaleType(ImageView.ScaleType.CENTER_CROP);header.addView(logo,new LinearLayout.LayoutParams(dp(42),dp(42)));
         }
         TextView ht=txt(title,22,white,true);LinearLayout.LayoutParams htp=new LinearLayout.LayoutParams(0,dp(48),1);htp.setMargins(dp(8),0,0,0);header.addView(ht,htp);
         if(!"Settings".equals(active)){
-            TextView gear=iconText("⚙",24,muted);gear.setOnClickListener(v->drawSettings());header.addView(gear,new LinearLayout.LayoutParams(dp(48),dp(48)));
+            TextView gear=iconText("⚙",24,white);gear.setBackground(rounded(Color.rgb(14,21,29),18,line,1));gear.setOnClickListener(v->drawSettings());header.addView(gear,new LinearLayout.LayoutParams(dp(44),dp(44)));
         }
         root.addView(header,new LinearLayout.LayoutParams(-1,dp(62)));
 
@@ -105,7 +129,9 @@ public class MainActivity extends Activity {
         ScrollView sv=new ScrollView(this);sv.setFillViewport(true);sv.setVerticalScrollBarEnabled(false);sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
 
         nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);nav.setGravity(Gravity.CENTER);nav.setPadding(dp(2),dp(6),dp(2),dp(6));nav.setBackground(rounded(Color.rgb(9,14,19),18,line,1));
-        addNav("⌂","Home",active);addNav("▣","Photos",active);addNav("⇧","Uploads",active);addNav("⚙","Settings",active);
+        addNav("⌂","Home",active);addNav("▣","Photos",active);addNav("⇧","Uploads",active);
+        // photo_editor_bottom_nav
+        TextView editorNav=txt("✎\nEditor",11,muted,false);editorNav.setGravity(Gravity.CENTER);editorNav.setLineSpacing(0,.95f);editorNav.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});nav.addView(editorNav,new LinearLayout.LayoutParams(0,-1,1));
         LinearLayout.LayoutParams nlp=new LinearLayout.LayoutParams(-1,dp(68));nlp.setMargins(0,dp(6),0,0);root.addView(nav,nlp);
         setContentView(root);
 
@@ -118,23 +144,29 @@ public class MainActivity extends Activity {
 
     void drawHome(){
         base("Nikon Auto Upload","Home");
+        MultiCameraSupport.ensureDefaults(p);
+        MultiCameraSupport.Profile cp=MultiCameraSupport.selected(p);
         boolean flickrOn=p.getBoolean("flickr_upload_enabled",true),isPublic=p.getBoolean("public",true),paused=p.getBoolean("receiver_paused",false);
         String ftp=p.getString("ftp_state","Waiting for Z8"),cell=p.getString("cellular_state","Checking cellular");
-        boolean cameraConnected=isCameraConnected(),cellReady=cell.toLowerCase(Locale.US).contains("ready");
+        String connectionMode=ConnectionStatus.cameraConnection(p);
+        boolean cameraConnected=isCameraConnected()||connectionMode.startsWith("USB-C")||connectionMode.startsWith("Bluetooth →"),cellReady=cell.toLowerCase(Locale.US).contains("ready");
 
-        LinearLayout hero=cardBox();hero.setGravity(Gravity.CENTER_HORIZONTAL);hero.setPadding(dp(18),dp(16),dp(18),dp(18));
-        ImageView camera=new ImageView(this);camera.setImageResource(R.drawable.ic_camera);camera.setScaleType(ImageView.ScaleType.FIT_CENTER);hero.addView(camera,new LinearLayout.LayoutParams(dp(190),dp(150)));
-        TextView z8=txt("Nikon Z8",22,white,true);z8.setGravity(Gravity.CENTER);hero.addView(z8,new LinearLayout.LayoutParams(-1,dp(34)));
-        TextView conn=txt((cameraConnected?"●  Connected by Wi-Fi FTP":"●  Waiting for camera"),14,cameraConnected?green:muted,true);conn.setGravity(Gravity.CENTER);hero.addView(conn,new LinearLayout.LayoutParams(-1,dp(30)));
-        LinearLayout chips=new LinearLayout(this);chips.setOrientation(LinearLayout.HORIZONTAL);chips.setGravity(Gravity.CENTER);chips.addView(chip("Wi-Fi FTP",cameraConnected?green:muted),new LinearLayout.LayoutParams(0,dp(58),1));chips.addView(chip(flickrOn?(cellReady?"5G/LTE Ready":"Cellular Check"):"Flickr Paused",flickrOn?(cellReady?blue:amber):muted),new LinearLayout.LayoutParams(0,dp(58),1));hero.addView(chips,new LinearLayout.LayoutParams(-1,dp(62)));
+        LinearLayout hero=cardBox();hero.setGravity(Gravity.CENTER_HORIZONTAL);hero.setPadding(dp(12),dp(10),dp(12),dp(16));
+        View camera=MultiCameraSupport.artwork(this,p);hero.addView(camera,new LinearLayout.LayoutParams(-1,dp(205)));
+        TextView z8=txt(cp.displayName(),24,white,true);z8.setGravity(Gravity.CENTER);hero.addView(z8,new LinearLayout.LayoutParams(-1,dp(34)));
+        TextView ver=txt("Nikon Auto Upload  •  "+appVersion(),12,muted,false);ver.setGravity(Gravity.CENTER);hero.addView(ver,new LinearLayout.LayoutParams(-1,dp(22)));
+        TextView conn=txt((cameraConnected?"●  "+cp.displayName()+" connected":"●  Waiting for "+cp.model),14,cameraConnected?green:muted,true);conn.setGravity(Gravity.CENTER);hero.addView(conn,new LinearLayout.LayoutParams(-1,dp(30)));
+        LinearLayout chips=new LinearLayout(this);chips.setOrientation(LinearLayout.HORIZONTAL);chips.setGravity(Gravity.CENTER);chips.addView(chip(connectionMode,cameraConnected?green:muted),new LinearLayout.LayoutParams(0,dp(58),1));chips.addView(chip(flickrOn?(cellReady?"5G/LTE Ready":"Cellular Check"):"Flickr Paused",flickrOn?(cellReady?blue:amber):muted),new LinearLayout.LayoutParams(0,dp(58),1));hero.addView(chips,new LinearLayout.LayoutParams(-1,dp(62)));
         body.addView(hero);space(10);
+
+        ConnectionStatusDashboard dashboard=new ConnectionStatusDashboard(this,p);body.addView(dashboard);space(10);
 
         Health h=health();TextView ready=txt(h.title,17,Color.WHITE,true);ready.setGravity(Gravity.CENTER);ready.setBackground(rounded(h.color,16,h.color,0));ready.setPadding(dp(12),0,dp(12),0);body.addView(ready,new LinearLayout.LayoutParams(-1,dp(52)));
         TextView hd=txt(h.detail,12,muted,false);hd.setGravity(Gravity.CENTER);body.addView(hd,new LinearLayout.LayoutParams(-1,dp(42)));
 
         PhotoItem latest=firstPhoto();
         if(latest!=null){
-            sectionHeader("Latest photo");LinearLayout live=cardBox();ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);try{image.setImageBitmap(getContentResolver().loadThumbnail(latest.uri,new Size(1400,900),null));}catch(Exception e){image.setImageResource(R.drawable.ic_camera);}live.addView(image,new LinearLayout.LayoutParams(-1,dp(190)));
+            sectionHeader("Latest photo");LinearLayout live=cardBox();ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);loadThumbAsync(image,latest.uri,1400);live.addView(image,new LinearLayout.LayoutParams(-1,dp(190)));
             LinearLayout liveInfo=new LinearLayout(this);liveInfo.setOrientation(LinearLayout.HORIZONTAL);liveInfo.setGravity(Gravity.CENTER_VERTICAL);liveInfo.setPadding(dp(12),dp(8),dp(12),dp(8));TextView li=txt(displayName(latest.uri)+"\n"+formatBytes(latest.size),13,white,true);liveInfo.addView(li,new LinearLayout.LayoutParams(0,dp(48),1));TextView view=txt("VIEW ›",12,blue,true);view.setGravity(Gravity.CENTER);view.setOnClickListener(v->{ArrayList<Uri>x=new ArrayList<>();x.add(latest.uri);openPhotoViewer(x,0);});liveInfo.addView(view,new LinearLayout.LayoutParams(dp(72),dp(48)));live.addView(liveInfo);body.addView(live);space(8);
         }
 
@@ -145,14 +177,21 @@ public class MainActivity extends Activity {
         }
 
         sectionHeader("Quick controls");LinearLayout controls=cardBox();
+        Button usbQuick=smallButton("USB-C WIRED IMPORT",green);usbQuick.setOnClickListener(v->startActivity(new Intent(this,UsbCameraActivity.class)));controls.addView(usbQuick);
+        Button overlays=smallButton("PHOTO EDITOR",blue);overlays.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});controls.addView(overlays);
+        Button phoneCamera=smallButton("PHONE CAMERA",green);phoneCamera.setOnClickListener(v->startActivity(new Intent(this,PhoneCameraActivity.class)));controls.addView(phoneCamera);
         Switch flickr=new Switch(this);styleSwitch(flickr,"Upload new photos to Flickr",flickrOn);flickr.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("flickr_upload_enabled",c).apply();startDirect(false);toast(c?"Flickr uploads ON":"Flickr paused — camera transfer stays ON");drawHome();});controls.addView(flickr);
         Button receive=smallButton(paused?"RESUME CAMERA RECEIVING":"PAUSE CAMERA RECEIVING",paused?green:amber);receive.setOnClickListener(v->{sendServiceCommand(paused?"resume_receiver":"pause_receiver");p.edit().putBoolean("receiver_paused",!paused).apply();drawHome();});controls.addView(receive);body.addView(controls);
 
-        sectionHeader("Status");LinearLayout statusCard=cardBox();connectionInfo=txt("",13,white,false);statusCard.addView(connectionInfo);body.addView(statusCard);status=txt("● "+p.getString("last_status","Ready"),12,statusColor(p.getString("last_status","")),true);body.addView(status,new LinearLayout.LayoutParams(-1,dp(38)));refreshLiveViews(null);
+        sectionHeader("Editor automation");LinearLayout editorAutoCard=cardBox();boolean editorLocked=p.getBoolean("editor_layout_locked",false);editorAutoCard.addView(txt(editorLocked?"●  LOCKED AUTO LAYOUT":"○  Manual editor",14,editorLocked?green:muted,true));editorAutoCard.addView(txt(editorLocked?"Incoming JPEGs keep the original, create the edited copy automatically, then follow your Flickr output choice.":"Open Editor from the bottom bar, build the layout, then tap LOCK when you want incoming photos processed automatically.",12,muted,false));Button openEditor=smallButton("OPEN PHOTO EDITOR",blue);openEditor.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});editorAutoCard.addView(openEditor);body.addView(editorAutoCard);
+
+        sectionHeader("Activity");connectionInfo=null;status=txt("● "+p.getString("last_status","Ready"),12,statusColor(p.getString("last_status","")),true);body.addView(status,new LinearLayout.LayoutParams(-1,dp(38)));refreshLiveViews(null);
     }
 
     Health health(){
         boolean running=p.getBoolean("receiver_running",false),paused=p.getBoolean("receiver_paused",false),flickr=p.getBoolean("flickr_upload_enabled",true);long free=freeBytes();int battery=phoneBattery();
+        String usbState=p.getString("usb_state","").toLowerCase(Locale.US);
+        if(usbState.contains("connected")||usbState.contains("ready")||usbState.contains("import"))return new Health("USB-C CAMERA CONNECTED","Offline wired import is available. No Wi-Fi or IP address is required for the camera link.",green);
         if(paused)return new Health("RECEIVING PAUSED","Tap resume before shooting.",amber);
         if(!running)return new Health("START RECEIVER","The Z8 receiver is not running.",red);
         if(free<1024L*1024L*1024L)return new Health("LOW PHONE STORAGE","Less than 1 GB free.",amber);
@@ -160,7 +199,7 @@ public class MainActivity extends Activity {
         if(flickr&&p.getString("access_token","").isEmpty())return new Health("FLICKR NOT CONNECTED","Camera transfer still works; connect Flickr in Settings.",amber);
         if(flickr&&!p.getString("cellular_state","").toLowerCase(Locale.US).contains("ready"))return new Health("GETTING READY","Waiting for the cellular Flickr path.",blue);
         if(isCameraConnected())return new Health("CAMERA CONNECTED","Ready to receive full-size JPEGs from the Z8.",green);
-        return new Health("READY — WAITING FOR Z8","Turn on your Z8 WLAN2 FTP profile. No outside Wi-Fi is required.",green);
+        return new Health("READY — WAITING FOR CAMERA",MultiCameraSupport.waitingText(p),green);
     }
 
     boolean isCameraConnected(){String ftp=p.getString("ftp_state","").toLowerCase(Locale.US);return ftp.contains("connected")||ftp.contains("logged")||ftp.contains("receiv")||ftp.contains("transfer")||ftp.contains("photo");}
@@ -170,10 +209,14 @@ public class MainActivity extends Activity {
         if(connectionInfo!=null){
             boolean on=p.getBoolean("flickr_upload_enabled",true),pub=p.getBoolean("public",true);String album=p.getString("last_album_name","");
             StringBuilder b=new StringBuilder();
-            b.append("Camera: ").append(p.getString("ftp_state","Waiting for Z8")).append('\n');
+            b.append("Connection: ").append(ConnectionStatus.cameraConnection(p)).append('\n');
+            b.append("IP address: ").append(ConnectionStatus.ipv4(this,p)).append('\n');
+            b.append("Network: ").append(ConnectionStatus.networkSummary(this)).append('\n');
+            String cameraIp=p.getString("nikon_handoff_camera_ip","");if(!cameraIp.isEmpty())b.append("Camera IP: ").append(cameraIp).append('\n');
+            b.append("Camera: ").append(p.getString("ftp_state","Waiting for camera")).append('\n');
             b.append("Receiver: ").append(p.getBoolean("receiver_paused",false)?"PAUSED":"RUNNING").append('\n');
             b.append("Phone storage: ").append(formatBytes(freeBytes())).append(" free").append('\n');
-            b.append("Flickr: ").append(on?("ON • "+(pub?"PUBLIC":"PRIVATE")):"OFF • PHONE ONLY").append('\n');
+            b.append("Flickr: ").append(on?("ON • "+(pub?"PUBLIC":"ONLY ME")):"OFF • PHONE ONLY").append('\n');
             if(on)b.append("Cellular: ").append(p.getString("cellular_state","Checking")).append('\n');
             if(!album.isEmpty())b.append("Album: ").append(album).append("  ").append(p.getInt("last_album_count",0)).append('/').append(p.getInt("album_max_photos",999)).append('\n');
             b.append("Pending uploads: ").append(p.getStringSet("pending_uploads",Collections.emptySet()).size());
@@ -212,7 +255,7 @@ public class MainActivity extends Activity {
             LinearLayout row=null;int col=0;
             for(PhotoItem item:g.getValue()){
                 if(col%3==0){row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);body.addView(row,new LinearLayout.LayoutParams(-1,dp(photoSelectMode?148:118)));}
-                Uri uri=item.uri;int index=allUris.indexOf(uri);FrameLayout cell=new FrameLayout(this);LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(0,dp(photoSelectMode?142:112),1);clp.setMargins(dp(2),dp(2),dp(2),dp(2));row.addView(cell,clp);ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackgroundColor(panel2);cell.addView(image,new FrameLayout.LayoutParams(-1,-1));try{image.setImageBitmap(getContentResolver().loadThumbnail(uri,new Size(700,700),null));}catch(Exception e){image.setImageResource(R.drawable.ic_camera);}if(photoSelectMode){CheckBox cb=new CheckBox(this);cb.setChecked(selectedPhotos.contains(uri.toString()));cb.setButtonTintList(ColorStateList.valueOf(blue));FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.END);cell.addView(cb,cp);cb.setOnCheckedChangeListener((b,c)->{if(c)selectedPhotos.add(uri.toString());else selectedPhotos.remove(uri.toString());});image.setOnClickListener(v->cb.setChecked(!cb.isChecked()));}else image.setOnClickListener(v->openPhotoViewer(allUris,index));col++;
+                Uri uri=item.uri;int index=allUris.indexOf(uri);FrameLayout cell=new FrameLayout(this);LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(0,dp(photoSelectMode?142:112),1);clp.setMargins(dp(2),dp(2),dp(2),dp(2));row.addView(cell,clp);ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackgroundColor(panel2);cell.addView(image,new FrameLayout.LayoutParams(-1,-1));loadThumbAsync(image,uri,360);if(photoSelectMode){CheckBox cb=new CheckBox(this);cb.setChecked(selectedPhotos.contains(uri.toString()));cb.setButtonTintList(ColorStateList.valueOf(blue));FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.END);cell.addView(cb,cp);cb.setOnCheckedChangeListener((b,c)->{if(c)selectedPhotos.add(uri.toString());else selectedPhotos.remove(uri.toString());});image.setOnClickListener(v->cb.setChecked(!cb.isChecked()));}else image.setOnClickListener(v->openPhotoViewer(allUris,index));col++;
             }
             while(col%3!=0){Space filler=new Space(this);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(0,dp(112),1);fp.setMargins(dp(2),dp(2),dp(2),dp(2));row.addView(filler,fp);col++;}
             space(8);
@@ -236,8 +279,8 @@ public class MainActivity extends Activity {
         LinearLayout details=cardBox();TextView name=txt("",15,white,true),date=txt("",12,muted,false);details.addView(name);details.addView(date);TextView phone=txt("✓  Downloaded to phone",13,green,true),flickr=txt("",13,muted,true),album=txt("",13,muted,true);details.addView(phone,new LinearLayout.LayoutParams(-1,dp(38)));details.addView(flickr,new LinearLayout.LayoutParams(-1,dp(38)));details.addView(album,new LinearLayout.LayoutParams(-1,dp(38)));page.addView(details);
         LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);actions.setGravity(Gravity.CENTER);TextView star=actionItem("☆","Favorite"),share=actionItem("↗","Share"),del=actionItem("⌫","Delete");actions.addView(star,new LinearLayout.LayoutParams(0,dp(68),1));actions.addView(share,new LinearLayout.LayoutParams(0,dp(68),1));actions.addView(del,new LinearLayout.LayoutParams(0,dp(68),1));page.addView(actions);
         final int[] index={Math.max(0,Math.min(start,photos.size()-1))};final float[] zoom={1f};
-        final Runnable show=()->{Uri u=photos.get(index[0]);try{zoom[0]=1f;image.setScaleX(1f);image.setScaleY(1f);image.setImageBitmap(getContentResolver().loadThumbnail(u,new Size(2600,2600),null));}catch(Exception e){image.setImageURI(u);}name.setText(displayName(u));date.setText(photoInfo(u));Set<String>up=p.getStringSet("uploaded_uris",Collections.emptySet()),fail=p.getStringSet("failed_upload_uris",Collections.emptySet()),pend=p.getStringSet("pending_uploads",Collections.emptySet());if(up.contains(u.toString())){flickr.setText("☁  Uploaded to Flickr — completed");flickr.setTextColor(green);String a=albumForUri(u.toString());album.setText(a.isEmpty()?"▣  Flickr album: verified":"▣  Saved to album: "+a);album.setTextColor(green);}else if(fail.contains(u.toString())){flickr.setText("!  Flickr upload failed — queued to retry");flickr.setTextColor(amber);album.setText("▣  Album waits for successful upload");album.setTextColor(muted);}else if(pend.contains(u.toString())){flickr.setText("◷  Waiting to upload to Flickr");flickr.setTextColor(amber);album.setText("▣  Album filing pending");album.setTextColor(muted);}else{flickr.setText("○  Saved on phone only");flickr.setTextColor(muted);album.setText("▣  Not sent to Flickr");album.setTextColor(muted);}star.setText((p.getStringSet("favorite_uris",Collections.emptySet()).contains(u.toString())?"★":"☆")+"\nFavorite");};
-        back.setOnClickListener(v->d.dismiss());star.setOnClickListener(v->{toggleSet("favorite_uris",photos.get(index[0]).toString());show.run();});share.setOnClickListener(v->sharePhoto(photos.get(index[0]));del.setOnClickListener(v->{Uri u=photos.get(index[0]);new AlertDialog.Builder(this).setTitle("Delete from phone?").setMessage("This removes only the phone copy. Flickr and the Z8 card are not touched.").setNegativeButton("Cancel",null).setPositiveButton("Delete",(x,y)->{d.dismiss();deleteUris(Collections.singletonList(u));}).show();});
+        final Runnable show=()->{Uri u=photos.get(index[0]);zoom[0]=1f;image.setScaleX(1f);image.setScaleY(1f);loadThumbAsync(image,u,2600);name.setText(displayName(u));date.setText(photoInfo(u));Set<String>up=p.getStringSet("uploaded_uris",Collections.emptySet()),fail=p.getStringSet("failed_upload_uris",Collections.emptySet()),pend=p.getStringSet("pending_uploads",Collections.emptySet());if(up.contains(u.toString())){flickr.setText("☁  Uploaded to Flickr — completed");flickr.setTextColor(green);String a=albumForUri(u.toString());album.setText(a.isEmpty()?"▣  Flickr album: verified":"▣  Saved to album: "+a);album.setTextColor(green);}else if(fail.contains(u.toString())){flickr.setText("!  Flickr upload waiting to retry — or tap Uploads ▸ Retry");flickr.setTextColor(amber);album.setText("▣  Album waits for successful upload");album.setTextColor(muted);}else if(pend.contains(u.toString())){flickr.setText("◷  Waiting to upload to Flickr");flickr.setTextColor(amber);album.setText("▣  Album filing pending");album.setTextColor(muted);}else{flickr.setText("○  Saved on phone only");flickr.setTextColor(muted);album.setText("▣  Not sent to Flickr");album.setTextColor(muted);}star.setText((p.getStringSet("favorite_uris",Collections.emptySet()).contains(u.toString())?"★":"☆")+"\nFavorite");};
+        back.setOnClickListener(v->d.dismiss());star.setOnClickListener(v->{toggleSet("favorite_uris",photos.get(index[0]).toString());show.run();});share.setOnClickListener(v->sharePhoto(photos.get(index[0])));del.setOnClickListener(v->{Uri u=photos.get(index[0]);new AlertDialog.Builder(this).setTitle("Delete from phone?").setMessage("This removes only the phone copy. Flickr and the Z8 card are not touched.").setNegativeButton("Cancel",null).setPositiveButton("Delete",(x,y)->{d.dismiss();deleteUris(Collections.singletonList(u));}).show();});
         final ScaleGestureDetector scaleDetector=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector detector){zoom[0]*=detector.getScaleFactor();zoom[0]=Math.max(1f,Math.min(4f,zoom[0]));image.setScaleX(zoom[0]);image.setScaleY(zoom[0]);return true;}});final GestureDetector gesture=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){@Override public boolean onDown(MotionEvent e){return true;}@Override public boolean onFling(MotionEvent e1,MotionEvent e2,float vx,float vy){if(e1==null||e2==null||zoom[0]>1.05f)return false;float dx=e2.getX()-e1.getX();if(Math.abs(dx)<dp(80))return false;if(dx<0&&index[0]<photos.size()-1){index[0]++;show.run();return true;}if(dx>0&&index[0]>0){index[0]--;show.run();return true;}return false;}});image.setOnTouchListener((v,e)->{scaleDetector.onTouchEvent(e);gesture.onTouchEvent(e);return true;});show.run();d.setContentView(page);d.show();
     }
 
@@ -272,15 +315,113 @@ public class MainActivity extends Activity {
         Button clear=smallButton("CLEAR UPLOAD HISTORY & DIAGNOSTICS",muted);clear.setOnClickListener(v->{p.edit().remove("completed_upload_log").remove("event_log").apply();toast("History cleared");drawUploads();});body.addView(clear,new LinearLayout.LayoutParams(-1,dp(50)));
     }
 
-    LinearLayout uploadRow(Uri u,String state,int stateColor){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(7),dp(8),dp(7));row.setBackground(rounded(panel,14,line,1));ImageView im=new ImageView(this);im.setScaleType(ImageView.ScaleType.CENTER_CROP);try{im.setImageBitmap(getContentResolver().loadThumbnail(u,new Size(300,300),null));}catch(Exception e){im.setImageResource(R.drawable.ic_camera);}row.addView(im,new LinearLayout.LayoutParams(dp(62),dp(62)));LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);info.setPadding(dp(10),0,0,0);info.addView(txt(displayName(u),13,white,true));info.addView(txt(state,12,stateColor,true));row.addView(info,new LinearLayout.LayoutParams(0,dp(62),1));return row;}
+    LinearLayout uploadRow(Uri u,String state,int stateColor){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(7),dp(8),dp(7));row.setBackground(rounded(panel,14,line,1));ImageView im=new ImageView(this);im.setScaleType(ImageView.ScaleType.CENTER_CROP);loadThumbAsync(im,u,300);row.addView(im,new LinearLayout.LayoutParams(dp(62),dp(62)));LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);info.setPadding(dp(10),0,0,0);info.addView(txt(displayName(u),13,white,true));info.addView(txt(state,12,stateColor,true));row.addView(info,new LinearLayout.LayoutParams(0,dp(62),1));return row;}
 
     void drawSettings(){
         base("Settings","Settings");
-        sectionHeader("Camera Connection");LinearLayout camera=cardBox();camera.addView(statusRow("Wi-Fi FTP",isCameraConnected()?"Nikon Z8 Connected":"Waiting for Nikon Z8",isCameraConnected()?green:muted));Button wifi=smallButton("OPEN PHONE WI-FI SETTINGS",blue);wifi.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));camera.addView(wifi);Button restart=smallButton("START / RESTART Z8 RECEIVER",green);restart.setOnClickListener(v->startDirect(true));camera.addView(restart);body.addView(camera);
+        MultiCameraSupport.ensureDefaults(p);
+        MultiCameraSupport.Profile cp=MultiCameraSupport.selected(p);
+        sectionHeader("Camera");
+        LinearLayout camChoice=cardBox();
+        camChoice.addView(statusRow("Selected camera",cp.displayName(),green));
+        camChoice.addView(txt(cp.mode.equals(MultiCameraSupport.MODE_CAMERA_AP)?"Camera creates the Wi-Fi network":"Phone hotspot supplies the camera network",12,muted,false));
+        Button chooseCamera=smallButton("CHOOSE CAMERA MODEL",blue);chooseCamera.setOnClickListener(v->MultiCameraSupport.showSelector(this,p,this::drawSettings));camChoice.addView(chooseCamera);
+        Button setupCamera=smallButton("SHOW SETUP FOR "+cp.model.toUpperCase(Locale.US),green);setupCamera.setOnClickListener(v->MultiCameraSupport.showSetup(this,p));camChoice.addView(setupCamera);
+        Button cameraHelp=smallButton("CAMERA FTP HELP — ALL SUPPORTED MODELS",blue);cameraHelp.setOnClickListener(v->MultiCameraSupport.showHelpFile(this));camChoice.addView(cameraHelp);
+        body.addView(camChoice);
 
-        sectionHeader("Transfer Options");LinearLayout transfer=cardBox();Switch auto=new Switch(this);styleSwitch(auto,"Auto start camera receiver",p.getBoolean("auto_start_receiver",true));auto.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("auto_start_receiver",c).apply());transfer.addView(auto);Switch upload=new Switch(this);styleSwitch(upload,"Upload JPEG files to Flickr",p.getBoolean("flickr_upload_enabled",true));upload.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("flickr_upload_enabled",c).apply();startDirect(false);});transfer.addView(upload);Switch keep=new Switch(this);styleSwitch(keep,"Keep a copy on phone",!p.getBoolean("auto_delete_after_upload",false));keep.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("auto_delete_after_upload",!c).apply());transfer.addView(keep);Switch dup=new Switch(this);styleSwitch(dup,"Duplicate protection",p.getBoolean("duplicate_protection",true));dup.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("duplicate_protection",c).apply());transfer.addView(dup);Switch awake=new Switch(this);styleSwitch(awake,"Keep screen awake while app is open",p.getBoolean("keep_screen_awake",false));awake.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("keep_screen_awake",c).apply();applyKeepAwake();});transfer.addView(awake);body.addView(transfer);
+        if("Nikon".equals(cp.brand)){
+            sectionHeader("Nikon Bluetooth — Experimental");
+            LinearLayout btCard=cardBox();
+            String btState=p.getString("nikon_bt_state","Not paired");
+            int btColor=btState.toLowerCase(Locale.US).contains("connected")||btState.toLowerCase(Locale.US).contains("complete")?green:(btState.toLowerCase(Locale.US).contains("pair")?amber:muted);
+            btCard.addView(statusRow("Smart-device Bluetooth",btState,btColor));
+            String btName=p.getString("nikon_bt_camera_name","");
+            if(!btName.isEmpty())btCard.addView(statusRow("Saved camera",btName,white));
+            String serial=p.getString("nikon_bt_camera_serial","");
+            if(!serial.isEmpty())btCard.addView(statusRow("Camera serial",serial,muted));
+            btCard.addView(txt("Bluetooth can now trigger an experimental automatic Nikon Wi-Fi/PTP handoff for NEW full-resolution JPEGs. Pair once, then use the Bluetooth screen to test the complete handoff.",12,muted,false));
+            Button btSetup=big("PAIR / CONNECT NIKON BLUETOOTH",blue);
+            btSetup.setOnClickListener(v->startActivity(new Intent(this,NikonBluetoothActivity.class)));
+            btCard.addView(btSetup);
+            body.addView(btCard);
+        }
 
-        sectionHeader("Flickr Options");LinearLayout flickr=cardBox();flickr.addView(statusRow("Account",p.getString("flickr_name","").isEmpty()?"Not connected":p.getString("flickr_name",""),p.getString("access_token","").isEmpty()?amber:green));Switch privateOnly=new Switch(this);styleSwitch(privateOnly,"Only me — keep new photos private",!p.getBoolean("public",true));privateOnly.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("public",!c).apply());flickr.addView(privateOnly);Switch albums=new Switch(this);styleSwitch(albums,"Create date-based albums automatically",p.getBoolean("daily_albums_enabled",true));albums.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("daily_albums_enabled",c).apply());flickr.addView(albums);EditText max=input("Maximum photos per album",String.valueOf(p.getInt("album_max_photos",999)));max.setInputType(InputType.TYPE_CLASS_NUMBER);flickr.addView(max);EditText suffix=input("Album suffix (optional)",p.getString("album_suffix",""));flickr.addView(suffix);EditText tags=input("Default Flickr tags",p.getString("tags","nikon z8"));flickr.addView(tags);Button saveFlickr=smallButton("SAVE FLICKR OPTIONS",blue);saveFlickr.setOnClickListener(v->{int n=999;try{n=Integer.parseInt(max.getText().toString().trim());}catch(Exception ignored){}n=Math.max(1,Math.min(999,n));p.edit().putInt("album_max_photos",n).putString("album_suffix",clean(suffix.getText().toString())).putString("tags",tags.getText().toString().trim()).remove("flickr_album_cache_base").remove("flickr_album_cache_id").remove("flickr_album_cache_title").remove("flickr_album_cache_count").apply();toast("Flickr options saved");});flickr.addView(saveFlickr);body.addView(flickr);
+        if(MultiCameraSupport.usesPhoneHotspot(p)){
+            CameraHotspotManager.updateAddress(p);
+            sectionHeader("Camera Hotspot");
+            LinearLayout hotspot=cardBox();
+            hotspot.addView(txt("Use this app-created local camera network instead of Samsung Mobile Hotspot. It is designed so the camera can reach the FTP receiver on this phone while Flickr keeps using cellular data.",12,muted,false));
+            boolean hs=CameraHotspotManager.isRunning();
+            // The hotspot dies with the app process; don't show a stale "RUNNING" with no Start button.
+            if(!hs&&p.getBoolean("camera_hotspot_running",false))p.edit().putBoolean("camera_hotspot_running",false).apply();
+            String ssid=p.getString("camera_hotspot_ssid","");
+            String hp=p.getString("camera_hotspot_password","");
+            String hip=p.getString("camera_hotspot_ip","waiting for hotspot address");
+            hotspot.addView(statusRow("Camera hotspot",hs?"RUNNING":"OFF",hs?green:muted));
+            if(hs){
+                hotspot.addView(statusRow("Wi-Fi name (SSID)",ssid.isEmpty()?"Starting...":ssid,white));
+                hotspot.addView(statusRow("Wi-Fi password",hp.isEmpty()?"Starting...":hp,white));
+                hotspot.addView(statusRow("PHONE FTP ADDRESS",hip+":2121",blue));
+                String allIps=p.getString("camera_hotspot_all_ips","");if(!allIps.isEmpty())hotspot.addView(txt("Active local IPv4: "+allIps,11,muted,false));
+                Button refreshIp=smallButton("REFRESH HOTSPOT FTP ADDRESS",blue);refreshIp.setOnClickListener(v->{CameraHotspotManager.updateAddress(p);drawSettings();});hotspot.addView(refreshIp);
+                Button stopHs=smallButton("STOP CAMERA HOTSPOT",red);stopHs.setOnClickListener(v->CameraHotspotManager.stop(p,msg->{toast(msg);drawSettings();}));hotspot.addView(stopHs);
+            }else{
+                Button startHs=big("START CAMERA HOTSPOT",green);startHs.setOnClickListener(v->CameraHotspotManager.start(this,p,msg->{toast(msg);if(CameraHotspotManager.isRunning())startDirect(false);drawSettings();}));hotspot.addView(startHs);
+                hotspot.addView(txt("Important: turn OFF Samsung/Android Mobile Hotspot before starting this. Android will create a separate local-only Wi-Fi network and show its name/password here.",11,amber,false));
+            }
+            body.addView(hotspot);
+        }
+
+        sectionHeader("FTP Login");
+        LinearLayout ftpLogin=cardBox();
+        ftpLogin.addView(txt("Use these exact credentials in the camera FTP profile.",12,muted,false));
+        EditText ftpUserEdit=input("FTP username",p.getString("ftp_user",DirectTransferService.DEFAULT_FTP_USER));
+        ftpUserEdit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        ftpLogin.addView(ftpUserEdit,new LinearLayout.LayoutParams(-1,dp(52)));
+        EditText ftpPassEdit=input("FTP password",p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD));
+        ftpPassEdit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        ftpLogin.addView(ftpPassEdit,new LinearLayout.LayoutParams(-1,dp(52)));
+        TextView ftpPort=txt("Port: 2121  •  Use 02121 when the camera requires five digits",12,muted,false);ftpLogin.addView(ftpPort);
+        Button saveFtp=smallButton("SAVE FTP LOGIN & RESTART RECEIVER",green);
+        saveFtp.setOnClickListener(v->{
+            String u=clean(ftpUserEdit.getText().toString()),pw=ftpPassEdit.getText().toString().trim();
+            if(u.isEmpty()){toast("FTP username cannot be blank");return;}
+            if(pw.isEmpty()){toast("FTP password cannot be blank");return;}
+            p.edit().putString("ftp_user",u).putString("ftp_password",pw).apply();
+            sendServiceCommand("restart_receiver");
+            toast("FTP login saved — receiver restarted");
+            drawSettings();
+        });
+        ftpLogin.addView(saveFtp);
+        Button resetFtp=smallButton("RESET FTP LOGIN TO DEFAULT",muted);
+        resetFtp.setOnClickListener(v->{
+            p.edit().putString("ftp_user",DirectTransferService.DEFAULT_FTP_USER).putString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD).apply();
+            sendServiceCommand("restart_receiver");
+            toast("Default FTP login restored");
+            drawSettings();
+        });
+        ftpLogin.addView(resetFtp);
+        body.addView(ftpLogin);
+
+        sectionHeader("Connection Methods");
+        LinearLayout methods=cardBox();
+        String currentConnection=ConnectionStatus.cameraConnection(p);
+        methods.addView(statusRow("Current connection",currentConnection,currentConnection.startsWith("Waiting")?muted:green));
+        methods.addView(statusRow("IP address",ConnectionStatus.ipv4(this,p),muted));
+        methods.addView(statusRow("Network",ConnectionStatus.networkSummary(this),muted));
+        Button usbMethod=smallButton("USB-C WIRED",green);usbMethod.setOnClickListener(v->startActivity(new Intent(this,UsbCameraActivity.class)));methods.addView(usbMethod);
+        Button overlayMethod=smallButton("PHOTO EDITOR",blue);overlayMethod.setOnClickListener(v->{Intent i=new Intent(this,TouchTemplateEditorActivity.class);i.putExtra("photo_editor",true);startActivity(i);});methods.addView(overlayMethod);
+        Button phoneMethod=smallButton("PHONE CAMERA",green);phoneMethod.setOnClickListener(v->startActivity(new Intent(this,PhoneCameraActivity.class)));methods.addView(phoneMethod);
+        Button wifiMethod=smallButton("WI-FI / HOTSPOT",blue);wifiMethod.setOnClickListener(v->MultiCameraSupport.showSetup(this,p));methods.addView(wifiMethod);
+        Button wirelessMethod=smallButton("BLUETOOTH / WIRELESS SETUP",Color.rgb(70,80,90));wirelessMethod.setOnClickListener(v->{if("Nikon".equals(cp.brand))startActivity(new Intent(this,NikonBluetoothActivity.class));else toast("Bluetooth wireless setup is currently implemented for Nikon. USB-C and FTP remain available for this camera.");});methods.addView(wirelessMethod);
+        body.addView(methods);
+
+        sectionHeader("Camera Connection");LinearLayout camera=cardBox();camera.addView(statusRow(MultiCameraSupport.networkLabel(p),isCameraConnected()?cp.displayName()+" Connected":"Waiting for "+cp.displayName(),isCameraConnected()?green:muted));Button wifi=smallButton("OPEN PHONE WI-FI SETTINGS",blue);wifi.setOnClickListener(v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));camera.addView(wifi);Button restart=smallButton("START / RESTART CAMERA RECEIVER",green);restart.setOnClickListener(v->startDirect(true));camera.addView(restart);body.addView(camera);
+
+        sectionHeader("Transfer Options");LinearLayout transfer=cardBox();Switch auto=new Switch(this);styleSwitch(auto,"Auto start camera receiver",p.getBoolean("auto_start_receiver",true));auto.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("auto_start_receiver",c).apply());transfer.addView(auto);Switch upload=new Switch(this);styleSwitch(upload,"Upload JPEG files to Flickr",p.getBoolean("flickr_upload_enabled",true));upload.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("flickr_upload_enabled",c).apply();startDirect(false);});transfer.addView(upload);Switch keep=new Switch(this);styleSwitch(keep,"Keep a copy on phone",!p.getBoolean("auto_delete_after_upload",false));keep.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("auto_delete_after_upload",!c).apply());transfer.addView(keep);Switch wifiUp=new Switch(this);styleSwitch(wifiUp,"Use Wi-Fi internet for Flickr if cellular is off",p.getBoolean("allow_wifi_uploads",true));wifiUp.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("allow_wifi_uploads",c).apply();startDirect(false);});transfer.addView(wifiUp);Switch dup=new Switch(this);styleSwitch(dup,"Duplicate protection",p.getBoolean("duplicate_protection",true));dup.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("duplicate_protection",c).apply());transfer.addView(dup);Switch awake=new Switch(this);styleSwitch(awake,"Keep screen awake while app is open",p.getBoolean("keep_screen_awake",false));awake.setOnCheckedChangeListener((b,c)->{p.edit().putBoolean("keep_screen_awake",c).apply();applyKeepAwake();});transfer.addView(awake);body.addView(transfer);
+
+        sectionHeader("Flickr Options");LinearLayout flickr=cardBox();flickr.addView(statusRow("Account",p.getString("flickr_name","").isEmpty()?"Not connected":p.getString("flickr_name",""),p.getString("access_token","").isEmpty()?amber:green));Switch privateOnly=new Switch(this);styleSwitch(privateOnly,"Only me — keep new photos private",!p.getBoolean("public",true));privateOnly.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("public",!c).apply());flickr.addView(privateOnly);Switch albums=new Switch(this);styleSwitch(albums,"Create date-based albums automatically",p.getBoolean("daily_albums_enabled",true));albums.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("daily_albums_enabled",c).apply());flickr.addView(albums);EditText max=input("Maximum photos per album",String.valueOf(p.getInt("album_max_photos",999)));max.setInputType(InputType.TYPE_CLASS_NUMBER);flickr.addView(max);EditText suffix=input("Album suffix (optional)",p.getString("album_suffix",""));flickr.addView(suffix);EditText tags=input("Default Flickr tags",p.getString("tags","camera photography"));flickr.addView(tags);Button saveFlickr=smallButton("SAVE FLICKR OPTIONS",blue);saveFlickr.setOnClickListener(v->{int n=999;try{n=Integer.parseInt(max.getText().toString().trim());}catch(Exception ignored){}n=Math.max(1,Math.min(999,n));p.edit().putInt("album_max_photos",n).putString("album_suffix",clean(suffix.getText().toString())).putString("tags",tags.getText().toString().trim()).remove("flickr_album_cache_base").remove("flickr_album_cache_id").remove("flickr_album_cache_title").remove("flickr_album_cache_count").apply();toast("Flickr options saved");});flickr.addView(saveFlickr);body.addView(flickr);
 
         sectionHeader("Flickr Account");LinearLayout acct=cardBox();EditText k=input("Flickr API key",p.getString("flickr_key",""));EditText s=input("Flickr API secret",p.getString("flickr_secret",""));s.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);acct.addView(k);acct.addView(s);Button conn=smallButton(p.getString("access_token","").isEmpty()?"CONNECT FLICKR":"RECONNECT FLICKR",green);conn.setOnClickListener(v->{p.edit().putString("flickr_key",k.getText().toString().trim()).putString("flickr_secret",s.getText().toString().trim()).apply();new Thread(()->{try{String u=new FlickrClient(this).beginAuth();startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start();});acct.addView(conn);body.addView(acct);
 
@@ -288,9 +429,7 @@ public class MainActivity extends Activity {
 
         sectionHeader("Diagnostics & Reliability");LinearLayout diag=cardBox();diag.addView(statusRow("Phone battery",phoneBattery()+"%",phoneBattery()<15?amber:green));diag.addView(statusRow("Cellular",p.getString("cellular_state","Checking"),p.getString("cellular_state","").toLowerCase(Locale.US).contains("ready")?green:amber));Switch clearDone=new Switch(this);styleSwitch(clearDone,"Clear upload history & diagnostics when app closes",p.getBoolean("auto_clear_completed",true));clearDone.setOnCheckedChangeListener((b,c)->p.edit().putBoolean("auto_clear_completed",c).apply());diag.addView(clearDone);Button export=smallButton("EXPORT DIAGNOSTIC LOG",blue);export.setOnClickListener(v->exportDiagnostics());diag.addView(export);Button clear=smallButton("CLEAR DIAGNOSTICS NOW",muted);clear.setOnClickListener(v->{p.edit().remove("event_log").remove("completed_upload_log").apply();toast("Diagnostics cleared");});diag.addView(clear);body.addView(diag);
 
-        sectionHeader("Advanced Z8 FTP");LinearLayout ftp=cardBox();ftp.addView(txt("Port 2121   •   User nikon   •   Passive 32768–61000",12,muted,false));EditText ftpPass=input("FTP password",p.getString("ftp_password",DirectTransferService.DEFAULT_FTP_PASSWORD));ftpPass.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_VARIATION_PASSWORD);ftp.addView(ftpPass);Button ftpSave=smallButton("SAVE FTP PASSWORD",blue);ftpSave.setOnClickListener(v->{String x=ftpPass.getText().toString().trim();if(x.length()<4){toast("Use at least 4 digits");return;}p.edit().putString("ftp_password",x).putBoolean("ftp_fixed_password_v031",true).apply();stopService(new Intent(this,DirectTransferService.class));startDirect(false);toast("FTP password saved");});ftp.addView(ftpSave);body.addView(ftp);
-
-        TextView version=txt("Nikon Auto Upload 0.4.0  •  Preview-style redesign  •  Wi-Fi FTP only — no Bluetooth",11,muted,false);version.setGravity(Gravity.CENTER);body.addView(version,new LinearLayout.LayoutParams(-1,dp(54)));
+        TextView version=txt("Nikon Auto Upload  •  "+appVersion()+"\n57 Nikon + Canon + Sony + Fujifilm FTP profiles",11,muted,false);version.setGravity(Gravity.CENTER);body.addView(version,new LinearLayout.LayoutParams(-1,dp(54)));
     }
 
     LinearLayout statusRow(String label,String value,int color){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.HORIZONTAL);r.setGravity(Gravity.CENTER_VERTICAL);r.setPadding(0,dp(4),0,dp(4));r.addView(txt(label,13,white,true),new LinearLayout.LayoutParams(0,dp(42),1));TextView v=txt("●  "+value,12,color,true);v.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);r.addView(v,new LinearLayout.LayoutParams(0,dp(42),1));return r;}
@@ -298,7 +437,7 @@ public class MainActivity extends Activity {
     void exportDiagnostics(){
         try{String name="NikonAutoUpload-Diagnostics-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(new Date())+".txt";ContentValues v=new ContentValues();v.put(MediaStore.Downloads.DISPLAY_NAME,name);v.put(MediaStore.Downloads.MIME_TYPE,"text/plain");if(Build.VERSION.SDK_INT>=29){v.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/Nikon Auto Upload");v.put(MediaStore.Downloads.IS_PENDING,1);}Uri u=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,v);if(u==null)throw new Exception("Could not create diagnostics file");try(OutputStream out=getContentResolver().openOutputStream(u,"w")){if(out==null)throw new Exception("Could not write diagnostics file");out.write(diagnosticText().getBytes(StandardCharsets.UTF_8));}if(Build.VERSION.SDK_INT>=29){ContentValues done=new ContentValues();done.put(MediaStore.Downloads.IS_PENDING,0);getContentResolver().update(u,done,null,null);}Intent share=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_STREAM,u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(share,"Share diagnostic log"));}catch(Exception e){toast("Diagnostic export failed: "+e.getMessage());}
     }
-    String diagnosticText(){return "Nikon Auto Upload 0.4.0\nGenerated: "+formatTime(System.currentTimeMillis())+"\n\nReceiver running: "+p.getBoolean("receiver_running",false)+"\nReceiver paused: "+p.getBoolean("receiver_paused",false)+"\nFTP state: "+p.getString("ftp_state","")+"\nWi-Fi IP: "+p.getString("last_ip","")+"\nCellular: "+p.getString("cellular_state","")+"\nFlickr enabled: "+p.getBoolean("flickr_upload_enabled",true)+"\nFlickr connected: "+(!p.getString("access_token","").isEmpty())+"\nPrivacy: "+(p.getBoolean("public",true)?"PUBLIC":"PRIVATE")+"\nDaily albums: "+p.getBoolean("daily_albums_enabled",true)+"\nCurrent album: "+p.getString("last_album_name","")+"\nPending uploads: "+p.getStringSet("pending_uploads",Collections.emptySet()).size()+"\nFailed: "+p.getStringSet("failed_upload_uris",Collections.emptySet()).size()+"\nPhone folder size: "+formatBytes(nikonFolderBytes())+"\nFree storage: "+formatBytes(freeBytes())+"\nPhone battery: "+phoneBattery()+"%\n\nRecent events:\n"+p.getString("event_log","");}
+    String diagnosticText(){return "Nikon Auto Upload "+appVersion()+"\nAndroid "+Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+") • "+Build.MANUFACTURER+" "+Build.MODEL+"\nGenerated: "+formatTime(System.currentTimeMillis())+"\n\nReceiver running: "+p.getBoolean("receiver_running",false)+"\nReceiver paused: "+p.getBoolean("receiver_paused",false)+"\nFTP state: "+p.getString("ftp_state","")+"\nWi-Fi IP: "+p.getString("last_ip","")+"\nCellular: "+p.getString("cellular_state","")+"\nFlickr enabled: "+p.getBoolean("flickr_upload_enabled",true)+"\nFlickr connected: "+(!p.getString("access_token","").isEmpty())+"\nPrivacy: "+(p.getBoolean("public",true)?"PUBLIC":"ONLY ME")+"\nUploading now: "+p.getInt("status_uploading_count",0)+"\nDaily albums: "+p.getBoolean("daily_albums_enabled",true)+"\nCurrent album: "+p.getString("last_album_name","")+"\nPending uploads: "+p.getStringSet("pending_uploads",Collections.emptySet()).size()+"\nFailed: "+p.getStringSet("failed_upload_uris",Collections.emptySet()).size()+"\nPhone folder size: "+formatBytes(nikonFolderBytes())+"\nFree storage: "+formatBytes(freeBytes())+"\nPhone battery: "+phoneBattery()+"%\n\nRecent events:\n"+p.getString("event_log","");}
 
     long nikonFolderBytes(){long total=0;try(Cursor c=getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,new String[]{MediaStore.Images.Media.SIZE,MediaStore.Images.Media.RELATIVE_PATH},Build.VERSION.SDK_INT>=29?MediaStore.Images.Media.RELATIVE_PATH+" LIKE ?":null,Build.VERSION.SDK_INT>=29?new String[]{"Pictures/Nikon Auto Upload%"}:null,null)){while(c!=null&&c.moveToNext())total+=Math.max(0,c.getLong(0));}catch(Exception ignored){}return total;}
     long freeBytes(){try{File f=getExternalFilesDir(null);if(f==null)f=getFilesDir();StatFs s=new StatFs(f.getAbsolutePath());return s.getAvailableBytes();}catch(Exception e){return Long.MAX_VALUE;}}

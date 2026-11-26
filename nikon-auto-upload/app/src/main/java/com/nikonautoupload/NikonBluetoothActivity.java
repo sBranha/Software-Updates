@@ -33,6 +33,8 @@ public class NikonBluetoothActivity extends Activity {
     private static final UUID PAIR_UUID    = UUID.fromString("00002000-3dd4-4255-8d62-6dc7b9bd5561");
     private static final UUID NOT1_UUID    = UUID.fromString("00002008-3dd4-4255-8d62-6dc7b9bd5561");
     private static final UUID ID_UUID      = UUID.fromString("00002002-3dd4-4255-8d62-6dc7b9bd5561");
+    private static final UUID WIFI_CONFIG_UUID = UUID.fromString("00002004-3dd4-4255-8d62-6dc7b9bd5561");
+    private static final UUID WIFI_ESTABLISH_UUID = UUID.fromString("00002005-3dd4-4255-8d62-6dc7b9bd5561");
     private static final UUID CCCD_UUID    = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     private static final byte[] BLOWFISH_KEY = new byte[]{(byte)0xff,(byte)0xff,(byte)0xaa,0x55,0x11,0x22,0x33,0x00};
@@ -45,7 +47,8 @@ public class NikonBluetoothActivity extends Activity {
     private BluetoothAdapter adapter;
     private BluetoothLeScanner scanner;
     private BluetoothGatt gatt;
-    private BluetoothGattCharacteristic pairChr, not1Chr, idChr;
+    private BluetoothGattCharacteristic pairChr, not1Chr, idChr, wifiConfigChr, wifiEstablishChr;
+    private NikonPtpAutoTransfer autoTransfer;
     private TextView status, log;
     private LinearLayout foundList;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -94,6 +97,21 @@ public class NikonBluetoothActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         p=getSharedPreferences("settings",MODE_PRIVATE);
+        if(!p.contains("nikon_auto_handoff_enabled"))p.edit().putBoolean("nikon_auto_handoff_enabled",true).apply();
+        autoTransfer=new NikonPtpAutoTransfer(this,p,new NikonPtpAutoTransfer.Listener(){
+            @Override public void onLog(String message){append("[PHOTO] "+message);}
+            @Override public void onState(String message,boolean error){setStatus(message,error?Color.RED:Color.rgb(55,206,108));}
+            @Override public void onWifiReady(android.net.Network network,String cameraIp){
+                runOnUiThread(()->{
+                    append("[PHOTO] Nikon camera Wi-Fi is available.");
+                    if(wifiEstablishChr!=null){
+                        write(wifiEstablishChr,new byte[]{0x01});
+                        append("[PHOTO] Sent Nikon Wi-Fi establishment command (2005 = 01).");
+                    }else append("[PHOTO] Nikon characteristic 2005 is not available on this camera.");
+                    handler.postDelayed(()->{if(autoTransfer!=null)autoTransfer.startPtp(network,cameraIp);},900);
+                });
+            }
+        });
         BluetoothManager bm=(BluetoothManager)getSystemService(BLUETOOTH_SERVICE);
         adapter=bm==null?null:bm.getAdapter();
         scanner=adapter==null?null:adapter.getBluetoothLeScanner();
@@ -105,6 +123,7 @@ public class NikonBluetoothActivity extends Activity {
     @Override protected void onDestroy() {
         stopScan();
         try { if(adapter!=null)adapter.cancelDiscovery(); } catch(Exception ignored){}
+        if(autoTransfer!=null)autoTransfer.stop();
         closeGatt();
         try { unregisterReceiver(btReceiver); } catch(Exception ignored){}
         super.onDestroy();
@@ -124,10 +143,43 @@ public class NikonBluetoothActivity extends Activity {
         ScrollView sv=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout info=card(panel);info.addView(text("EXPERIMENTAL SNAPBRIDGE-STYLE CONNECTION",13,blue,true));
-        info.addView(text("This pairs/reconnects Nikon smart-device Bluetooth. Full-resolution photos still use the app's Wi-Fi/FTP receiver. It does not require SnapBridge to be running.",13,muted,false));
+        info.addView(text("Bluetooth stays connected for control. When Auto Photo Handoff is ON, the app reads Nikon Wi-Fi information over Bluetooth, joins the camera Wi-Fi, opens PTP/IP, and pulls each NEW full-resolution JPEG to the phone. If Nikon protects the Wi-Fi password, enter the camera password once below; the app reuses it automatically after that.",13,muted,false));
         info.addView(text("On the camera: Network menu → Connect to smart device → Pairing (Bluetooth) → Start pairing. Then tap SCAN FOR NIKON CAMERA below.",13,white,false));body.addView(info);
 
         status=text(p.getString("nikon_bt_state","Not paired"),15,muted,true);status.setPadding(dp(12),dp(12),dp(12),dp(12));status.setBackgroundColor(panel);body.addView(status,new LinearLayout.LayoutParams(-1,dp(52)));
+
+        Switch autoHandoff=new Switch(this);autoHandoff.setText("Automatic full-resolution photo handoff");autoHandoff.setTextColor(white);autoHandoff.setChecked(p.getBoolean("nikon_auto_handoff_enabled",true));autoHandoff.setPadding(dp(8),dp(6),dp(8),dp(6));
+        autoHandoff.setOnCheckedChangeListener((v,on)->{p.edit().putBoolean("nikon_auto_handoff_enabled",on).apply();append("[PHOTO] Auto handoff "+(on?"ON":"OFF"));if(!on&&autoTransfer!=null)autoTransfer.stop();else if(on&&p.getString("nikon_bt_state","").toLowerCase(Locale.US).contains("connected"))requestWifiConfiguration();});
+        body.addView(autoHandoff,new LinearLayout.LayoutParams(-1,dp(54)));
+        TextView handoffState=text("Photo handoff: "+p.getString("nikon_handoff_state","waiting for Bluetooth"),12,muted,false);handoffState.setPadding(dp(8),dp(2),dp(8),dp(6));body.addView(handoffState);
+        Button handoff=button("START / RETRY PHOTO HANDOFF",amber);handoff.setOnClickListener(v->requestWifiConfiguration());body.addView(handoff);
+
+        LinearLayout wifiPasswordCard=card(panel);
+        wifiPasswordCard.addView(text("CAMERA WI-FI PASSWORD — ONE-TIME FALLBACK",13,blue,true));
+        wifiPasswordCard.addView(text("Some Nikon firmware protects the Wi-Fi password inside Bluetooth characteristic 2004. If the app says the password is protected, enter the Wi-Fi password shown by the camera once. It is saved on this phone and reused automatically.",12,muted,false));
+        EditText wifiPasswordInput=new EditText(this);
+        wifiPasswordInput.setHint("Camera Wi-Fi password");
+        wifiPasswordInput.setHintTextColor(muted);wifiPasswordInput.setTextColor(white);wifiPasswordInput.setSingleLine(true);
+        wifiPasswordInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        wifiPasswordInput.setText(p.getString("nikon_wifi_password_override",""));
+        wifiPasswordCard.addView(wifiPasswordInput,new LinearLayout.LayoutParams(-1,dp(52)));
+        Button saveWifiPassword=button("SAVE PASSWORD & RETRY HANDOFF",blue);
+        saveWifiPassword.setOnClickListener(v->{
+            String entered=wifiPasswordInput.getText().toString();
+            if(!isValidWifiPassphrase(entered)){
+                setStatus("Enter the camera Wi-Fi password (8–63 ASCII characters)",Color.rgb(255,193,7));
+                append("[PHOTO] Camera Wi-Fi password was not saved: use 8–63 normal ASCII characters.");
+                return;
+            }
+            p.edit().putString("nikon_wifi_password_override",entered).apply();
+            append("[PHOTO] One-time Nikon camera Wi-Fi password saved. Retrying handoff.");
+            requestWifiConfiguration();
+        });
+        wifiPasswordCard.addView(saveWifiPassword);
+        Button clearWifiPassword=button("CLEAR SAVED CAMERA WI-FI PASSWORD",Color.rgb(70,80,90));
+        clearWifiPassword.setOnClickListener(v->{p.edit().remove("nikon_wifi_password_override").apply();wifiPasswordInput.setText("");append("[PHOTO] Saved Nikon camera Wi-Fi password cleared.");});
+        wifiPasswordCard.addView(clearWifiPassword);
+        body.addView(wifiPasswordCard);
 
         Button scan=button("SCAN FOR NIKON CAMERA",green);scan.setOnClickListener(v->startScan(false));body.addView(scan);
         Button saved=button("CONNECT SAVED NIKON CAMERA",blue);saved.setOnClickListener(v->startScan(true));body.addView(saved);
@@ -194,14 +246,17 @@ public class NikonBluetoothActivity extends Activity {
         @Override public void onServicesDiscovered(BluetoothGatt g,int statusCode){
             BluetoothGattService svc=g.getService(SERVICE_UUID);if(svc==null){runOnUiThread(()->setStatus("Nikon smart-device service not found",Color.RED));return;}
             pairChr=svc.getCharacteristic(PAIR_UUID);not1Chr=svc.getCharacteristic(NOT1_UUID);idChr=svc.getCharacteristic(ID_UUID);
+            wifiConfigChr=svc.getCharacteristic(WIFI_CONFIG_UUID);wifiEstablishChr=svc.getCharacteristic(WIFI_ESTABLISH_UUID);
             if(pairChr==null||not1Chr==null||idChr==null){runOnUiThread(()->setStatus("Required Nikon Bluetooth characteristics are missing",Color.RED));return;}
-            runOnUiThread(()->append("Nikon smart-device service discovered"));descriptorStage=0;enablePairIndications(g);
+            runOnUiThread(()->{append("Nikon smart-device service discovered");append("[PHOTO] Wi-Fi config 2004: "+(wifiConfigChr==null?"MISSING":"found")+" • establish 2005: "+(wifiEstablishChr==null?"MISSING":"found"));});descriptorStage=0;enablePairIndications(g);
         }
         @Override public void onDescriptorWrite(BluetoothGatt g,BluetoothGattDescriptor d,int statusCode){
             if(statusCode!=BluetoothGatt.GATT_SUCCESS){runOnUiThread(()->append("Descriptor write failed: "+statusCode));return;}
             if(descriptorStage==0){descriptorStage=1;enableNot1Notifications(g);}else if(descriptorStage==1){descriptorStage=2;runOnUiThread(()->append("PAIR + NOT1 subscriptions enabled"));sendStage1();}
         }
         @Override public void onCharacteristicChanged(BluetoothGatt g,BluetoothGattCharacteristic c){handleChanged(c,c.getValue());}
+        @Override public void onCharacteristicRead(BluetoothGatt g,BluetoothGattCharacteristic c,int statusCode){handleCharacteristicRead(c,c.getValue(),statusCode);}
+        @Override public void onCharacteristicRead(BluetoothGatt g,BluetoothGattCharacteristic c,byte[] value,int statusCode){handleCharacteristicRead(c,value,statusCode);}
         @Override public void onCharacteristicWrite(BluetoothGatt g,BluetoothGattCharacteristic c,int statusCode){
             runOnUiThread(()->append("Write "+shortUuid(c.getUuid())+" status="+statusCode));
             if(c.getUuid().equals(ID_UUID)&&statusCode==BluetoothGatt.GATT_SUCCESS){handler.postDelayed(()->finishBlePairingPhase(),600);}
@@ -224,6 +279,7 @@ public class NikonBluetoothActivity extends Activity {
         if(data==null)return;
         if(c.getUuid().equals(NOT1_UUID)){
             if(data.length>=2&&data[0]==1&&data[1]==0){gotSuccess=true;runOnUiThread(()->append("Nikon NOT1 success received"));}
+            else if(autoTransfer!=null&&autoTransfer.isRunning()){runOnUiThread(()->append("[PHOTO] Nikon 2008 event: "+hex(data)));autoTransfer.kickPoll();}
             return;
         }
         if(!c.getUuid().equals(PAIR_UUID)||data.length<17)return;
@@ -234,7 +290,8 @@ public class NikonBluetoothActivity extends Activity {
         } else if(stage==4){
             String serial=new String(Arrays.copyOfRange(data,9,17)).replace("\u0000","").trim();p.edit().putString("nikon_bt_camera_serial",serial).apply();runOnUiThread(()->append("Camera serial: "+serial));
             String controller=p.getString("nikon_bt_controller_name","");if(controller.isEmpty()){controller=controllerName();p.edit().putString("nikon_bt_controller_name",controller).apply();}
-            write(idChr,controller.getBytes(java.nio.charset.StandardCharsets.US_ASCII));runOnUiThread(()->append("Writing controller name: "+controller));
+            final String controllerFinal=controller;
+            write(idChr,controllerFinal.getBytes(java.nio.charset.StandardCharsets.US_ASCII));runOnUiThread(()->append("Writing controller name: "+controllerFinal));
         }
     }
 
@@ -266,10 +323,67 @@ public class NikonBluetoothActivity extends Activity {
     private void finishBlePairingPhase(){
         p.edit().putLong("nikon_bt_controller_device",controllerDevice&0xffffffffL).putLong("nikon_bt_controller_nonce",controllerNonce&0xffffffffL).putString("nikon_bt_camera_name",selectedCameraName).putString("nikon_bt_last_ble_address",selectedBleAddress).apply();
         if(reconnectMode&&hasClassicBondForCamera()){
-            p.edit().putString("nikon_bt_state","Bluetooth connected").apply();setStatus("Nikon Bluetooth connected",Color.rgb(55,206,108));append("Saved Nikon Bluetooth connection is ready.");return;
+            p.edit().putString("nikon_bt_state","Bluetooth connected").apply();setStatus("Nikon Bluetooth connected",Color.rgb(55,206,108));append("Saved Nikon Bluetooth connection is ready.");
+            if(p.getBoolean("nikon_auto_handoff_enabled",true))handler.postDelayed(this::requestWifiConfiguration,800);
+            return;
         }
         setStatus("BLE handshake complete — starting Android Bluetooth pairing…",Color.rgb(255,193,7));append(gotSuccess?"Nikon handshake accepted":"Proceeding to Classic bond; NOT1 success may arrive later on this camera");beginClassicBonding();
     }
+
+    private void requestWifiConfiguration(){
+        if(!p.getBoolean("nikon_auto_handoff_enabled",true)){append("[PHOTO] Auto handoff is OFF.");return;}
+        if(gatt==null){append("[PHOTO] Bluetooth must be connected first. Tap CONNECT SAVED NIKON CAMERA.");setStatus("Connect Nikon Bluetooth first",Color.rgb(255,193,7));return;}
+        if(wifiConfigChr==null){append("[PHOTO] Nikon Wi-Fi configuration characteristic 2004 is missing.");setStatus("Camera does not expose Nikon Wi-Fi handoff characteristic 2004",Color.RED);return;}
+        try{
+            append("[PHOTO] Reading Nikon Wi-Fi configuration (2004)…");
+            setStatus("Asking Nikon for its Wi-Fi network…",Color.rgb(33,150,243));
+            if(!gatt.readCharacteristic(wifiConfigChr)){append("[PHOTO] Android could not start characteristic 2004 read.");setStatus("Could not request Nikon Wi-Fi credentials",Color.RED);}
+        }catch(Exception e){append("[PHOTO] Wi-Fi credential read error: "+e.getMessage());setStatus("Wi-Fi credential read failed",Color.RED);}
+    }
+
+    private void handleCharacteristicRead(BluetoothGattCharacteristic c,byte[] data,int statusCode){
+        if(c==null||!c.getUuid().equals(WIFI_CONFIG_UUID))return;
+        if(statusCode!=BluetoothGatt.GATT_SUCCESS){runOnUiThread(()->{append("[PHOTO] Nikon 2004 read failed: status="+statusCode);setStatus("Nikon Wi-Fi credential read failed",Color.RED);});return;}
+        if(data==null||data.length<102){int n=data==null?0:data.length;runOnUiThread(()->{append("[PHOTO] Nikon 2004 payload too short: "+n+" bytes");setStatus("Nikon Wi-Fi data format was unexpected",Color.RED);});return;}
+        String parsedSsid=asciiZ(data,1,32),parsedPassword=asciiZ(data,33,64);
+        int security=data[97]&255;
+        String ip=(data[98]&255)+"."+(data[99]&255)+"."+(data[100]&255)+"."+(data[101]&255);
+        String savedSsid=p.getString("nikon_handoff_ssid","");
+        final String ssid=(parsedSsid==null||parsedSsid.isEmpty())?savedSsid:parsedSsid;
+        final boolean protectedPassword=(parsedPassword==null||!isValidWifiPassphrase(parsedPassword));
+        String savedPassword=p.getString("nikon_wifi_password_override","");
+        final String password=protectedPassword?savedPassword:parsedPassword;
+        if(ssid==null||ssid.isEmpty()){
+            runOnUiThread(()->{append("[PHOTO] Nikon 2004 Wi-Fi name is protected/unreadable.");setStatus("Could not read the Nikon camera Wi-Fi name",Color.RED);});
+            return;
+        }
+        p.edit().putString("nikon_handoff_ssid",ssid).putString("nikon_handoff_ip_hint",ip).putInt("nikon_handoff_security",security).apply();
+        if(protectedPassword&&!isValidWifiPassphrase(password)){
+            runOnUiThread(()->{
+                append("[PHOTO] Nikon 2004 password field is protected/non-ASCII. It will NOT be sent to Android as a WPA password.");
+                append("[PHOTO] Enter the camera Wi-Fi password once in CAMERA WI-FI PASSWORD, then tap SAVE PASSWORD & RETRY HANDOFF.");
+                p.edit().putString("nikon_handoff_state","Camera Wi-Fi password needed once").apply();
+                setStatus("Nikon protects its Wi-Fi password — enter it once below",Color.rgb(255,193,7));
+            });
+            return;
+        }
+        runOnUiThread(()->{
+            append("[PHOTO] Nikon Wi-Fi configuration ready: SSID="+ssid+" • security="+security+" • camera IP hint="+ip+" • password source="+(protectedPassword?"saved one-time password":"camera Bluetooth"));
+            if(autoTransfer!=null)autoTransfer.startWifi(ssid,password,ip);
+        });
+    }
+
+    private String asciiZ(byte[] data,int start,int len){
+        int end=Math.min(data.length,start+len),n=start;
+        while(n<end&&data[n]!=0){int v=data[n]&255;if(v<0x20||v>0x7e)return null;n++;}
+        if(n<=start)return "";
+        return new String(data,start,n-start,java.nio.charset.StandardCharsets.US_ASCII);
+    }
+    private boolean isValidWifiPassphrase(String value){
+        if(value==null||value.length()<8||value.length()>63)return false;
+        return java.nio.charset.StandardCharsets.US_ASCII.newEncoder().canEncode(value);
+    }
+    private String hex(byte[] b){StringBuilder s=new StringBuilder();for(int i=0;i<Math.min(b.length,32);i++)s.append(String.format(Locale.US,"%02X",b[i]&255)).append(i+1<Math.min(b.length,32)?" ":"");return s.toString();}
 
     private void beginClassicBonding(){
         closeGatt();
@@ -292,10 +406,10 @@ public class NikonBluetoothActivity extends Activity {
     private String shortUuid(UUID u){String s=u.toString();return s.length()>8?s.substring(4,8):s;}
 
     private void stopScan(){if(scanner!=null&&scanCallback!=null&&hasBluetoothPermissions())try{scanner.stopScan(scanCallback);}catch(Exception ignored){}scanCallback=null;}
-    private void closeGatt(){try{if(gatt!=null){gatt.disconnect();gatt.close();}}catch(Exception ignored){}gatt=null;pairChr=null;not1Chr=null;idChr=null;}
+    private void closeGatt(){try{if(gatt!=null){gatt.disconnect();gatt.close();}}catch(Exception ignored){}gatt=null;pairChr=null;not1Chr=null;idChr=null;wifiConfigChr=null;wifiEstablishChr=null;}
 
     private boolean hasBluetoothPermissions(){if(Build.VERSION.SDK_INT>=31)return checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED&&checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;}
-    private void requestBluetoothPermissions(){ArrayList<String> req=new ArrayList<>();if(Build.VERSION.SDK_INT>=31){if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.BLUETOOTH_SCAN);if(checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.BLUETOOTH_CONNECT);}else if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!req.isEmpty())requestPermissions(req.toArray(new String[0]),80);}
+    private void requestBluetoothPermissions(){ArrayList<String> req=new ArrayList<>();if(Build.VERSION.SDK_INT>=31){if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.BLUETOOTH_SCAN);if(checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.BLUETOOTH_CONNECT);if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.NEARBY_WIFI_DEVICES);}else if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)req.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!req.isEmpty())requestPermissions(req.toArray(new String[0]),80);}
 
     private void append(String s){runOnUiThread(()->{if(log!=null){String old=log.getText().toString();if(old.length()>8000)old=old.substring(old.length()-6000);log.setText(old+s+"\n");}});}
     private void setStatus(String s,int color){runOnUiThread(()->{p.edit().putString("nikon_bt_state",s).apply();if(status!=null){status.setText(s);status.setTextColor(color);}});}

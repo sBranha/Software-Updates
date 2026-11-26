@@ -22,7 +22,7 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         try
         {
-            WriteStartupLog("Starting Camera Auto Upload Windows 1.0.2");
+            WriteStartupLog("Starting Camera Auto Upload Windows " + (typeof(App).Assembly.GetName().Version?.ToString(3) ?? "unknown"));
             ShowStartupWindow();
             Dispatcher.BeginInvoke(new Action(OpenMainWindow), DispatcherPriority.ApplicationIdle);
         }

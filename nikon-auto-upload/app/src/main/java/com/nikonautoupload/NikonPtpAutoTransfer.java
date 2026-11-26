@@ -39,6 +39,8 @@ public final class NikonPtpAutoTransfer {
     private static final int TYPE_END_DATA = 0x000C;
     private static final int TYPE_PING = 0x000D;
     private static final int TYPE_PONG = 0x000E;
+    private static final int TYPE_EVENT = 0x0008;
+    private static final int MAX_OBJECT_ATTEMPTS = 3;
 
     private static final int OP_OPEN_SESSION = 0x1002;
     private static final int OP_GET_OBJECT_HANDLES = 0x1007;
@@ -63,6 +65,8 @@ public final class NikonPtpAutoTransfer {
     private volatile boolean baselineReady;
     private final Set<Integer> baselineHandles = Collections.synchronizedSet(new HashSet<>());
     private int transactionId = 1;
+    private final Object pollSignal = new Object();
+    private final Map<Integer, Integer> objectAttempts = new HashMap<>();
 
     public NikonPtpAutoTransfer(Context context, SharedPreferences prefs, Listener listener) {
         this.app = context.getApplicationContext();
@@ -79,6 +83,15 @@ public final class NikonPtpAutoTransfer {
         if (ssid == null || ssid.trim().isEmpty()) {
             state("Camera did not provide a Wi-Fi name", true);
             return;
+        }
+        if (password != null && !password.isEmpty()) {
+            boolean ascii = StandardCharsets.US_ASCII.newEncoder().canEncode(password);
+            if (!ascii || password.length() < 8 || password.length() > 63) {
+                log("Refusing invalid/non-ASCII Nikon Wi-Fi password before Android network request.");
+                state("Camera Wi-Fi password needs to be entered once", true);
+                prefs.edit().putString("nikon_handoff_state", "Camera Wi-Fi password needed once").apply();
+                return;
+            }
         }
         running.set(true);
         ptpStarted = false;
@@ -241,6 +254,7 @@ public final class NikonPtpAutoTransfer {
             throw new IOException("PTP event channel rejected (type " + eack.type + ")");
         }
         log("PTP/IP event channel accepted.");
+        startEventReader(eventSocket, ein, eout);
 
         transactionId = 1;
         int response = executeNoData(OP_OPEN_SESSION, 1);
@@ -248,6 +262,39 @@ public final class NikonPtpAutoTransfer {
             throw new IOException("OpenSession response 0x" + Integer.toHexString(response));
         }
         log("PTP session open.");
+    }
+
+    /**
+     * The camera pushes events (e.g. "object added") and keep-alive pings on the event channel.
+     * It was never read before: during long bursts its buffer could fill and pings went unanswered,
+     * which can make the camera drop the link. Now events are drained, pings answered, and a new
+     * photo event triggers an immediate check instead of waiting for the next poll.
+     */
+    private void startEventReader(Socket socket, InputStream ein, OutputStream eout) {
+        Thread t = new Thread(() -> {
+            while (running.get() && socket == eventSocket && !socket.isClosed()) {
+                try {
+                    Header h = readHeader(ein);
+                    int payload = h.length - 8;
+                    if (payload < 0 || payload > 1024 * 1024) throw new IOException("Bad event packet");
+                    skipExactly(ein, payload);
+                    if (h.type == TYPE_PING) {
+                        ByteBuffer b = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
+                        b.putInt(8).putInt(TYPE_PONG);
+                        synchronized (eout) { eout.write(b.array()); eout.flush(); }
+                    } else if (h.type == TYPE_EVENT) {
+                        synchronized (pollSignal) { pollSignal.notifyAll(); }
+                    }
+                } catch (SocketTimeoutException idle) {
+                    // no events; keep listening
+                } catch (Exception e) {
+                    if (running.get()) log("PTP/IP event channel closed: " + shortMsg(e));
+                    return;
+                }
+            }
+        }, "NikonPtp-Events");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void initializeBaseline() throws Exception {
@@ -263,7 +310,7 @@ public final class NikonPtpAutoTransfer {
 
     private void pollLoop() throws Exception {
         while (running.get() && network != null && commandSocket != null && !commandSocket.isClosed()) {
-            Thread.sleep(2500);
+            synchronized (pollSignal) { pollSignal.wait(2500); }
             Set<Integer> now;
             try {
                 now = getHandles();
@@ -279,14 +326,24 @@ public final class NikonPtpAutoTransfer {
             List<Integer> added = new ArrayList<>();
             for (Integer h : now) if (!baselineHandles.contains(h)) added.add(h);
             Collections.sort(added, Comparator.comparingLong(Integer::toUnsignedLong));
+            Set<Integer> retryLater = new HashSet<>();
             for (Integer handle : added) {
-                baselineHandles.add(handle);
                 if (!running.get()) return;
-                try { processNewHandle(handle); }
-                catch (Exception e) { log("New object 0x" + Integer.toHexString(handle) + " failed: " + shortMsg(e)); }
+                try {
+                    processNewHandle(handle);
+                    objectAttempts.remove(handle);
+                } catch (Exception e) {
+                    // A failed download is retried on the next poll instead of being skipped forever.
+                    int n = objectAttempts.merge(handle, 1, Integer::sum);
+                    log("New object 0x" + Integer.toHexString(handle) + " failed (" + n + "/" + MAX_OBJECT_ATTEMPTS + "): " + shortMsg(e));
+                    if (n < MAX_OBJECT_ATTEMPTS) retryLater.add(handle);
+                    else objectAttempts.remove(handle);
+                    if (commandSocket == null || commandSocket.isClosed()) throw e;
+                }
             }
             baselineHandles.retainAll(now);
             baselineHandles.addAll(now);
+            baselineHandles.removeAll(retryLater);
         }
     }
 
@@ -301,19 +358,25 @@ public final class NikonPtpAutoTransfer {
             return;
         }
 
-        File dir = new File(app.getCacheDir(), "nikon_ptp");
-        if (!dir.exists() && !dir.mkdirs()) throw new IOException("Could not create PTP cache");
+        // App storage + unique prefix: a queued photo can never be overwritten by a later one with
+        // the same camera file name, and Android can't purge it like cache.
+        File dir = new File(app.getFilesDir(), "nikon_ptp");
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("Could not create PTP folder");
         String safeName = safeFileName(info.name);
         if (safeName.isEmpty()) safeName = "DSC_" + Integer.toUnsignedString(handle) + ".JPG";
-        File part = new File(dir, safeName + ".part");
-        File done = new File(dir, safeName);
-        if (part.exists()) part.delete();
-        if (done.exists()) done.delete();
+        String unique = UUID.randomUUID().toString() + "__" + safeName;
+        File part = new File(dir, unique + ".part");
+        File done = new File(dir, unique);
 
         prefs.edit().putString("nikon_handoff_state", "Downloading " + safeName).apply();
+        AppStatusHub.reportTransfer(prefs,"Transferring",safeName,0,1,1);
         state("Downloading " + safeName + " from Nikon…", false);
         log("Downloading full-resolution JPEG over Nikon Wi-Fi: " + safeName);
         executeDataToFile(OP_GET_OBJECT, part, handle);
+        if (info.size > 0 && info.size != 0xffffffffL && part.length() != info.size) {
+            part.delete();
+            throw new IOException("Incomplete download (" + part.length() + " of " + info.size + " bytes)");
+        }
         if (!part.renameTo(done)) {
             copyFile(part, done);
             part.delete();
@@ -323,6 +386,7 @@ public final class NikonPtpAutoTransfer {
         prefs.edit().putString("nikon_handoff_state", "Downloaded " + safeName)
                 .putString("nikon_handoff_last_photo", safeName)
                 .putLong("nikon_handoff_last_photo_time", System.currentTimeMillis()).apply();
+        AppStatusHub.reportTransfer(prefs,"Complete",safeName,0,1,1);
         state("Photo received: " + safeName, false);
     }
 
@@ -331,6 +395,7 @@ public final class NikonPtpAutoTransfer {
         i.putExtra("command", "import_file");
         i.putExtra("file_path", file.getAbsolutePath());
         i.putExtra("file_name", name);
+        i.putExtra("source_label", "Nikon Wi-Fi");
         if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(i); else app.startService(i);
     }
 

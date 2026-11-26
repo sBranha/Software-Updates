@@ -36,7 +36,13 @@ public final class UsbPtpCamera implements Closeable {
             this.width=width; this.height=height;
         }
 
+        /** Identifies the file across USB reconnects (object handles may be renumbered). */
         public String signature() {
+            return "v2:"+Integer.toUnsignedString(storageId)+":"+name+":"+size+":"+captureDate;
+        }
+
+        /** Signature format used up to 0.8.7, still honoured so old imports aren't repeated. */
+        public String legacySignature() {
             return Integer.toUnsignedString(storageId)+":"+Integer.toUnsignedString(handle)+":"+size+":"+name;
         }
 
@@ -114,7 +120,7 @@ public final class UsbPtpCamera implements Closeable {
         if(!c.claimInterface(found,true)){c.close();throw new IOException("Android could not claim the camera PTP interface");}
 
         device=d; connection=c; ptpInterface=found; bulkIn=in; bulkOut=out; interruptIn=intr;
-        transactionId=1; infoCache.clear();
+        transactionId=1; infoCache.clear(); rxPos=0; rxLen=0;
         int response=executeNoDataWithTx(OP_OPEN_SESSION,0,1);
         if(response!=RESPONSE_OK){close();throw new IOException("Camera rejected PTP OpenSession: 0x"+Integer.toHexString(response));}
         sessionOpen=true;
@@ -242,10 +248,28 @@ public final class UsbPtpCamera implements Closeable {
         while(pos<len){int n=bulkRead(out,off+pos,len-pos,timeout);if(n<=0)throw new EOFException("USB camera stopped responding");pos+=n;}
     }
 
+    /*
+     * USB reads go through one large receive buffer. Reading a 12-byte PTP header straight from a
+     * bulk endpoint fails ("overflow") when the camera sends header + data in one 512/1024-byte
+     * packet, and a zero-length packet (sent when a container ends exactly on a packet boundary)
+     * used to be mistaken for a dead camera. Buffering handles both.
+     */
+    private final byte[] rx=new byte[512*1024];
+    private int rxPos=0,rxLen=0;
+
     private int bulkRead(byte[] buffer,int offset,int len,int timeout) throws IOException {
         if(connection==null)throw new IOException("USB camera disconnected");
-        int n=connection.bulkTransfer(bulkIn,buffer,offset,len,timeout);
-        if(n<0)throw new IOException("USB read failed"); return n;
+        if(rxPos>=rxLen){
+            int n,zeroPackets=0;
+            do{
+                n=connection.bulkTransfer(bulkIn,rx,0,rx.length,timeout);
+                if(n<0)throw new IOException("USB read failed");
+                if(n==0&&++zeroPackets>4)return 0;
+            }while(n==0);
+            rxPos=0;rxLen=n;
+        }
+        int k=Math.min(len,rxLen-rxPos);
+        System.arraycopy(rx,rxPos,buffer,offset,k);rxPos+=k;return k;
     }
 
     private void bulkWrite(byte[] buffer,int offset,int len,int timeout) throws IOException {
@@ -297,7 +321,7 @@ public final class UsbPtpCamera implements Closeable {
         sessionOpen=false;
         if(connection!=null&&ptpInterface!=null){try{connection.releaseInterface(ptpInterface);}catch(Exception ignored){}}
         if(connection!=null)try{connection.close();}catch(Exception ignored){}
-        connection=null;ptpInterface=null;bulkIn=null;bulkOut=null;interruptIn=null;device=null;infoCache.clear();
+        connection=null;ptpInterface=null;bulkIn=null;bulkOut=null;interruptIn=null;device=null;infoCache.clear();rxPos=0;rxLen=0;
     }
 
     private static final class Header {

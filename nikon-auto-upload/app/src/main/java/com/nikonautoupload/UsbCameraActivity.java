@@ -82,25 +82,29 @@ public class UsbCameraActivity extends Activity {
         if(usb.hasPermission(device)){connectDevice();return;}
         setStatus("Camera detected — asking Android for USB permission…",false);
         Intent intent=new Intent(ACTION_USB_PERMISSION).setPackage(getPackageName());
-        int flags=PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE;
+        int flags=PendingIntent.FLAG_UPDATE_CURRENT;
+        if(Build.VERSION.SDK_INT>=31)flags|=PendingIntent.FLAG_MUTABLE; else flags|=PendingIntent.FLAG_IMMUTABLE;
         usb.requestPermission(device,PendingIntent.getBroadcast(this,71,intent,flags));
     }
+
+    private void applyKeepScreenOn(boolean on){runOnUiThread(()->{if(on)getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);});}
 
     private void connectDevice(){
         final UsbDevice d=device;if(d==null)return;setStatus("Opening USB-C camera…",false);
         io.submit(()->{
             try{
                 UsbPtpCamera camera=new UsbPtpCamera(usb);camera.open(d);ptp=camera;
-                String name=cameraName(d);p.edit().putString("usb_state","Connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();
-                runOnUiThread(()->{setStatus("USB-C camera connected",false);updateDeviceText();});
+                String name=cameraName(d);p.edit().putString("usb_state","USB-C connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();
+                AppStatusHub.reportCamera(p,name,"USB-C",true);AppStatusHub.reportTransfer(p,"Idle","",0,0,0);
+                runOnUiThread(()->{setStatus("USB-C camera connected",false);updateDeviceText();});applyKeepScreenOn(true);
                 refreshPhotos(false);
             }catch(Exception e){p.edit().putString("usb_state","Error: "+shortMsg(e)).apply();runOnUiThread(()->setStatus("USB connection failed: "+shortMsg(e),true));}
         });
     }
 
     private void disconnect(String message){
-        UsbPtpCamera c=ptp;ptp=null;if(c!=null)try{c.close();}catch(Exception ignored){}
-        p.edit().putString("usb_state",message==null?"Disconnected":message).apply();
+        UsbPtpCamera c=ptp;ptp=null;if(c!=null)try{c.close();}catch(Exception ignored){}applyKeepScreenOn(false);
+        p.edit().putString("usb_state",message==null?"Disconnected":message).apply();AppStatusHub.clearCameraReport(p);AppStatusHub.clearTransfer(p);
         if(message!=null)runOnUiThread(()->{setStatus(message,false);photos.clear();selectedHandles.clear();renderPhotos();});
     }
 
@@ -131,15 +135,24 @@ public class UsbCameraActivity extends Activity {
         io.submit(()->{
             int totalFiles=list.size(),index=0;
             for(UsbPtpCamera.PhotoObject x:list){
-                if(ptp==null||!ptp.isOpen())break;index++;final int fileIndex=index;
+                if(ptp==null||!ptp.isOpen())break;index++;final int fileIndex=index;final long transferStarted=SystemClock.elapsedRealtime();final long[] speedMark=new long[]{transferStarted,0};
+                AppStatusHub.reportTransfer(p,"Transferring",x.name,0,fileIndex,totalFiles);
                 try{
-                    File dir=new File(getCacheDir(),"usb_import");if(!dir.exists())dir.mkdirs();String safe=safeName(x.name);File part=new File(dir,safe+".part"),done=new File(dir,safe);if(part.exists())part.delete();if(done.exists())done.delete();
+                    // App storage (not cache: Android may purge cache) + unique name, so two cards' DSC_0001.JPG
+                    // or a photo still waiting in the upload pipeline can never overwrite each other.
+                    File dir=new File(getFilesDir(),"usb_import");if(!dir.exists())dir.mkdirs();String safe=safeName(x.name);String unique=UUID.randomUUID().toString()+"__"+safe;File part=new File(dir,unique+".part"),done=new File(dir,unique);
                     runOnUiThread(()->{setStatus(label+" • "+fileIndex+"/"+totalFiles+" • "+x.name,false);progress.setProgress(0);progress.setIndeterminate(false);});
-                    ptp.download(x,part,(bytes,max)->runOnUiThread(()->{int pct=max<=0?0:(int)Math.min(100,(bytes*100L)/max);progress.setProgress(pct);summary.setText("Transferring "+x.name+" • "+pct+"% • "+formatBytes(bytes)+" / "+formatBytes(max));}));
+                    ptp.download(x,part,(bytes,max)->{
+                        long now=SystemClock.elapsedRealtime(),dt=Math.max(1,now-speedMark[0]),delta=Math.max(0,bytes-speedMark[1]);long bps=(delta*1000L)/dt;
+                        if(dt>=300){speedMark[0]=now;speedMark[1]=bytes;AppStatusHub.reportTransfer(p,"Transferring",x.name,bps,fileIndex,totalFiles);}
+                        runOnUiThread(()->{int pct=max<=0?0:(int)Math.min(100,(bytes*100L)/max);progress.setProgress(pct);summary.setText("Transferring "+x.name+" • "+pct+"% • "+formatBytes(bytes)+" / "+formatBytes(max)+(bps>0?" • "+ConnectionStatus.formatSpeed(bps):""));});
+                    });
                     if(!part.renameTo(done)){copy(part,done);part.delete();}
+                    if(x.size>0&&done.length()!=x.size&&x.size!=0xffffffffL){done.delete();throw new IOException("Size mismatch ("+done.length()+" of "+x.size+" bytes)");}
                     markImported(x);sendIntoApp(done,x.name);p.edit().putString("usb_last_status","Imported "+x.name).putString("usb_last_photo",x.name).putLong("usb_last_photo_time",System.currentTimeMillis()).apply();
+                    AppStatusHub.reportTransfer(p,"Complete",x.name,0,fileIndex,totalFiles);
                     runOnUiThread(()->setStatus("USB transfer complete: "+x.name,false));
-                }catch(Exception e){p.edit().putString("usb_last_status","Failed: "+shortMsg(e)).apply();runOnUiThread(()->setStatus("USB transfer failed for "+x.name+": "+shortMsg(e),true));}
+                }catch(Exception e){p.edit().putString("usb_last_status","Failed: "+shortMsg(e)).apply();AppStatusHub.reportTransfer(p,"Failed",x.name,0,fileIndex,totalFiles);runOnUiThread(()->setStatus("USB transfer failed for "+x.name+": "+shortMsg(e),true));}
             }
             runOnUiThread(()->{progress.setProgress(0);summary.setText("USB import finished");selectedHandles.clear();renderPhotos();});
         });
@@ -147,7 +160,7 @@ public class UsbCameraActivity extends Activity {
 
     private void sendIntoApp(File file,String name){Intent i=new Intent(this,DirectTransferService.class);i.putExtra("command","import_file");i.putExtra("file_path",file.getAbsolutePath());i.putExtra("file_name",name);i.putExtra("source_label","USB-C");if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);}
 
-    private boolean wasImported(UsbPtpCamera.PhotoObject x){return p.getStringSet("usb_imported_signatures",Collections.emptySet()).contains(x.signature());}
+    private boolean wasImported(UsbPtpCamera.PhotoObject x){Set<String>s=p.getStringSet("usb_imported_signatures",Collections.emptySet());return s.contains(x.signature())||s.contains(x.legacySignature());}
     private synchronized void markImported(UsbPtpCamera.PhotoObject x){Set<String>s=new HashSet<>(p.getStringSet("usb_imported_signatures",Collections.emptySet()));s.add(x.signature());p.edit().putStringSet("usb_imported_signatures",s).apply();}
 
     private void deleteSelected(){

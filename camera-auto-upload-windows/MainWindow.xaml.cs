@@ -8,7 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using Rectangle = System.Windows.Shapes.Rectangle;
 using Forms = System.Windows.Forms;
 using DrawingColor = System.Drawing.Color;
 
@@ -30,7 +30,7 @@ public partial class MainWindow : Window
     FrameworkElement? photoVisual;
     LayerModel? selectedLayer;
     bool photoSelected;
-    bool loadingSettings;
+    bool loadingSettings = true;
     bool rebuildingLayers;
     bool dragging;
     Point lastDrag;
@@ -53,7 +53,7 @@ public partial class MainWindow : Window
         watcher.Log += Log;
         watcher.FileArrived += HandleIncomingFileAsync;
         uploads.Log += Log;
-        uploads.CountChanged += n => Dispatcher.Invoke(() => { QueueCountText.Text = $"{n} pending"; HomeQueueStatus.Text = $"{n} pending"; });
+        uploads.CountChanged += n => Dispatcher.InvokeAsync(() => { QueueCountText.Text = $"{n} pending"; HomeQueueStatus.Text = $"{n} pending"; });
         uploads.Load();
         uploads.Start(() => settings);
 
@@ -66,7 +66,9 @@ public partial class MainWindow : Window
         RefreshVisuals();
         RefreshHome();
         Closed += (_, _) => { ftp.Dispose(); watcher.Dispose(); };
-        Log("Camera Auto Upload Windows 1.0 started");
+        Log($"Camera Auto Upload Windows {AppVersion} started");
+        Title = $"Camera Auto Upload for Windows — v{AppVersion}";
+        VersionText.Text = $"WINDOWS v{AppVersion}";
     }
 
     void LoadSavedLayout()
@@ -126,15 +128,25 @@ public partial class MainWindow : Window
         HomeQueueStatus.Text = $"{uploads.Count} pending";
     }
 
+    // Non-blocking and bounded: background threads (FTP, uploads) never wait on the UI, and the
+    // log can't grow without limit during a long burst session.
     void Log(string text)
     {
-        Dispatcher.Invoke(() =>
+        var line = $"[{DateTime.Now:HH:mm:ss}] {text}\r\n";
+        Dispatcher.InvokeAsync(() =>
         {
-            var line = $"[{DateTime.Now:HH:mm:ss}] {text}\r\n";
             ActivityLog.AppendText(line);
+            if (ActivityLog.LineCount > 1500)
+            {
+                var keep = ActivityLog.Text;
+                var cut = keep.Length > 60000 ? keep.IndexOf('\n', keep.Length - 60000) : -1;
+                if (cut > 0) ActivityLog.Text = keep[(cut + 1)..];
+            }
             ActivityLog.ScrollToEnd();
         });
     }
+
+    public static string AppVersion => typeof(MainWindow).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "unknown";
 
     void ShowPage(Grid page)
     {

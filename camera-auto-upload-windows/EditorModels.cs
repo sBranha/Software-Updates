@@ -92,6 +92,7 @@ public sealed class UploadItem
     public DateTime AddedUtc { get; set; } = DateTime.UtcNow;
     public int Attempts { get; set; }
     public string LastError { get; set; } = "";
+    public DateTime NextAttemptUtc { get; set; } = DateTime.MinValue;
 }
 
 public static class AppPaths

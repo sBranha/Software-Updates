@@ -1,6 +1,6 @@
 CAMERA AUTO UPLOAD — FTP CAMERA SETUP HELP
-Version 0.5.1 beta
-Verified camera profiles: 48
+Version 0.8.6 beta
+Verified camera profiles: 57
 Last reviewed: October 2026
 
 WHAT THIS APP DOES
@@ -10,8 +10,8 @@ COMMON FTP SETTINGS
 Protocol: FTP (plain FTP; do not choose FTPS or SFTP)
 Server/Host: use the phone IP displayed in the app
 Port: 2121 (some cameras display this as 02121)
-User: nikon
-Password: use the value shown in Settings > Advanced FTP
+User: use the username shown in Settings > FTP Login
+Password: use the password shown in Settings > FTP Login
 Passive/PASV mode: ON when available
 Destination folder: Root/Home folder
 Recommended transfer file: JPEG only
@@ -69,14 +69,23 @@ Supported:
 - Nikon Z7 + WT-7
 - Nikon Z6 + WT-7
 - Nikon D850 + WT-7
+- Nikon D780 + WT-7
+- Nikon D500 + WT-7
+- Nikon D810A + WT-7
+- Nikon D810 + WT-7
+- Nikon D750 + WT-7
+- Nikon D7200 + WT-7
 - Nikon D6 + WT-6
+- Nikon D5 + WT-6 / WT-5
+- Nikon D4S + WT-5
+- Nikon D4 + WT-5
 
 Setup:
 1. Attach and power the listed Nikon wireless transmitter.
 2. Enable the transmitter/network option in the camera.
 3. Create an FTP Upload profile.
 4. Use access-point mode if available, then join that Wi-Fi from the Android phone.
-5. Use FTP server port 2121, user nikon, app FTP password, root folder.
+5. Use FTP server port 2121, the configured FTP username, app FTP password, root folder.
 6. Enable upload as pictures are taken / automatic FTP upload.
 7. Use JPEG transfer for this app/Flickr workflow.
 
@@ -85,6 +94,9 @@ Z7II/Z6II WT-7: https://onlinemanual.nikonimglib.com/z7II_z6II/en/10_establishin
 Z7/Z6 WT-7: https://onlinemanual.nikonimglib.com/z7_z6/en/10_connections_02.html
 D850 WT-7: https://onlinemanual.nikonimglib.com/d850/en/19_technical_notes_02.html
 D6 WT-6: https://onlinemanual.nikonimglib.com/d6/en/13_ethernet_wt-6_05.html
+D780 WT-7: https://onlinemanual.nikonimglib.com/d780/en/11_network_connections_04.html
+WT-7 supported cameras: https://downloadcenter.nikonimglib.com/en/download/fw/378.html
+Nikon network-device compatibility: https://downloadcenter.nikonimglib.com/en/download/sw/272.html
 
 ============================================================
 CANON — PHONE HOTSPOT + FTP
@@ -104,7 +116,7 @@ Wireless accessory profiles:
 - Canon EOS-1D X Mark II + WFT-E8
 
 Setup:
-1. Android Settings > Mobile Hotspot > ON.
+1. Nikon Auto Upload > Settings > START CAMERA HOTSPOT.
 2. Connect the Canon camera to that hotspot.
 3. Communication functions / Wireless features > Transfer images to FTP server.
 4. Create/add a connection.
@@ -157,7 +169,7 @@ Supported:
 - Sony ILX-LR1
 
 Setup:
-1. Android Mobile Hotspot = ON.
+1. Nikon Auto Upload Camera Hotspot = ON.
 2. Connect the Sony camera to the hotspot using Network > Wi-Fi > Access Point Set.
 3. Network > FTP Transfer > FTP Transfer Func. > Server Setting.
 4. Host Name = phone IP shown by the app.
@@ -199,7 +211,7 @@ Requires FT-XH:
 - Fujifilm X-H2S + FT-XH
 
 Setup:
-1. Android Mobile Hotspot = ON.
+1. Nikon Auto Upload Camera Hotspot = ON.
 2. Connect the Fujifilm camera/file transmitter to that hotspot.
 3. Network/USB Setting > Create/Edit Connection Setting > Create Using Wizard > FTP Transfer.
 4. Choose Wireless LAN.
@@ -229,7 +241,7 @@ Camera cannot connect:
 - Confirm the camera and phone are on the same Wi-Fi network.
 - Re-check the phone IP shown in the app.
 - Port must be 2121.
-- User must be nikon.
+- User must exactly match the username saved in Settings > FTP Login.
 - Re-enter the FTP password exactly.
 - Use plain FTP, not FTPS/SFTP.
 - Enable Passive/PASV when available.
@@ -251,3 +263,110 @@ Phone receives photos but Flickr does not:
 
 SECURITY
 The app intentionally uses a local FTP server on the camera/phone network. Do not expose port 2121 to the public internet or forward it through a router. Use a strong FTP password.
+
+
+NIKON BLUETOOTH (EXPERIMENTAL)
+------------------------------
+For Nikon cameras that support SnapBridge smart-device Bluetooth, Settings now includes PAIR / CONNECT NIKON BLUETOOTH.
+
+Camera: Network menu > Connect to smart device > Pairing (Bluetooth) > Start pairing.
+App: Settings > Nikon Bluetooth > PAIR / CONNECT NIKON BLUETOOTH > SCAN FOR NIKON CAMERA.
+
+The app performs the Nikon smart-device BLE handshake and then asks Android to complete the Bluetooth Classic bond/passkey step. After pairing, use CONNECT SAVED NIKON CAMERA for reconnect tests.
+
+0.6.1 PHOTO HANDOFF TEST:
+After Nikon Bluetooth says connected, leave Automatic full-resolution photo handoff ON. The app reads Nikon characteristic 2004 for the camera Wi-Fi network, asks Android to join it, sends Nikon establishment command 2005, opens PTP/IP on port 15740, takes a baseline of existing card objects, and then downloads only NEW JPEG objects. Existing photos on the card are not pulled. The downloaded JPEG is fed into the normal phone/Flickr/session pipeline.
+
+For this first beta, keep the Nikon Bluetooth screen open while testing. Wait until the status says READY - take a picture before shooting.
+
+
+0.6.2 NIKON PROTECTED WI-FI PASSWORD FIX
+----------------------------------------
+Some Nikon cameras return a protected/binary password field in Bluetooth characteristic 2004. Android rejects that binary data as a WPA passphrase. The app now detects this safely instead of attempting to use it.
+
+When prompted, enter the camera's displayed Wi-Fi password one time in Nikon Bluetooth > CAMERA WI-FI PASSWORD — ONE-TIME FALLBACK, then tap SAVE PASSWORD & RETRY HANDOFF. The password is retained on the phone and reused for later automatic Bluetooth-to-Wi-Fi handoffs.
+
+
+0.7.0 USB-C WIRED CAMERA IMPORT
+--------------------------------
+USB-C Wired is a separate camera-import module. It uses Android USB Host/OTG and standard USB Still Image/PTP transport. It does not replace or modify the Wi-Fi/FTP receiver or Nikon Bluetooth handoff.
+
+1. Use a data-capable USB-C cable.
+2. Put the camera in MTP/PTP / USB data mode if the camera offers a USB mode choice.
+3. Open Settings > Connection Methods > USB-C WIRED, or plug in a compatible PTP camera and choose Nikon Auto Upload when Android asks.
+4. Grant Android USB permission.
+5. Select one or more photos, IMPORT NEW, or enable automatic import of newly-shot photos.
+6. Full-resolution JPEG and supported RAW files are copied without deleting the camera originals. RAW files are retained on the phone; JPEGs continue through the existing Flickr queue when Flickr upload is enabled.
+7. Delete from camera requires the separate DELETE SELECTED FROM CAMERA button and an explicit confirmation.
+
+The Home/Settings status now shows connection type, phone IP address where applicable, active network(s), and Nikon camera IP when the Bluetooth/Wi-Fi PTP handoff has one. USB-C does not need an IP address.
+
+
+SHARED CONNECTION STATUS DASHBOARD
+----------------------------------
+The Home screen has an expandable status dashboard shared by USB-C, Wi-Fi/FTP, phone hotspot, Nikon Bluetooth/Wi-Fi handoff, Flickr, and future camera-brand connectors.
+
+Green = connected/working. Yellow = connected but limited (for example, USB import works but internet is unavailable). Red = disconnected, failed, or needs attention.
+
+The compact view shows camera/model + connection type, internet, current transfer/progress/speed when available, and Flickr queue state. SHOW DETAILS adds SSID/network when Android exposes it, phone IP, camera IP when known, cellular state, transfer file, and waiting/uploading/completed/failed queue counts.
+
+USB-C and internet are intentionally independent: losing Wi-Fi/internet never marks a working USB camera as failed, and imported photos remain queued until Flickr can reach the internet again.
+
+
+0.8.0 PHOTO OVERLAY / SPORTS CARD MODULE
+----------------------------------------
+Photo Overlays is a separate post-import processing module. It never edits the original camera file or camera memory card and does not own USB-C, FTP, Wi-Fi, Bluetooth or PTP connections.
+
+The Overlay Studio supports reusable Baseball, Softball, Football, Basketball, Team/Event, Watermark and custom templates. Templates may contain editable text, team/player/event/date/photographer tokens, transparent PNG/logo graphics, movable/resizable/rotatable elements, font choices, text size and opacity. Portrait and landscape templates are selected separately.
+
+Shoot Setup lets you choose team/event/player details, portrait and landscape templates, automatic overlay ON/OFF, optional hold-for-preview, and Flickr output: Original only, Overlay/Card only, or Both.
+
+Automatic flow: Camera photo -> normal camera card -> normal app import -> untouched original saved on phone -> optional second overlay JPEG created -> selected output(s) enter the existing Flickr queue. If internet is unavailable, the existing Flickr queue waits exactly as before.
+
+If Hold for preview is enabled, the finished card is saved but is not placed in the Flickr pending queue until APPROVE FOR FLICKR is pressed. KEEP PHONE ONLY leaves the processed copy on the phone.
+
+
+0.8.1 TEMPLATE BUILDER + PHONE CAMERA
+-------------------------------------
+Overlay Studio is now a complete reachable template workflow. Import a transparent PNG made in Canva/Photoshop as a full-card base, then place editable fields such as {NUMBER}, {PLAYER_NAME}, {TEAM}, {EVENT}, {DATE}, and {PHOTOGRAPHER} over intentional blank areas in the design. Element colors accept any RGB hex value and shapes may be outlines or filled color blocks. Templates remain reusable and separate for portrait and landscape.
+
+PHONE CAMERA is an independent source for times when the main camera is not available. TAKE PHOTO WITH PHONE opens the Android phone camera at full-resolution output, saves the original to Pictures/Camera Auto Upload/Phone, then passes that saved JPEG through the same optional overlay/card and Flickr queue. The original remains untouched. Existing Nikon/Sony/Canon/Fujifilm transport code is not replaced by Phone Camera.
+
+
+0.8.2 FULL TEMPLATE EDITOR
+--------------------------
+The Sports Card editor is now layer based. Text, player-number fields, shapes, logos and imported PNG artwork are individually selectable template parts. Open LAYER LIST to select a part, then move, nudge, resize width/height, rotate, adjust transparency, change color, show/hide, duplicate, delete, and move the layer forward/back.
+
+Choose TEST PHOTO BEHIND TEMPLATE to edit the overlay directly over a real photo. Imported PNG artwork renders in the editor instead of as a placeholder. Image/PNG layers can also receive a tint/recolor while preserving transparent areas and light/dark shading.
+
+Color presets include Red/Black, Red/Green, White/Blue and Black/Gold, plus custom Primary/Secondary/Text colors. Presets recolor editable text and shape layers; every part can still be changed individually after applying a preset.
+
+All template editing remains separate from the camera transport modules. The original camera/phone photo is never edited; finished card output is a second processed copy.
+
+
+FULL-SCREEN TOUCH TEMPLATE EDITOR (0.8.3)
+-----------------------------------------
+Template editing now opens on its own page inside Camera Auto Upload. Tap the player name, number, position, logo, PNG frame or another item directly on the card. Drag with one finger. Pinch with two fingers to resize. Twist with two fingers to rotate. Double-tap text to edit it. Tap blank canvas and pinch to zoom the whole workspace for precise placement.
+
+
+PHOTO-FIRST EDITOR + LOCKED AUTO LAYOUT (0.8.4)
+------------------------------------------------
+Editor is now a bottom navigation destination. Choose any phone/gallery photo, then edit directly on the canvas. Tap the PHOTO itself to move it under the overlay. Drag with one finger, pinch to zoom, and twist to rotate. Text, number, position, PNG frames, logos, shapes and other graphics are separate direct-touch layers. The workspace also supports undo/redo, layer order, duplication, deletion, grid and fit controls.
+
+LOCK saves the current portrait/landscape layout and its photo placement and enables automatic overlay processing for incoming JPEGs. The original import remains untouched. The edited copy follows the chosen Original / Edited / Both Flickr queue setting, and the existing Flickr queue still waits safely when internet is unavailable.
+
+
+EDITOR CROP + ROTATION + SAFE AREA (0.8.5)
+-----------------------------------------
+CROP is a non-destructive mask. Select PHOTO or a PNG/image layer, tap CROP, then drag a box around the part you want to keep. Everything outside the box is hidden without stretching the artwork. RESET CROP restores the full layer.
+
+Rotating the Android phone no longer recreates the editor. The loaded preview photo, current layer positions, scale/rotation, crop, selection, and undo/redo state remain in place while the interface rotates with the phone.
+
+The editor now respects Android status-bar and navigation-bar safe areas so the top controls are below the status area and the bottom tools stay above Back/Home/Recents or gesture navigation.
+
+
+TEXT + IMAGE PROPERTIES (0.8.6)
+--------------------------------
+Double-tap any text layer to open Text Properties over the canvas. Text content, font family, size, text color, bold, italic, alignment, opacity, outline color/width, and shadow color/strength update live while the window is open. Apply keeps the edit; Cancel restores the layer.
+
+Double-tap the main photo, a PNG frame, logo, or other image layer to open Image Properties. Drag Hue from -180 to +180 degrees to shift colors while keeping transparency and shading. PNG/image layers also keep the existing optional tint controls.

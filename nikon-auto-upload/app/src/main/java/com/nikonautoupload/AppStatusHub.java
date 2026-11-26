@@ -48,10 +48,11 @@ public final class AppStatusHub {
 
     public static Snapshot snapshot(Context context, SharedPreferences p) {
         Snapshot s=new Snapshot();
-        try{s.cameraModel=MultiCameraSupport.cameraName(p);}catch(Exception ignored){}
+        ConnectionStatus.Report shared=ConnectionStatus.build(context,p);
+        s.cameraModel=shared.cameraName;
         String reportedModel=p.getString("status_camera_model","");if(!reportedModel.isEmpty())s.cameraModel=reportedModel;
 
-        String connection=ConnectionStatus.cameraConnection(p);
+        String connection=(shared.connectionType==null||"None".equals(shared.connectionType))?ConnectionStatus.cameraConnection(p):shared.connectionType;
         String reportedConnection=p.getString("status_connection_type","");
         if(!reportedConnection.isEmpty())connection=reportedConnection;
         s.connectionType=connection;
@@ -108,9 +109,9 @@ public final class AppStatusHub {
     }
     public static void clearCameraReport(SharedPreferences p){p.edit().remove("status_camera_model").remove("status_connection_type").apply();}
     public static void reportTransfer(SharedPreferences p,String state,String photo,long speedBps,int current,int total){
-        p.edit().putString("status_transfer_state",state==null?"":state).putString("status_transfer_photo",photo==null?"":photo).putLong("status_transfer_speed_bps",Math.max(0,speedBps)).putInt("status_transfer_current",Math.max(0,current)).putInt("status_transfer_total",Math.max(0,total)).apply();
+        p.edit().putString("status_transfer_state",state==null?"":state).putString("status_transfer_photo",photo==null?"":photo).putLong("status_transfer_speed_bps",Math.max(0,speedBps)).putInt("status_transfer_current",Math.max(0,current)).putInt("status_transfer_total",Math.max(0,total)).putInt("status_photo_current",Math.max(0,current)).putInt("status_photo_total",Math.max(0,total)).apply();
     }
-    public static void clearTransfer(SharedPreferences p){p.edit().remove("status_transfer_state").remove("status_transfer_photo").remove("status_transfer_speed_bps").remove("status_transfer_current").remove("status_transfer_total").apply();}
+    public static void clearTransfer(SharedPreferences p){p.edit().remove("status_transfer_state").remove("status_transfer_photo").remove("status_transfer_speed_bps").remove("status_transfer_current").remove("status_transfer_total").remove("status_photo_current").remove("status_photo_total").apply();}
 
     private static String inferTransferState(SharedPreferences p,String connection){
         String usb=p.getString("usb_state","");

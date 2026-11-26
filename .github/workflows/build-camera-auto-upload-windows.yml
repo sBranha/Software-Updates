@@ -3,7 +3,7 @@ name: Build Camera Auto Upload Windows
 on:
   workflow_dispatch:
   push:
-    branches: [ nikon-auto-upload-build ]
+    branches: [ nikon-auto-upload-build, 'claude/nikon-*' ]
     paths:
       - 'camera-auto-upload-windows/**'
       - 'nikon-auto-upload/assets/launcher_z8.webp.b64'
@@ -28,17 +28,16 @@ jobs:
           python -m pip install --disable-pip-version-check pillow
           python camera-auto-upload-windows/make_icon.py
 
-      - name: Prepare Windows source
-        run: python camera-auto-upload-windows/prepare_build.py
-
-      - name: Apply Windows desktop UI
-        run: python camera-auto-upload-windows/run_patch_windows_105.py
-
-      - name: Apply Windows 1.0.6 real-camera-photo UI
-        run: python camera-auto-upload-windows/patch_windows_106.py
-
-      - name: Apply Windows 1.0.7 professional camera UI
-        run: python camera-auto-upload-windows/patch_windows_107.py
+      # 1.0.8+: source is already prepared (prepare_build.py and patch_windows_105-107 are
+      # applied and committed). Running them again would fail or double-apply.
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content camera-auto-upload-windows/CameraAutoUpload.Windows.csproj
+          $v = $proj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Building Windows $v"
 
       - name: Build curated official camera photo library
         shell: pwsh
@@ -89,8 +88,8 @@ jobs:
       - name: Build portable package
         shell: pwsh
         run: |
-          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-1.0.7.exe
-          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-1.0.7-portable.zip -Force
+          Copy-Item publish/CameraAutoUpload.Windows.exe CameraAutoUpload-Windows-${{ steps.ver.outputs.version }}.exe
+          Compress-Archive -Path publish/* -DestinationPath CameraAutoUpload-Windows-${{ steps.ver.outputs.version }}-portable.zip -Force
 
       - name: Install Inno Setup
         shell: pwsh
@@ -107,9 +106,9 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: CameraAutoUpload-Windows-Setup-1.0.7
+          name: CameraAutoUpload-Windows-Setup-${{ steps.ver.outputs.version }}
           path: |
-            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-1.0.7.exe
-            CameraAutoUpload-Windows-1.0.7.exe
-            CameraAutoUpload-Windows-1.0.7-portable.zip
+            camera-auto-upload-windows/installer-output/CameraAutoUpload-Windows-Setup-${{ steps.ver.outputs.version }}.exe
+            CameraAutoUpload-Windows-${{ steps.ver.outputs.version }}.exe
+            CameraAutoUpload-Windows-${{ steps.ver.outputs.version }}-portable.zip
           if-no-files-found: error

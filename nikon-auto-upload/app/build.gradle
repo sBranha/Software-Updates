@@ -8,7 +8,7 @@ android {
         applicationId 'com.nikonautoupload'
         minSdk 29
         targetSdk 35
-        versionCode 24
-        versionName '0.7.1'
+        versionCode 34
+        versionName '0.8.9'
     }
 }

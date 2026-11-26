@@ -76,7 +76,7 @@ public static class CameraPhotoService
     static HttpClient CreateClient()
     {
         var c = new HttpClient { Timeout = TimeSpan.FromSeconds(18) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 CameraAutoUpload-Windows/1.0.7");
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 CameraAutoUpload-Windows/1.0.8");
         return c;
     }
 

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace CameraAutoUpload.Windows;
@@ -38,6 +39,7 @@ public partial class MainWindow
         EditorAutomationText.Text = settings.LayoutLocked
             ? "● LOCKED AUTO LAYOUT — incoming JPEGs keep the original, create the edited copy automatically, then follow your Original / Edited / Both upload choice."
             : "○ Manual editor — open Editor from the bottom bar, build the layout, then tap LOCK when you want incoming photos processed automatically.";
+        RefreshCameraArtwork105(cp);
     }
 
     void Photos_Click(object sender, RoutedEventArgs e)
