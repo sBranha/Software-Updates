@@ -60,7 +60,7 @@ public class UsbCameraActivity extends Activity {
     };
 
     @Override public void onCreate(Bundle b){
-        super.onCreate(b);p=getSharedPreferences("settings",MODE_PRIVATE);usb=(UsbManager)getSystemService(USB_SERVICE);registerUsbReceiver();draw();
+        super.onCreate(b);p=getSharedPreferences("settings",MODE_PRIVATE);usb=(UsbManager)getSystemService(USB_SERVICE);serviceCommand("usb_pause");registerUsbReceiver();draw();
         if(!p.contains("usb_auto_import"))p.edit().putBoolean("usb_auto_import",false).apply();
         UsbDevice fromIntent=getUsbDevice(getIntent());if(fromIntent!=null)device=fromIntent;else device=findFirstCamera();
         if(device!=null)requestPermissionOrConnect();else setStatus("Plug a camera into the phone with USB-C / OTG",false);
@@ -68,7 +68,10 @@ public class UsbCameraActivity extends Activity {
     }
 
     @Override protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);UsbDevice d=getUsbDevice(i);if(d!=null){device=d;requestPermissionOrConnect();}}
-    @Override protected void onDestroy(){handler.removeCallbacks(autoPoll);disconnect(null);if(receiverRegistered)try{unregisterReceiver(usbReceiver);}catch(Exception ignored){}io.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){handler.removeCallbacks(autoPoll);disconnect(null);if(receiverRegistered)try{unregisterReceiver(usbReceiver);}catch(Exception ignored){}io.shutdownNow();serviceCommand("usb_resume");super.onDestroy();}
+
+    /** While this screen is open it owns the camera; automatic tethering resumes when it closes. */
+    private void serviceCommand(String cmd){try{Intent i=new Intent(this,DirectTransferService.class).putExtra("command",cmd);if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);}catch(Exception ignored){}}
 
     private UsbDevice getUsbDevice(Intent i){if(i==null)return null;if(Build.VERSION.SDK_INT>=33)return i.getParcelableExtra(UsbManager.EXTRA_DEVICE,UsbDevice.class);return i.getParcelableExtra(UsbManager.EXTRA_DEVICE);}
 
@@ -93,6 +96,8 @@ public class UsbCameraActivity extends Activity {
         final UsbDevice d=device;if(d==null)return;setStatus("Opening USB-C camera…",false);
         io.submit(()->{
             try{
+                // Give the background tether a moment to let go of the camera.
+                for(int w=0;w<30&&p.getBoolean("usb_tether_active",false);w++)Thread.sleep(100);
                 UsbPtpCamera camera=new UsbPtpCamera(usb);camera.open(d);ptp=camera;
                 String name=cameraName(d);p.edit().putString("usb_state","USB-C connected").putString("usb_camera_name",name).putString("usb_vid_pid",String.format(Locale.US,"%04X:%04X",d.getVendorId(),d.getProductId())).apply();
                 AppStatusHub.reportCamera(p,name,"USB-C",true);AppStatusHub.reportTransfer(p,"Idle","",0,0,0);
@@ -104,7 +109,7 @@ public class UsbCameraActivity extends Activity {
 
     private void disconnect(String message){
         UsbPtpCamera c=ptp;ptp=null;if(c!=null)try{c.close();}catch(Exception ignored){}applyKeepScreenOn(false);
-        p.edit().putString("usb_state",message==null?"Disconnected":message).apply();AppStatusHub.clearCameraReport(p);AppStatusHub.clearTransfer(p);
+        p.edit().putString("usb_state","").apply();AppStatusHub.clearCameraReport(p);AppStatusHub.clearTransfer(p);
         if(message!=null)runOnUiThread(()->{setStatus(message,false);photos.clear();selectedHandles.clear();renderPhotos();});
     }
 
@@ -176,7 +181,7 @@ public class UsbCameraActivity extends Activity {
         LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("‹");back.setTextSize(28);back.setOnClickListener(v->finish());top.addView(back,new LinearLayout.LayoutParams(dp(54),dp(52)));TextView title=text("USB-C Wired Camera",22,white,true);top.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));root.addView(top);
         ScrollView scroll=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
-        LinearLayout info=card();info.addView(text("OFFLINE CAMERA IMPORT",13,blue,true));info.addView(text("Plug the camera directly into the phone with a data-capable USB-C cable. No Wi-Fi, hotspot, Bluetooth, or internet is required for importing.",13,muted,false));body.addView(info);
+        LinearLayout info=card();info.addView(text("OFFLINE CAMERA IMPORT",13,blue,true));info.addView(text("Plug the camera directly into the phone with a data-capable USB-C cable. No Wi-Fi, hotspot, Bluetooth, or internet is required. You don't need this screen for normal shooting: with the cable in, new photos import automatically in the background. Use this screen to browse the card or import older photos; automatic import pauses while it is open.",13,muted,false));body.addView(info);
         status=text("Looking for a USB camera…",15,muted,true);status.setPadding(dp(12),dp(12),dp(12),dp(12));status.setBackgroundColor(panel);body.addView(status,new LinearLayout.LayoutParams(-1,dp(58)));
         deviceInfo=text("No camera connected",12,muted,false);deviceInfo.setPadding(dp(10),dp(8),dp(10),dp(8));body.addView(deviceInfo);
 

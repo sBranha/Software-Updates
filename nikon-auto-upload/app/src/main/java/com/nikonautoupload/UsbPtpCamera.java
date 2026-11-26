@@ -151,6 +151,47 @@ public final class UsbPtpCamera implements Closeable {
         return photos;
     }
 
+    /** All object handles on every card (cheap; used to spot newly shot photos). */
+    public synchronized LinkedHashSet<Integer> listHandles() throws IOException {
+        ensureOpen();
+        int[] storages=parseU32Array(executeData(OP_GET_STORAGE_IDS));
+        LinkedHashSet<Integer> handles=new LinkedHashSet<>();
+        for(int storage:storages){
+            try{for(int h:parseU32Array(executeData(OP_GET_OBJECT_HANDLES,storage,0,0)))handles.add(h);}
+            catch(IOException e){ if(storages.length==1)throw e; } // an empty / busy second slot must not hide the first
+        }
+        return handles;
+    }
+
+    /** ObjectInfo for one handle, or null when it is not a photo (folders, movies, sidecar files). */
+    public synchronized PhotoObject photoInfo(int handle) throws IOException {
+        ensureOpen();
+        PhotoObject obj=infoCache.get(handle);
+        if(obj==null){obj=parseObjectInfo(handle,executeData(OP_GET_OBJECT_INFO,handle));infoCache.put(handle,obj);}
+        return (isPhotoName(obj.name)||obj.format==0x3801)?obj:null;
+    }
+
+    public static final int EVENT_OBJECT_ADDED=0x4002;
+    public static final int EVENT_CAPTURE_COMPLETE=0x400D;
+
+    /**
+     * Waits up to timeoutMs for a camera event on the interrupt pipe.
+     * Returns {eventCode, param1} or null when nothing arrived (or the camera has no event pipe).
+     */
+    public int[] readEvent(int timeoutMs) throws IOException {
+        UsbDeviceConnection c=connection; UsbEndpoint ep=interruptIn;
+        if(c==null)throw new IOException("USB camera disconnected");
+        if(ep==null){try{Thread.sleep(timeoutMs);}catch(InterruptedException ie){Thread.currentThread().interrupt();}return null;}
+        byte[] buf=new byte[Math.max(64,ep.getMaxPacketSize())];
+        int n=c.bulkTransfer(ep,buf,buf.length,timeoutMs);
+        if(n<12)return null;
+        ByteBuffer b=ByteBuffer.wrap(buf,0,n).order(ByteOrder.LITTLE_ENDIAN);
+        b.getInt(); int type=b.getShort()&0xffff; int code=b.getShort()&0xffff; b.getInt();
+        if(type!=4)return null;
+        int param=n>=16?b.getInt():0;
+        return new int[]{code,param};
+    }
+
     public synchronized void download(PhotoObject photo, File destination, ProgressListener progress) throws IOException {
         ensureOpen();
         if(photo==null)throw new IOException("No photo selected");

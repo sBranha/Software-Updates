@@ -92,7 +92,7 @@ public final class AppStatusHub {
         else if(s.waitingUploads>0&&!s.internetAvailable)s.uploadState="Queued — waiting for internet";
         else if(s.waitingUploads>0)s.uploadState="Queued";
         else s.uploadState="Up to date";
-        s.uploadColor=!p.getBoolean("flickr_upload_enabled",true)?YELLOW:(s.failedUploads>0&&s.internetAvailable?RED:(s.internetAvailable?GREEN:YELLOW));
+        s.uploadColor=!p.getBoolean("flickr_upload_enabled",true)||p.getString("access_token","").isEmpty()?YELLOW:(s.failedUploads>0&&s.internetAvailable?RED:(s.internetAvailable?GREEN:YELLOW));
 
         // Camera importing and internet uploading are intentionally independent.
         // A good USB connection stays green even if internet is down.

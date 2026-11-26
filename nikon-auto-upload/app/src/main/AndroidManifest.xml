@@ -27,7 +27,9 @@
         android:largeHeap="true"
         android:allowBackup="true">
         <activity android:name=".NikonBluetoothActivity" android:exported="false"/>
-        <activity android:name=".UsbCameraActivity" android:exported="true" android:launchMode="singleTop">
+        <activity android:name=".UsbCameraActivity" android:exported="false" android:launchMode="singleTop"/>
+        <activity android:name=".UsbAttachActivity" android:exported="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true" android:noHistory="true" android:taskAffinity="" android:launchMode="singleInstance">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
                 <category android:name="android.intent.category.DEFAULT"/>

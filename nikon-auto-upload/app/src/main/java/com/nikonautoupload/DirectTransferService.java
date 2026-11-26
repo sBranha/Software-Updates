@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The camera never waits on the phone gallery, the editor or Flickr. Every stage is
  * persistent, so a crash, reboot or lost connection only delays photos, never drops them.
  */
-public class DirectTransferService extends Service implements SimpleFtpServer.Listener {
+public class DirectTransferService extends Service implements SimpleFtpServer.Listener, UsbTether.Host {
     public static final String ACTION_STATUS="com.nikonautoupload.DIRECT_STATUS";
     public static final String CH="nikon_direct";
     public static final int FTP_PORT=2121;
@@ -69,6 +69,7 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     private ConnectivityManager.NetworkCallback cellularCallback;
     private String mode="z8ap";
 
+    private UsbTether usbTether;
     private PowerManager.WakeLock cpuLock;
     private WifiManager.WifiLock wifiLowLatency,wifiHighPerf;
 
@@ -99,6 +100,7 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
         recoverBufferedTransfers(true);
         if(flickrEnabled())requestCellular();
         retry.scheduleWithFixedDelay(this::tick,20,30,TimeUnit.SECONDS);
+        usbTether=new UsbTether(this,p,this);usbTether.start();
     }
 
     private void tick(){
@@ -108,6 +110,7 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
             recoverBufferedTransfers(false);
             runCleanupIfNeeded();
             p.edit().putString("last_ip",findBestLocalIp()).apply();
+            if(usbTether!=null)usbTether.check();
             updateLocks();
         }catch(Throwable t){addEvent("Background check error: "+shortMessage(t));}
     }
@@ -129,6 +132,9 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
             }catch(Exception e){addEvent(source+" handoff import error: "+shortMessage(e));}
             return START_STICKY;
         }
+        if("usb_check".equals(cmd)){if(usbTether!=null)usbTether.check();return START_STICKY;}
+        if("usb_pause".equals(cmd)){if(usbTether!=null)usbTether.setPaused(true);return START_STICKY;}
+        if("usb_resume".equals(cmd)){if(usbTether!=null)usbTether.setPaused(false);return START_STICKY;}
         if("pause_receiver".equals(cmd)){pauseReceiver();return START_STICKY;}
         if("resume_receiver".equals(cmd)){resumeReceiver();return START_STICKY;}
         if("restart_receiver".equals(cmd)){restartReceiver();return START_STICKY;}
@@ -566,12 +572,12 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     private void updateLocks(){
         try{
             long now=System.currentTimeMillis();
-            boolean camera=ftpSessions.get()>0;
+            boolean camera=ftpSessions.get()>0||(usbTether!=null&&usbTether.isConnected());
             boolean busy=camera||pendingSaves.get()>0||activeUploads.get()>0||now-lastActivity<LOCK_LINGER_MS;
             synchronized(this){
                 if(busy){if(cpuLock!=null)cpuLock.acquire(15*60*1000L);}
                 else if(cpuLock!=null&&cpuLock.isHeld())cpuLock.release();
-                boolean wifi=camera||(pendingSaves.get()>0&&now-lastActivity<LOCK_LINGER_MS);
+                boolean wifi=ftpSessions.get()>0||(pendingSaves.get()>0&&now-lastActivity<LOCK_LINGER_MS);
                 for(WifiManager.WifiLock l:new WifiManager.WifiLock[]{wifiLowLatency,wifiHighPerf}){
                     if(l==null)continue;
                     if(wifi&&!l.isHeld())l.acquire();else if(!wifi&&l.isHeld())l.release();
@@ -620,6 +626,7 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
     private void createChannel(){((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CH,"Direct Nikon transfer",NotificationManager.IMPORTANCE_LOW));}
 
     @Override public void onDestroy(){
+        if(usbTether!=null)usbTether.shutdown();
         stopFtp();releaseCellular();
         p.edit().putBoolean("receiver_running",false).putString("ftp_state","Receiver stopped").putString("last_status","Receiver stopped").putBoolean("camera_ftp_session_active",false).putInt("status_uploading_count",0).apply();
         main.removeCallbacks(flushUi);
@@ -628,5 +635,11 @@ public class DirectTransferService extends Service implements SimpleFtpServer.Li
         for(WifiManager.WifiLock l:new WifiManager.WifiLock[]{wifiLowLatency,wifiHighPerf})try{if(l!=null&&l.isHeld())l.release();}catch(Exception ignored){}
         super.onDestroy();
     }
+    // ---------------------------------------------------------------- USB-C tethering
+
+    @Override public void onTetherPhoto(File file,String originalName){onPhotoReceived(file,originalName);}
+    @Override public void onTetherEvent(String text){addEvent(text);broadcast(text);}
+    @Override public void onTetherState(boolean connected){lastActivity=System.currentTimeMillis();updateLocks();broadcast(connected?"USB-C camera connected — auto-import on":"USB-C camera disconnected");}
+
     @Override public IBinder onBind(Intent intent){return null;}
 }
